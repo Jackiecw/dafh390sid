@@ -32,9 +32,7 @@ async function main() {
   const menuAdminStores = await prisma.menuItem.create({
     data: { key: 'ADMIN_STORES', name: '店铺管理' },
   });
-  const menuAdminProducts = await prisma.menuItem.create({
-    data: { key: 'ADMIN_PRODUCTS', name: '商品管理' },
-  });
+  // ⬇️ (修改 1/2) 删除了 menuAdminProducts 的创建
 
   // --- 2. 创建“角色”并【关联菜单】---
   
@@ -68,7 +66,7 @@ async function main() {
           { id: menuLinks.id },
           { id: menuAdminUsers.id },
           { id: menuAdminStores.id }, // ⬅️ 【新增】
-          { id: menuAdminProducts.id }, // ⬅️ 【新增】
+          // ⬇️ (修改 2/2) 删除了 menuAdminProducts 的关联
         ],
       },
     },

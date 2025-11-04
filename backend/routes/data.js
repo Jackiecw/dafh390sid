@@ -73,8 +73,9 @@ router.get('/me', authMiddleware, async (req, res) => {
 // 路径: POST /api/sales
 router.post('/sales', authMiddleware, async (req, res) => {
   try {
+    // ⬇️ (修改 1/2) 移除了 productSku
     const { 
-      recordDate, platform, storeName, country, productSku, 
+      recordDate, platform, storeName, country,
       salesVolume, revenue, adSpend 
     } = req.body;
 
@@ -89,7 +90,7 @@ router.post('/sales', authMiddleware, async (req, res) => {
         platform: platform,
         storeName: storeName,
         country: country,
-        productSku: productSku || null,
+        // ⬇️ (修改 2/2) 移除了 productSku
         salesVolume: parseInt(salesVolume),
         revenue: parseFloat(revenue),
         adSpend: parseFloat(adSpend || 0),

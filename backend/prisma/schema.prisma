@@ -18,6 +18,7 @@ model User {
   passwordHash String
   nickname     String
   createdAt    DateTime @default(now())
+ 
   role         Role     @relation(fields: [roleId], references: [id])
   roleId       String
   
@@ -43,37 +44,24 @@ model MenuItem {
   roles Role[]
 }
 
-// --- 4. 【新增】商品模型 (Product) ---
-model Product {
-  id          String    @id @default(cuid())
-  sku         String    @unique // (来自您的"型号") e.g., "AV-P001"
-  name        String    // (补充) 易读名称 e.g., "Aviewlux S1 Pro 投影仪"
-  category    ProductCategory // (补充) 品类
-  imageUrl    String?   // (来自您的"图片")
-  description String?   @db.Text // (来自您的"配置简述")
-  cost        Float     // (来自您的"采购价")
-  weightKg    Float?    // (补充) 重量 (公斤)
-  volumeM3    Float?    // (来自您的"体积") 体积 (立方米 m³)
+// --- 4. 商品模型 (Product) ---
+// (已删除)
 
-  // (新) 关系：此商品出现在多少条销售记录中
-  salesData SalesData[]
-}
-
-// --- 5. 【新增】店铺模型 (Store) ---
+// --- 5. 店铺模型 (Store) ---
 model Store {
   id              String   @id @default(cuid())
-  name            String   @unique // (来自您的"店铺编号") e.g., "Shopee 印尼 Mall 店"
-  platform        Platform // (来自您的"平台")
-  country         Country  // (来自您的"国家")
-  platformStoreId String?  // (补充) 店铺在平台上的真实 ID
-  status          StoreStatus // (来自您的"状态")
-  registeredAt    DateTime? // (来自您的"注册时间")
+  name            String   @unique // e.g., "Shopee 印尼 Mall 店"
+  platform        Platform
+  country         Country
+  platformStoreId String?  // 店铺在平台上的真实 ID
+  status          StoreStatus
+  registeredAt    DateTime?  // 注册时间
 
-  // (新) 关系：此店铺产生了多少条销售记录
+  // 关系：此店铺产生了多少条销售记录
   salesData SalesData[]
 }
 
-// --- 6. 【重大修改】销售数据模型 (SalesData) ---
+// --- 6. 销售数据模型 (SalesData) ---
 model SalesData {
   id          String   @id @default(cuid())
   recordDate  DateTime
@@ -97,9 +85,7 @@ model SalesData {
   store       Store  @relation(fields: [storeId], references: [id])
   storeId     String
 
-  // (新) 关联到商品 (可选, 允许只录入店铺总销售额)
-  product     Product? @relation(fields: [productId], references: [id])
-  productId   String?
+  // (已删除) 关联到商品
 }
 
 // --- 7. (不变) 周报模型 (WeeklyReport) ---
@@ -115,7 +101,7 @@ model WeeklyReport {
   authorId            String
 }
 
-// --- 8. 【新增】枚举 (Enums) ---
+// --- 8. 枚举 (Enums) ---
 
 // (用于 Store 表)
 enum Platform {
@@ -143,11 +129,4 @@ enum StoreStatus {
   CLOSED   // 已关闭
 }
 
-// (用于 Product 表)
-enum ProductCategory {
-  PROJECTOR // 投影仪
-  SCREEN    // 幕布
-  STAND     // 支架
-  ACCESSORY // 配件
-  OTHER
-}
+// (ProductCategory 枚举已被删除)

@@ -73,8 +73,6 @@
         <CommonLinks v-if="currentView === 'LINKS'" />
         <UserManagement v-if="currentView === 'ADMIN_USERS'" />
         <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-        
-        <ProductManagement v-if="currentView === 'ADMIN_PRODUCTS'" />
 
       </div>
     </main>
@@ -89,7 +87,6 @@ import CommonLinks from './CommonLinks.vue';
 import UserManagement from './UserManagement.vue';
 import ViewReports from './ViewReports.vue';
 import StoreManagement from './StoreManagement.vue'; 
-import ProductManagement from './ProductManagement.vue'; // ⬅️ 【新增】
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
 import { ChevronUpIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/20/solid';
@@ -102,7 +99,6 @@ const allMenuItems = [
   { key: 'VIEW_REPORTS', name: '周报查看' },
   { key: 'LINKS', name: '常用链接' },
   { key: 'ADMIN_STORES', name: '店铺管理' },
-  { key: 'ADMIN_PRODUCTS', name: '商品管理' },
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
