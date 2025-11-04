@@ -53,8 +53,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import apiClient from '../api';
-// ⬇️ 【关键修复点】 
-// 确保这一行导入的是 'ProductFormModal.vue'
+// ⬇️ 干净的导入语句
 import ProductFormModal from './ProductFormModal.vue';
 
 const products = ref([]);
