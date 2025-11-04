@@ -72,10 +72,15 @@
 
         <SalesForm v-if="currentView === 'SALES_FORM'" />
         <WeeklyReportForm v-if="currentView === 'WEEKLY_REPORT'" />
+        <ViewReports v-if="currentView === 'VIEW_REPORTS'" />
         <CommonLinks v-if="currentView === 'LINKS'" />
         <UserManagement v-if="currentView === 'ADMIN_USERS'" />
         
-        <ViewReports v-if="currentView === 'VIEW_REPORTS'" />
+        <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
+        <div v-if="currentView === 'ADMIN_PRODUCTS'" class="p-6 bg-white rounded-lg shadow">
+          <h1 class="text-xl font-semibold">商品管理</h1>
+          <p class="mt-2 text-stone-600">(此页面待开发)</p>
+        </div>
 
       </div>
 
@@ -89,24 +94,28 @@ import SalesForm from './SalesForm.vue';
 import WeeklyReportForm from './WeeklyReportForm.vue';
 import CommonLinks from './CommonLinks.vue';
 import UserManagement from './UserManagement.vue';
-import ViewReports from './ViewReports.vue'; // ⬅️ 【新增】
+import ViewReports from './ViewReports.vue';
+import StoreManagement from './StoreManagement.vue'; // ⬅️ 【新增】
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
 import { ChevronUpIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/20/solid';
 
-// 【修改】
+// 【修改】(添加新的菜单项 Key)
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_FORM', name: '销售数据录入' },
   { key: 'WEEKLY_REPORT', name: '周报填写' },
-  { key: 'VIEW_REPORTS', name: '周报查看' }, // ⬅️ 【新增】
+  { key: 'VIEW_REPORTS', name: '周报查看' },
   { key: 'LINKS', name: '常用链接' },
+  { key: 'ADMIN_STORES', name: '店铺管理' }, // ⬅️ 【新增】
+  { key: 'ADMIN_PRODUCTS', name: '商品管理' }, // ⬅️ 【新增】
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
 
+// (这段代码会自动工作，无需修改)
 const visibleMenuItems = computed(() => {
   const userPermissions = authStore.permissions; 
   if (!userPermissions) {
@@ -128,6 +137,7 @@ const handleLogout = () => {
 
 
 <style scoped>
+/* (样式 ... 保持不变) */
 .active-border {
   position: relative;
 }
