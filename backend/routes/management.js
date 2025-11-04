@@ -71,6 +71,51 @@ router.post('/stores', async (req, res) => {
   }
 });
 
+// ⬇️ 【新增】获取单个店铺详情
+// (GET /api/admin/stores/:id)
+router.get('/stores/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await prisma.store.findUnique({
+      where: { id: id },
+    });
+    if (!store) {
+      return res.status(404).json({ error: '店铺未找到' });
+    }
+    res.json(store);
+  } catch (error) {
+    res.status(500).json({ error: '获取店铺详情失败' });
+  }
+});
+
+// ⬇️ 【新增】更新店铺
+// (PUT /api/admin/stores/:id)
+router.put('/stores/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // 验证 (与 POST 相同)
+    const { registeredAt, ...rest } = req.body;
+    const validation = storeSchema.safeParse(rest);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
+    }
+
+    const updatedStore = await prisma.store.update({
+      where: { id: id },
+      data: {
+        ...validation.data,
+        registeredAt: registeredAt ? new Date(registeredAt) : null,
+      },
+    });
+    res.json(updatedStore);
+  } catch (error) {
+    if (error.code === 'P2002') return res.status(400).json({ error: '此店铺名称 (name) 已被占用' });
+    if (error.code === 'P2025') return res.status(404).json({ error: '店铺未找到' });
+    res.status(500).json({ error: '更新店铺失败' });
+  }
+});
+
 // --- 商品 (Product) CRUD ---
 // ⬇️ (修改 4/4) 删除了所有 商品(Product) 相关的路由
 

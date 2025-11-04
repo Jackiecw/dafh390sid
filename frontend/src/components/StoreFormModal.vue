@@ -28,8 +28,7 @@
             <DialogPanel class="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
               
               <DialogTitle as="h3" class="text-lg font-medium leading-6 text-gray-900">
-                创建新店铺
-              </DialogTitle>
+                {{ dialogTitle }} </DialogTitle>
               
               <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 
@@ -117,8 +116,7 @@
                   :disabled="isLoadingOptions"
                   class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-300"
                 >
-                  创建店铺
-                </button>
+                  {{ submitButtonText }} </button>
               </div>
             </DialogPanel>
           </TransitionChild>
@@ -129,7 +127,8 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+// ⬇️ 【修改】 导入 computed
+import { ref, watch, computed } from 'vue';
 import {
   TransitionRoot,
   TransitionChild,
@@ -139,16 +138,22 @@ import {
 } from '@headlessui/vue';
 import apiClient from '../api';
 
-// --- 1. Props 和 Emits ---
+// --- 1. 【修改】 Props 和 Emits ---
 const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false,
+  },
+  // ⬇️ 【新增】
+  storeToEditId: {
+    type: String,
+    default: null,
   }
 });
-const emit = defineEmits(['close', 'store-created']);
+// ⬇️ 【修改】
+const emit = defineEmits(['close', 'store-created', 'store-updated']);
 
-// --- 2. 内部状态 ---
+// --- 2. 【修改】 内部状态 ---
 const defaultFormData = () => ({
   name: '',
   platform: '',
@@ -169,9 +174,15 @@ const options = ref({
 });
 const isLoadingOptions = ref(false);
 
-// --- 3. 核心逻辑 (API 调用) ---
+// ⬇️ 【新增】 计算属性 (Computed)
+const isEditMode = computed(() => !!props.storeToEditId);
+const dialogTitle = computed(() => isEditMode.value ? '编辑店铺' : '创建新店铺');
+const submitButtonText = computed(() => isEditMode.value ? '保存更改' : '创建店铺');
 
-// (获取下拉菜单选项)
+
+// --- 3. 【修改】 核心逻辑 (API 调用) ---
+
+// (获取下拉菜单选项) (不变)
 async function fetchOptions() {
   if (options.value.platforms.length > 0) return; // (防止重复加载)
   
@@ -188,7 +199,31 @@ async function fetchOptions() {
   }
 }
 
-// (提交表单)
+// ⬇️ 【新增】 获取单个店铺的详情 (用于编辑)
+async function fetchStoreDetails() {
+  if (!isEditMode.value) return;
+  try {
+    const response = await apiClient.get(`/admin/stores/${props.storeToEditId}`);
+    const store = response.data;
+    
+    // 预填充表单
+    formData.value = {
+      name: store.name,
+      platform: store.platform,
+      country: store.country,
+      status: store.status,
+      platformStoreId: store.platformStoreId || '',
+      // (关键) HTML date input 需要 'YYYY-MM-DD' 格式
+      registeredAt: store.registeredAt ? new Date(store.registeredAt).toISOString().split('T')[0] : null,
+    };
+  } catch (error) {
+    console.error('获取店铺详情失败:', error);
+    errorMessage.value = '无法加载店铺详情。';
+  }
+}
+
+
+// ⬇️ 【修改】 提交表单 (POST 或 PUT)
 async function handleSubmit() {
   errorMessage.value = '';
 
@@ -199,27 +234,38 @@ async function handleSubmit() {
   };
 
   try {
-    // (调用我们在 management.js 中创建的 POST /stores 接口)
-    const response = await apiClient.post('/admin/stores', payload);
-    emit('store-created', response.data);
+    if (isEditMode.value) {
+      // (A) 【编辑】模式
+      const response = await apiClient.put(`/admin/stores/${props.storeToEditId}`, payload);
+      emit('store-updated', response.data);
+    } else {
+      // (B) 【创建】模式
+      const response = await apiClient.post('/admin/stores', payload);
+      emit('store-created', response.data);
+    }
     closeModal();
   } catch (error) {
-    console.error('创建店铺失败:', error);
+    console.error('操作店铺失败:', error);
     if (error.response && error.response.data.error) {
       errorMessage.value = error.response.data.error;
     } else {
-      errorMessage.value = '创建失败，请检查网络或联系管理员。';
+      errorMessage.value = '操作失败，请检查网络或联系管理员。';
     }
   }
 }
 
-// --- 4. 辅助函数 ---
+// --- 4. 【修改】 辅助函数 ---
 
 // (当弹窗打开时，加载选项并重置表单)
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     resetForm();
-    fetchOptions();
+    fetchOptions(); // (不变) 总是加载选项
+    
+    // ⬇️ 【新增】
+    if (isEditMode.value) {
+      fetchStoreDetails(); // 编辑模式下加载详情
+    }
   }
 });
 

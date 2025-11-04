@@ -22,7 +22,8 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">国家</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">状态</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">注册日期</th>
-            </tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
+          </tr>
         </thead>
         <tbody class="bg-white divide-y divide-stone-200">
           <tr v-for="store in stores" :key="store.id">
@@ -35,7 +36,12 @@
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDate(store.registeredAt) }}</td>
-            </tr>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              <button @click="handleEdit(store)" class="text-indigo-600 hover:text-indigo-900">
+                编辑
+              </button>
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -47,9 +53,9 @@
 
   <StoreFormModal
     :is-open="isModalOpen"
-    @close="closeModal"
+    :store-to-edit-id="currentStoreToEditId" @close="closeModal"
     @store-created="handleStoreCreated"
-  />
+    @store-updated="handleStoreUpdated" />
 </template>
 
 <script setup>
@@ -62,7 +68,10 @@ const isLoading = ref(true);
 const errorMessage = ref('');
 const isModalOpen = ref(false);
 
-// (获取店铺列表)
+// ⬇️ 【新增】
+const currentStoreToEditId = ref(null);
+
+// (获取店铺列表) (不变)
 async function fetchStores() {
   isLoading.value = true;
   errorMessage.value = '';
@@ -81,15 +90,35 @@ onMounted(() => {
   fetchStores();
 });
 
-// (弹窗控制)
+// ⬇️ 【修改】 (弹窗控制)
 function openModal() { isModalOpen.value = true; }
-function closeModal() { isModalOpen.value = false; }
+function closeModal() { 
+  isModalOpen.value = false; 
+  currentStoreToEditId.value = null; // (新增) 重置 ID
+}
+
+// (不变)
 function handleStoreCreated(newStore) {
   // (在不刷新的情况下，将新店铺添加到列表顶部)
   stores.value.unshift(newStore);
 }
 
-// (辅助函数)
+// ⬇️ 【新增】 (编辑逻辑)
+function handleEdit(store) {
+  currentStoreToEditId.value = store.id;
+  openModal();
+}
+
+// ⬇️ 【新增】 (更新 UI 逻辑)
+function handleStoreUpdated(updatedStore) {
+  const index = stores.value.findIndex(s => s.id === updatedStore.id);
+  if (index !== -1) {
+    stores.value[index] = updatedStore;
+  }
+}
+
+
+// (辅助函数) (不变)
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
   return new Date(dateString).toISOString().split('T')[0];

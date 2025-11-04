@@ -3,11 +3,11 @@
 const express = require('express');
 const prisma = require('../prismaClient'); 
 const authMiddleware = require('../authMiddleware'); 
-const adminMiddleware = require('../adminMiddleware'); // ⬅️ 【新增】导入 admin 守卫
+const adminMiddleware = require('../adminMiddleware'); // ⬅️ (不变)
 
 const router = express.Router();
 
-// ⬇️ 【新增】 获取所有周报 (仅限 Admin)
+// ⬇️ (不变) 获取所有周报 (仅限 Admin)
 // 路径: GET /api/reports
 router.get('/reports', adminMiddleware, async (req, res) => {
   try {
@@ -31,7 +31,7 @@ router.get('/reports', adminMiddleware, async (req, res) => {
 });
 
 
-// 接口 3: (GET) 获取当前登录的用户信息
+// (不变) 接口 3: (GET) 获取当前登录的用户信息
 // 路径: GET /api/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
@@ -69,42 +69,45 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// 接口 4: (POST) 提交销售数据 (受保护)
+// ⬇️ 【重大修改】接口 4: (POST) 提交销售数据 (受保护)
 // 路径: POST /api/sales
 router.post('/sales', authMiddleware, async (req, res) => {
   try {
-    // ⬇️ (修改 1/2) 移除了 productSku
+    // ⬇️ (修改 1/2) 移除了 platform, storeName, country, productSku
+    //    新增了 storeId
     const { 
-      recordDate, platform, storeName, country,
+      recordDate, storeId,
       salesVolume, revenue, adSpend 
     } = req.body;
 
-    if (!recordDate || !platform || !storeName || !country || !salesVolume || !revenue) {
-      return res.status(400).json({ error: '日期、平台、店铺、国家、销量和销售额是必填项' });
+    // ⬇️ (修改 2/2) 更新验证逻辑
+    if (!recordDate || !storeId || !salesVolume || !revenue) {
+      return res.status(400).json({ error: '日期、店铺、销量和销售额是必填项' });
     }
     const userId = req.user.userId;
 
     const newSalesData = await prisma.salesData.create({
       data: {
         recordDate: new Date(recordDate),
-        platform: platform,
-        storeName: storeName,
-        country: country,
-        // ⬇️ (修改 2/2) 移除了 productSku
         salesVolume: parseInt(salesVolume),
         revenue: parseFloat(revenue),
         adSpend: parseFloat(adSpend || 0),
         enteredById: userId, 
+        storeId: storeId, // ⬅️ (关键) 现在我们关联 Store
       }
     });
     res.status(201).json(newSalesData);
   } catch (error) {
     console.error('提交销售数据失败:', error);
+    // (新增) 检查 storeId 是否有效
+    if (error.code === 'P2003') { 
+      return res.status(400).json({ error: '提交失败：所选的店铺 (Store) 无效或不存在' });
+    }
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
 
-// 接口 5: (POST) 提交周报 (受保护)
+// (不变) 接口 5: (POST) 提交周报 (受保护)
 // 路径: POST /api/reports
 router.post('/reports', authMiddleware, async (req, res) => {
   try {
