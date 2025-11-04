@@ -11,6 +11,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const dataRoutes = require('./routes/data');
 const adminRoutes = require('./routes/admin');
+const managementRoutes = require('./routes/management');
 
 // 3. 初始化
 const app = express();
@@ -18,6 +19,7 @@ const app = express();
 // 4. 配置“中间件” (Middleware)
 app.use(cors()); // 允许跨域请求
 app.use(express.json()); // 允许 Express 解析 JSON 格式的请求体
+
 
 
 
@@ -41,6 +43,8 @@ app.use('/api', dataRoutes);
 
 // ⬇️ 告诉 Express，所有 adminRoutes 里的路由都以 /api/admin 开头
 app.use('/api/admin', adminRoutes);
+
+app.use('/api/admin', managementRoutes);
 
 // (注意：所有旧的 app.post 和 app.get 路由都已被删除)
 

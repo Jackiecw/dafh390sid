@@ -18,6 +18,9 @@ async function main() {
   const menuWeeklyReport = await prisma.menuItem.create({
     data: { key: 'WEEKLY_REPORT', name: '周报填写' },
   });
+  const menuViewReports = await prisma.menuItem.create({
+    data: { key: 'VIEW_REPORTS', name: '周报查看' },
+  });
   const menuLinks = await prisma.menuItem.create({
     data: { key: 'LINKS', name: '常用链接' },
   });
@@ -26,13 +29,15 @@ async function main() {
   });
   
   // ⬇️ 【新增】
-  const menuViewReports = await prisma.menuItem.create({
-    data: { key: 'VIEW_REPORTS', name: '周报查看' },
+  const menuAdminStores = await prisma.menuItem.create({
+    data: { key: 'ADMIN_STORES', name: '店铺管理' },
+  });
+  const menuAdminProducts = await prisma.menuItem.create({
+    data: { key: 'ADMIN_PRODUCTS', name: '商品管理' },
   });
 
   // --- 2. 创建“角色”并【关联菜单】---
   
-  // (A) 创建 "运营专员" 角色
   console.log('正在创建“运营专员”角色...');
   const roleOperation = await prisma.role.create({
     data: {
@@ -49,7 +54,6 @@ async function main() {
     },
   });
 
-  // (B) 创建 "超级管理员" 角色
   console.log('正在创建“超级管理员”角色...');
   const roleAdmin = await prisma.role.create({
     data: {
@@ -60,9 +64,11 @@ async function main() {
           { id: menuDashboard.id },
           { id: menuSalesForm.id },
           { id: menuWeeklyReport.id },
+          { id: menuViewReports.id },
           { id: menuLinks.id },
-          { id: menuAdminUsers.id }, 
-          { id: menuViewReports.id }, // ⬅️ 【新增】
+          { id: menuAdminUsers.id },
+          { id: menuAdminStores.id }, // ⬅️ 【新增】
+          { id: menuAdminProducts.id }, // ⬅️ 【新增】
         ],
       },
     },
@@ -88,8 +94,6 @@ async function main() {
   });
 
   console.log('...播种 (Seeding) 完成！');
-  console.log(`创建的用户: ${adminUser.username}`);
-  console.log(`创建的角色: ${roleAdmin.name}, ${roleOperation.name}`);
 }
 
 main()

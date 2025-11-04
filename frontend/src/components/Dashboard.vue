@@ -6,7 +6,6 @@
         <h1 class="text-xl font-bold text-indigo-600">海外电商部 内部系统</h1>
         <p class="text-sm text-stone-500 mt-1">仪表板</p>
       </div>
-
       <ul class="mt-4 space-y-1">
         <li v-for="item in visibleMenuItems" 
             :key="item.key" 
@@ -16,7 +15,6 @@
           <a href="#">{{ item.name }}</a>
         </li>
       </ul>
-      
       <div class="p-4 mt-auto">
         <Menu as="div" class="inline-block text-left w-full">
           <div>
@@ -55,7 +53,6 @@
     </nav>
 
     <main class="flex-1 p-6 md:p-10 overflow-auto">
-
       <header class="mb-6">
         <h2 class="text-3xl font-bold text-stone-900">
           欢迎您，{{ authStore.nickname }}！
@@ -75,15 +72,11 @@
         <ViewReports v-if="currentView === 'VIEW_REPORTS'" />
         <CommonLinks v-if="currentView === 'LINKS'" />
         <UserManagement v-if="currentView === 'ADMIN_USERS'" />
-        
         <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-        <div v-if="currentView === 'ADMIN_PRODUCTS'" class="p-6 bg-white rounded-lg shadow">
-          <h1 class="text-xl font-semibold">商品管理</h1>
-          <p class="mt-2 text-stone-600">(此页面待开发)</p>
-        </div>
+        
+        <ProductManagement v-if="currentView === 'ADMIN_PRODUCTS'" />
 
       </div>
-
     </main>
   </div>
 </template>
@@ -95,27 +88,28 @@ import WeeklyReportForm from './WeeklyReportForm.vue';
 import CommonLinks from './CommonLinks.vue';
 import UserManagement from './UserManagement.vue';
 import ViewReports from './ViewReports.vue';
-import StoreManagement from './StoreManagement.vue'; // ⬅️ 【新增】
+import StoreManagement from './StoreManagement.vue'; 
+import ProductManagement from './ProductManagement.vue'; // ⬅️ 【新增】
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
 import { ChevronUpIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/20/solid';
 
-// 【修改】(添加新的菜单项 Key)
+// (allMenuItems 列表已在上一版中完成，无需修改)
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_FORM', name: '销售数据录入' },
   { key: 'WEEKLY_REPORT', name: '周报填写' },
   { key: 'VIEW_REPORTS', name: '周报查看' },
   { key: 'LINKS', name: '常用链接' },
-  { key: 'ADMIN_STORES', name: '店铺管理' }, // ⬅️ 【新增】
-  { key: 'ADMIN_PRODUCTS', name: '商品管理' }, // ⬅️ 【新增】
+  { key: 'ADMIN_STORES', name: '店铺管理' },
+  { key: 'ADMIN_PRODUCTS', name: '商品管理' },
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
 
-// (这段代码会自动工作，无需修改)
+// (其他 <script> 部分 ... 保持不变)
 const visibleMenuItems = computed(() => {
   const userPermissions = authStore.permissions; 
   if (!userPermissions) {
