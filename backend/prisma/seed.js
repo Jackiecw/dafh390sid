@@ -1,3 +1,4 @@
+// ./backend/prisma/seed.js
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 
@@ -7,7 +8,6 @@ async function main() {
   console.log('开始播种 (Seeding)...');
 
   // --- 1. 创建所有“菜单项” ---
-  // 这些是系统中的“原子权限”
   console.log('正在创建菜单项...');
   const menuDashboard = await prisma.menuItem.create({
     data: { key: 'DASHBOARD', name: '仪表盘' },
@@ -24,6 +24,11 @@ async function main() {
   const menuAdminUsers = await prisma.menuItem.create({
     data: { key: 'ADMIN_USERS', name: '员工配置与管理' },
   });
+  
+  // ⬇️ 【新增】
+  const menuViewReports = await prisma.menuItem.create({
+    data: { key: 'VIEW_REPORTS', name: '周报查看' },
+  });
 
   // --- 2. 创建“角色”并【关联菜单】---
   
@@ -33,7 +38,6 @@ async function main() {
     data: {
       name: 'operation',
       description: '运营专员 (仅限数据录入和周报)',
-      // (核心) 关联这个角色能看到的菜单
       menus: {
         connect: [
           { id: menuDashboard.id },
@@ -51,14 +55,14 @@ async function main() {
     data: {
       name: 'admin',
       description: '超级管理员 (拥有所有权限)',
-      // (核心) 超级管理员拥有所有菜单
       menus: {
         connect: [
           { id: menuDashboard.id },
           { id: menuSalesForm.id },
           { id: menuWeeklyReport.id },
           { id: menuLinks.id },
-          { id: menuAdminUsers.id }, // ⬅️ 管理员独有
+          { id: menuAdminUsers.id }, 
+          { id: menuViewReports.id }, // ⬅️ 【新增】
         ],
       },
     },
@@ -66,7 +70,6 @@ async function main() {
 
   // --- 3. 创建您的第一个“超级管理员”用户 ---
   
-  // (重要!) 请在这里设置您自己的 admin 密码
   const adminPassword = 'your_secure_password123';
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
@@ -76,7 +79,6 @@ async function main() {
       username: 'admin',
       passwordHash: hashedPassword,
       nickname: '超级管理员',
-      // (核心) 关联到 "admin" 角色
       role: {
         connect: {
           id: roleAdmin.id,
@@ -90,7 +92,6 @@ async function main() {
   console.log(`创建的角色: ${roleAdmin.name}, ${roleOperation.name}`);
 }
 
-// --- (运行脚本的模板代码) ---
 main()
   .catch((e) => {
     console.error(e);

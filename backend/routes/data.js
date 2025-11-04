@@ -1,14 +1,35 @@
 // ./backend/routes/data.js
 
 const express = require('express');
-const prisma = require('../prismaClient'); // ⬅️ 导入共享的 prisma 实例
-const authMiddleware = require('../authMiddleware'); // ⬅️ 导入“检查站”
+const prisma = require('../prismaClient'); 
+const authMiddleware = require('../authMiddleware'); 
+const adminMiddleware = require('../adminMiddleware'); // ⬅️ 【新增】导入 admin 守卫
 
 const router = express.Router();
 
-// ⬇️⬇️⬇️ 注意 ⬇️⬇️⬇️
-// 所有这些路由都会自动使用 authMiddleware，因为我们在 index.js 中会这样设置
-// （或者，您也可以像下面这样在每个路由上手动添加 authMiddleware）
+// ⬇️ 【新增】 获取所有周报 (仅限 Admin)
+// 路径: GET /api/reports
+router.get('/reports', adminMiddleware, async (req, res) => {
+  try {
+    const reports = await prisma.weeklyReport.findMany({
+      orderBy: {
+        weekStartDate: 'desc', // 按周开始日期倒序
+      },
+      include: {
+        author: { // 包含提交周报的作者
+          select: {
+            nickname: true, // 只选择我们需要的“昵称”
+          }
+        }
+      }
+    });
+    res.json(reports);
+  } catch (error) {
+    console.error('获取周报列表失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
 
 // 接口 3: (GET) 获取当前登录的用户信息
 // 路径: GET /api/me
@@ -21,13 +42,27 @@ router.get('/me', authMiddleware, async (req, res) => {
         id: true,
         username: true,
         nickname: true,
-        role: true
+        role: true 
       }
     });
     if (!user) {
       return res.status(404).json({ error: '用户未找到' });
     }
-    res.json(user);
+    // (我们在这里即时注入 role.name)
+    // 注意：这个接口在您的项目中已过时 (V5)，
+    // 因为 /api/login 返回的 Token 已经包含了昵称和权限
+    // 但我们暂时保留它
+    const detailedUser = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { role: true }
+    });
+    res.json({
+        id: detailedUser.id,
+        username: detailedUser.username,
+        nickname: detailedUser.nickname,
+        role: detailedUser.role.name // 确保返回的是 'admin' 或 'operation'
+    });
+
   } catch (error) {
     console.error('获取用户信息失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
@@ -99,4 +134,4 @@ router.post('/reports', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router; // ⬅️ 导出路由
+module.exports = router;

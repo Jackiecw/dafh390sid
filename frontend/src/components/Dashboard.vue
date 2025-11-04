@@ -74,6 +74,8 @@
         <WeeklyReportForm v-if="currentView === 'WEEKLY_REPORT'" />
         <CommonLinks v-if="currentView === 'LINKS'" />
         <UserManagement v-if="currentView === 'ADMIN_USERS'" />
+        
+        <ViewReports v-if="currentView === 'VIEW_REPORTS'" />
 
       </div>
 
@@ -82,53 +84,43 @@
 </template>
 
 <script setup>
-// 【新增】导入 computed
 import { ref, computed } from 'vue'; 
 import SalesForm from './SalesForm.vue';
 import WeeklyReportForm from './WeeklyReportForm.vue';
 import CommonLinks from './CommonLinks.vue';
 import UserManagement from './UserManagement.vue';
+import ViewReports from './ViewReports.vue'; // ⬅️ 【新增】
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
 import { ChevronUpIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/20/solid';
 
-// 【新增】1. 定义“系统所有菜单”的主列表
-//    (注意: "key" 必须与您在 'seed.js' 中创建的 MenuItem "key" 完全一致)
+// 【修改】
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_FORM', name: '销售数据录入' },
   { key: 'WEEKLY_REPORT', name: '周报填写' },
+  { key: 'VIEW_REPORTS', name: '周报查看' }, // ⬅️ 【新增】
   { key: 'LINKS', name: '常用链接' },
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
 const authStore = useAuthStore();
-
-// 【修改】2. 默认视图现在是 'DASHBOARD'
 const currentView = ref('DASHBOARD'); 
 
-// 【新增】3. 创建一个“计算属性”，用于过滤菜单
 const visibleMenuItems = computed(() => {
-  // 从 Pinia "保险箱"中获取权限数组
   const userPermissions = authStore.permissions; 
-  
   if (!userPermissions) {
-    return []; // 如果权限不存在，返回空
+    return []; 
   }
-
-  // 过滤 "allMenuItems"
   return allMenuItems.filter(item => 
-    // 只有当 Pinia 数组中包含这个菜单的 key 时，才显示它
     userPermissions.includes(item.key)
   );
 });
 
-// (不变) 
 const setView = (viewName) => {
   currentView.value = viewName;
 };
 
-// (不变)
 const handleLogout = () => {
   authStore.logout();
 };
@@ -136,7 +128,6 @@ const handleLogout = () => {
 
 
 <style scoped>
-/* (不变) */
 .active-border {
   position: relative;
 }
