@@ -1,0 +1,63 @@
+### 1. 测试用户注册 (创建您的第一个管理员账号)
+POST http://localhost:3000/api/register
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "your_secure_password123",
+  "nickname": "超级管理员",
+  "role": "ADMIN"
+}
+
+### 2. 测试用户名重复
+POST http://localhost:3000/api/register
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "another_password", 
+  "nickname": "另一个管理员"
+}
+
+### 3. 测试创建普通运营账号
+POST http://localhost:3000/api/register
+Content-Type: application/json
+
+{
+  "username": "operation1",
+  "password": "operation_password",
+  "nickname": "运营A"
+}
+
+### 4. 测试登录 (使用您注册的 admin 账号)
+POST http://localhost:3000/api/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "your_secure_password123" 
+}
+
+### 5. 测试登录 (错误密码)
+POST http://localhost:3000/api/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "wrong_password"
+}
+
+### 6. 测试“受保护”的接口 (不带通行证)
+#
+# 期望：失败 (401 Unauthorized)
+GET http://localhost:3000/api/me
+
+### 7. 测试“受保护”的接口 (带通行证)
+#
+# 步骤 1: 先运行下面的 "POST /api/login" 请求，获取一个 Token
+# 步骤 2: 复制那个 Token
+# 步骤 3: 粘贴到下面 "Authorization" 的 YOUR_TOKEN_HERE 位置
+# 
+# 期望：成功 (200 OK)，并返回用户信息
+GET http://localhost:3000/api/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWhpcG01ZGYwMDAwdjYxczNlaG43cjUwIiwicm9sZSI6IkFETUlOIiwibmlja25hbWUiOiLotoXnuqfnrqHnkIblkZgiLCJpYXQiOjE3NjIxNTMxNDcsImV4cCI6MTc2Mjc1Nzk0N30.DjzhxyIdgv1JhlrcodUN-8CDjjVlI_0uiDlhOGB6I1o

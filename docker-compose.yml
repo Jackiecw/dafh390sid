@@ -1,0 +1,38 @@
+# docker-compose.yml
+
+# 定义我们使用的 Docker Compose 文件版本
+version: '3.8'
+
+# 'services' 是我们要运行的所有“容器”的列表
+services:
+
+  # 这是我们的第一个服务：数据库
+  db:
+    image: postgres:15-alpine     # 使用官方的 postgres 15 版本镜像
+    container_name: internal_db   # 给这个容器起个固定的名字
+    restart: always               # 关键：让它在电脑重启后自动运行
+
+    # 环境变量：设置数据库的用户名、密码和库名
+    environment:
+      POSTGRES_USER: admin        # (您可以改成您想要的用户名)
+      POSTGRES_PASSWORD: admin  # (!!请改成一个您自己的强密码!!)
+      POSTGRES_DB: internal_app   # (您网站的数据库名称)
+
+    # 端口映射：
+    # 格式 "宿主机端口:容器端口"
+    # 意思是：把电脑(宿主机)的 5432 端口 映射到 容器的 5432 端口
+    # 这样，您电脑上的其他程序才能访问到这个数据库
+    ports:
+      - "5432:5432"
+
+    # 数据卷 (Volume)：
+    # 这是最关键的一步，用于“数据持久化”
+    # 把它理解为：把容器内的数据库文件，存放到您电脑的真实硬盘上
+    # 这样，就算容器被删除，您的“销售数据”和“周报”也永远不会丢失
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+# 这是“数据卷”的全局定义
+volumes:
+  db-data:
+    driver: local

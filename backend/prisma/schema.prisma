@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  // (新增) 下面这行是为了让 Prisma Client 支持我们即将创建的 "many-to-many" 关系
+  previewFeatures = ["relationJoins"] 
+}
+
+datasource db {
+  provider = "postgresql" // 您的数据库类型
+  url      = env("DATABASE_URL")
+}
+
+// --- 1. 用户模型 (修改) ---
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  nickname     String
+  createdAt    DateTime @default(now())
+
+  // 【修改】
+  // "role" 不再是一个简单的字符串。
+  // 它现在是一个指向 "Role" 模型的关系。
+  role   Role   @relation(fields: [roleId], references: [id])
+  roleId String // 这是外键
+
+  // (不变) 用户创建的记录
+  salesData    SalesData[]
+  weeklyReports WeeklyReport[]
+}
+
+// --- 2. 角色模型 (新增) ---
+// 这是 "角色" 本身，例如 "超级管理员" 或 "运营专员"
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // 例如 "admin", "operation"
+  description String
+
+  // (关系) 这个角色有多少用户
+  users User[]
+
+  // 【核心】
+  // 这个角色被授权了哪些 "菜单项" (多对多关系)
+  menus MenuItem[]
+}
+
+// --- 3. 菜单项模型 (新增) ---
+// 这是我们系统中所有 "可被授权" 的菜单项
+model MenuItem {
+  id   String @id @default(cuid())
+  
+  // "key" 是最重要的，前端将用它来判断是否显示
+  // 例如 "DASHBOARD", "SALES_FORM", "ADMIN_USERS"
+  key  String @unique 
+  
+  name String // "仪表盘", "销售数据录入"
+  
+  // (关系) 这个菜单项被哪些角色所拥有 (多对多关系)
+  roles Role[]
+}
+
+// --- (以下模型不变) ---
+
+model SalesData {
+  id           String   @id @default(cuid())
+  recordDate   DateTime
+  platform     String
+  storeName    String
+  country      String
+  productSku   String?
+  salesVolume  Int
+  revenue      Float
+  adSpend      Float
+  createdAt    DateTime @default(now())
+  
+  // (不变) 关联到创建者
+  enteredBy    User     @relation(fields: [enteredById], references: [id])
+  enteredById  String
+}
+
+model WeeklyReport {
+  id                  String   @id @default(cuid())
+  weekStartDate       DateTime
+  summaryThisWeek     String   @db.Text
+  planNextWeek        String   @db.Text
+  problemsEncountered String?  @db.Text
+  other               String?  @db.Text
+  createdAt           DateTime @default(now())
+  
+  // (不变) 关联到作者
+  author     User     @relation(fields: [authorId], references: [id])
+  authorId   String
+}
