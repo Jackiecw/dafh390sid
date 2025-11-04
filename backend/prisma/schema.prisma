@@ -2,9 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
-  // (新增) 下面这行是为了让 Prisma Client 支持我们即将创建的 "many-to-many" 关系
-  previewFeatures = ["relationJoins"] 
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -12,74 +11,98 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- 1. 用户模型 (修改) ---
+// --- 1. 用户模型 (不变) ---
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
   passwordHash String
   nickname     String
   createdAt    DateTime @default(now())
-
-  // 【修改】
-  // "role" 不再是一个简单的字符串。
-  // 它现在是一个指向 "Role" 模型的关系。
-  role   Role   @relation(fields: [roleId], references: [id])
-  roleId String // 这是外键
-
-  // (不变) 用户创建的记录
-  salesData    SalesData[]
+  role         Role     @relation(fields: [roleId], references: [id])
+  roleId       String
+  
+  // (关系不变)
+  salesData     SalesData[]
   weeklyReports WeeklyReport[]
 }
 
-// --- 2. 角色模型 (新增) ---
-// 这是 "角色" 本身，例如 "超级管理员" 或 "运营专员"
+// --- 2. 角色模型 (不变) ---
 model Role {
   id          String   @id @default(cuid())
-  name        String   @unique // 例如 "admin", "operation"
+  name        String   @unique
   description String
-
-  // (关系) 这个角色有多少用户
-  users User[]
-
-  // 【核心】
-  // 这个角色被授权了哪些 "菜单项" (多对多关系)
-  menus MenuItem[]
+  users       User[]
+  menus       MenuItem[]
 }
 
-// --- 3. 菜单项模型 (新增) ---
-// 这是我们系统中所有 "可被授权" 的菜单项
+// --- 3. 菜单项模型 (不变) ---
 model MenuItem {
-  id   String @id @default(cuid())
-  
-  // "key" 是最重要的，前端将用它来判断是否显示
-  // 例如 "DASHBOARD", "SALES_FORM", "ADMIN_USERS"
-  key  String @unique 
-  
-  name String // "仪表盘", "销售数据录入"
-  
-  // (关系) 这个菜单项被哪些角色所拥有 (多对多关系)
+  id    String @id @default(cuid())
+  key   String @unique
+  name  String
   roles Role[]
 }
 
-// --- (以下模型不变) ---
+// --- 4. 【新增】商品模型 (Product) ---
+model Product {
+  id          String    @id @default(cuid())
+  sku         String    @unique // (来自您的"型号") e.g., "AV-P001"
+  name        String    // (补充) 易读名称 e.g., "Aviewlux S1 Pro 投影仪"
+  category    ProductCategory // (补充) 品类
+  imageUrl    String?   // (来自您的"图片")
+  description String?   @db.Text // (来自您的"配置简述")
+  cost        Float     // (来自您的"采购价")
+  weightKg    Float?    // (补充) 重量 (公斤)
+  volumeM3    Float?    // (来自您的"体积") 体积 (立方米 m³)
 
-model SalesData {
-  id           String   @id @default(cuid())
-  recordDate   DateTime
-  platform     String
-  storeName    String
-  country      String
-  productSku   String?
-  salesVolume  Int
-  revenue      Float
-  adSpend      Float
-  createdAt    DateTime @default(now())
-  
-  // (不变) 关联到创建者
-  enteredBy    User     @relation(fields: [enteredById], references: [id])
-  enteredById  String
+  // (新) 关系：此商品出现在多少条销售记录中
+  salesData SalesData[]
 }
 
+// --- 5. 【新增】店铺模型 (Store) ---
+model Store {
+  id              String   @id @default(cuid())
+  name            String   @unique // (来自您的"店铺编号") e.g., "Shopee 印尼 Mall 店"
+  platform        Platform // (来自您的"平台")
+  country         Country  // (来自您的"国家")
+  platformStoreId String?  // (补充) 店铺在平台上的真实 ID
+  status          StoreStatus // (来自您的"状态")
+  registeredAt    DateTime? // (来自您的"注册时间")
+
+  // (新) 关系：此店铺产生了多少条销售记录
+  salesData SalesData[]
+}
+
+// --- 6. 【重大修改】销售数据模型 (SalesData) ---
+model SalesData {
+  id          String   @id @default(cuid())
+  recordDate  DateTime
+  salesVolume Int
+  revenue     Float
+  adSpend     Float
+  createdAt   DateTime @default(now())
+
+  // --- (旧字段已被移除) ---
+  // platform     String  (REMOVED)
+  // storeName    String  (REMOVED)
+  // country      String  (REMOVED)
+  // productSku   String? (REMOVED)
+  
+  // --- (关系字段) ---
+  // (不变) 关联到创建者
+  enteredBy   User   @relation(fields: [enteredById], references: [id])
+  enteredById String
+
+  // (新) 关联到店铺 (必需)
+  store       Store  @relation(fields: [storeId], references: [id])
+  storeId     String
+
+  // (新) 关联到商品 (可选, 允许只录入店铺总销售额)
+  product     Product? @relation(fields: [productId], references: [id])
+  productId   String?
+}
+
+// --- 7. (不变) 周报模型 (WeeklyReport) ---
 model WeeklyReport {
   id                  String   @id @default(cuid())
   weekStartDate       DateTime
@@ -88,8 +111,43 @@ model WeeklyReport {
   problemsEncountered String?  @db.Text
   other               String?  @db.Text
   createdAt           DateTime @default(now())
-  
-  // (不变) 关联到作者
-  author     User     @relation(fields: [authorId], references: [id])
-  authorId   String
+  author              User     @relation(fields: [authorId], references: [id])
+  authorId            String
+}
+
+// --- 8. 【新增】枚举 (Enums) ---
+
+// (用于 Store 表)
+enum Platform {
+  SHOPEE
+  TIKTOK_SHOP
+  LAZADA
+  WEBSITE
+  OTHER
+}
+
+enum Country {
+  ID // Indonesia
+  TH // Thailand
+  VN // Vietnam
+  MY // Malaysia
+  PH // Philippines
+  SG // Singapore
+  OTHER
+}
+
+enum StoreStatus {
+  ACTIVE   // 活跃
+  INACTIVE // 未活跃
+  BANNED   // 被封
+  CLOSED   // 已关闭
+}
+
+// (用于 Product 表)
+enum ProductCategory {
+  PROJECTOR // 投影仪
+  SCREEN    // 幕布
+  STAND     // 支架
+  ACCESSORY // 配件
+  OTHER
 }
