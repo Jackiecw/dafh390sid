@@ -93,7 +93,12 @@
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button 
                     @click="handleEditRole(role)" 
-                    class="text-indigo-600 hover:text-indigo-900"
+                    :disabled="role.name === 'admin'"
+                    :class="[
+                      role.name === 'admin' 
+                        ? 'text-gray-400 cursor-not-allowed' 
+                        : 'text-indigo-600 hover:text-indigo-900'
+                    ]"
                   >
                     编辑权限
                   </button>

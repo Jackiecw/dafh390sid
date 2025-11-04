@@ -173,7 +173,7 @@ async function fetchRoleDetails() {
   } catch (error) {
     console.error('获取角色详情失败:', error);
     errorMessage.value = '无法加载角色详情。';
-    closeModal();
+    //closeModal();
   }
 }
 

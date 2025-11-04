@@ -27,22 +27,20 @@ const userUpdateSchema = z.object({
   roleId: z.string().min(1, "必须选择一个角色"),
 });
 
-// ⬇️ 【新增】 "创建/更新角色" 模式
+// (不变) "创建/更新角色" 模式
 const roleSchema = z.object({
   name: z.string().min(2, "角色名 (key) 至少需要2个字符"),
   description: z.string().min(1, "角色描述不能为空"),
-  // (新增) "menuIds" 是一个包含所有被勾选菜单 ID 的数组
   menuIds: z.array(z.string()).default([]), 
 });
 
 
 // -----------------------------------------------------------------
 // --- 用户管理 API (Users) ---
-// (这部分 API 保持不变)
 // -----------------------------------------------------------------
 
-// (不变) GET /api/admin/users
-router.get('/admin/users', async (req, res) => { /* ... (代码不变) ... */ 
+// 【修改】 移除了 '/admin' 前缀
+router.get('/users', async (req, res) => { 
   try {
     const users = await prisma.user.findMany({
       include: { role: true },
@@ -59,8 +57,8 @@ router.get('/admin/users', async (req, res) => { /* ... (代码不变) ... */
   }
 });
 
-// (不变) GET /api/admin/users/:id
-router.get('/admin/users/:id', async (req, res) => { /* ... (代码不变) ... */ 
+// 【修改】 移除了 '/admin' 前缀
+router.get('/users/:id', async (req, res) => { 
   try {
     const { id } = req.params;
     const user = await prisma.user.findUnique({
@@ -80,8 +78,8 @@ router.get('/admin/users/:id', async (req, res) => { /* ... (代码不变) ... *
   }
 });
 
-// (不变) POST /api/admin/users
-router.post('/admin/users', async (req, res) => { /* ... (代码不变) ... */ 
+// 【修改】 移除了 '/admin' 前缀
+router.post('/users', async (req, res) => { 
   try {
     const validation = userCreateSchema.safeParse(req.body);
     if (!validation.success) {
@@ -113,8 +111,8 @@ router.post('/admin/users', async (req, res) => { /* ... (代码不变) ... */
   }
 });
 
-// (不变) PUT /api/admin/users/:id
-router.put('/admin/users/:id', async (req, res) => { /* ... (代码不变) ... */ 
+// 【修改】 移除了 '/admin' 前缀
+router.put('/users/:id', async (req, res) => { 
   try {
     const { id } = req.params;
     const validation = userUpdateSchema.safeParse(req.body);
@@ -148,8 +146,8 @@ router.put('/admin/users/:id', async (req, res) => { /* ... (代码不变) ... *
 // --- 角色管理 API (Roles) ---
 // -----------------------------------------------------------------
 
-// (不变) 接口 3: (GET) 获取【所有】角色列表
-router.get('/admin/roles', async (req, res) => {
+// 【修改】 移除了 '/admin' 前缀
+router.get('/roles', async (req, res) => {
   try {
     const roles = await prisma.role.findMany({
       orderBy: { name: 'asc' },
@@ -161,37 +159,31 @@ router.get('/admin/roles', async (req, res) => {
   }
 });
 
-// ⬇️ 【新增】 接口 4: (POST) 创建一个新角色
-//    路径: POST http://localhost:3000/api/admin/roles
-router.post('/admin/roles', async (req, res) => {
+// 【修改】 移除了 '/admin' 前缀
+router.post('/roles', async (req, res) => {
   try {
-    // 1. 验证输入 (name, description, menuIds)
     const validation = roleSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
     }
     
-    // (注意：menuIds 在"创建"时通常是空数组，但我们支持带权限创建)
     const { name, description, menuIds } = validation.data;
 
-    // 2. 检查 "name" (key) 是否已存在
     const existingRole = await prisma.role.findUnique({ where: { name } });
     if (existingRole) {
       return res.status(400).json({ error: '此角色名 (key) 已被占用' });
     }
     
-    // 3. 创建新角色
     const newRole = await prisma.role.create({
       data: {
         name: name,
         description: description,
-        // (核心) 关联所有被勾选的菜单项
         menus: {
           connect: menuIds.map(id => ({ id: id })),
         },
       },
       include: {
-        menus: true // (可选) 返回新角色及其权限
+        menus: true 
       }
     });
     
@@ -207,15 +199,14 @@ router.post('/admin/roles', async (req, res) => {
 });
 
 
-// ⬇️ 【新增】 接口 5: (GET) 获取【单个】角色的详细信息 (用于编辑)
-//    路径: GET http://localhost:3000/api/admin/roles/some-role-id
-router.get('/admin/roles/:id', async (req, res) => {
+// 【修改】 移除了 '/admin' 前缀
+router.get('/roles/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const role = await prisma.role.findUnique({
       where: { id: id },
       include: {
-        menus: true, // ⬅️ (核心) 包含此角色【已拥有】的菜单
+        menus: true, 
       },
     });
 
@@ -231,13 +222,11 @@ router.get('/admin/roles/:id', async (req, res) => {
   }
 });
 
-// ⬇️ 【新增】 接口 6: (PUT) 更新一个现有的角色 (及其权限)
-//    路径: PUT http://localhost:3000/api/admin/roles/some-role-id
-router.put('/admin/roles/:id', async (req, res) => {
+// 【修改】 移除了 '/admin' 前缀
+router.put('/roles/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. 验证输入
     const validation = roleSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
@@ -245,26 +234,22 @@ router.put('/admin/roles/:id', async (req, res) => {
 
     const { name, description, menuIds } = validation.data;
 
-    // 2. (可选) 检查 name (key) 唯一性
     const existingRole = await prisma.role.findUnique({ where: { name } });
     if (existingRole && existingRole.id !== id) {
       return res.status(400).json({ error: '此角色名 (key) 已被其他角色占用' });
     }
     
-    // 3. (核心) 更新角色
     const updatedRole = await prisma.role.update({
       where: { id: id },
       data: {
         name: name,
         description: description,
-        // (核心) "set" 会重置所有关联
-        // 它会断开所有旧的菜单，并连接所有新的 menuIds
         menus: {
           set: menuIds.map(id => ({ id: id })),
         },
       },
       include: {
-        menus: true // 返回更新后的角色
+        menus: true 
       }
     });
 
@@ -284,9 +269,8 @@ router.put('/admin/roles/:id', async (req, res) => {
 // --- 菜单项 API (Menu Items) ---
 // -----------------------------------------------------------------
 
-// ⬇️ 【新增】 接口 7: (GET) 获取【所有】可用的菜单项 (用于生成复选框)
-//    路径: GET http://localhost:3000/api/admin/menu-items
-router.get('/admin/menu-items', async (req, res) => {
+// 【修改】 移除了 '/admin' 前缀
+router.get('/menu-items', async (req, res) => {
   try {
     const menuItems = await prisma.menuItem.findMany({
       orderBy: {

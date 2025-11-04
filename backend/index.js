@@ -39,7 +39,8 @@ app.use('/api', authRoutes);
 //   (例如: /api/me, /api/sales, /api/reports)
 app.use('/api', dataRoutes);
 
-app.use('/api', adminRoutes);
+// ⬇️ 告诉 Express，所有 adminRoutes 里的路由都以 /api/admin 开头
+app.use('/api/admin', adminRoutes);
 
 // (注意：所有旧的 app.post 和 app.get 路由都已被删除)
 
