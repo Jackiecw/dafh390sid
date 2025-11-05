@@ -25,13 +25,13 @@
             leave-from="opacity-100 scale-100"
             leave-to="opacity-0 scale-95"
           >
-            <DialogPanel class="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+            <DialogPanel class="w-full max-w-xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
               
               <DialogTitle as="h3" class="text-lg font-medium leading-6 text-gray-900">
                 {{ dialogTitle }}
               </DialogTitle>
               
-              <div class="mt-4 space-y-4">
+              <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 
                 <div class="input-group">
                   <label for="username">用户名 (登录账号) *</label>
@@ -64,7 +64,50 @@
                   </select>
                 </div>
                 
-                <p v-if="errorMessage" class="text-red-600 text-sm">
+                <div class="input-group md:col-span-2">
+                  <label>主管国家 (可选)</label>
+                  <div class="mt-2 space-y-2 max-h-32 overflow-y-auto rounded-md border p-4">
+                    <div v-for="country in allCountries" :key="country.id" class="flex items-center">
+                      <input 
+                        type="checkbox" 
+                        :id="'sup-' + country.id" 
+                        :value="country.id" 
+                        v-model="selectedSupervisedIds"
+                        class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <label :for="'sup-' + country.id" class="ml-3 text-sm text-gray-700">
+                        {{ country.name }} ({{ country.code }})
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="input-group md:col-span-2">
+                  <label>运营国家 (可选)</label>
+                  <div class="mt-2 space-y-2 max-h-32 overflow-y-auto rounded-md border p-4">
+                    <div v-for="country in allCountries" :key="country.id" class="flex items-center">
+                      <input 
+                        type="checkbox" 
+                        :id="'op-' + country.id" 
+                        :value="country.id" 
+                        v-model="selectedOperatedIds"
+                        :disabled="isOperatedCountryDisabled(country.id)"
+                        class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      />
+                      <label :for="'op-' + country.id" 
+                             :class="[
+                               'ml-3 text-sm',
+                               isOperatedCountryDisabled(country.id) ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700'
+                             ]">
+                        {{ country.name }} ({{ country.code }})
+                        <span v-if="isOperatedCountryDisabled(country.id)" class="text-xs">(主管)</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                
+                
+                <p v-if="errorMessage" class="text-red-600 text-sm md:col-span-2">
                   {{ errorMessage }}
                 </p>
               </div>
@@ -94,7 +137,6 @@
 </template>
 
 <script setup>
-// 【新增】导入 computed
 import { ref, watch, computed } from 'vue';
 import {
   TransitionRoot,
@@ -105,7 +147,7 @@ import {
 } from '@headlessui/vue';
 import apiClient from '../api';
 
-// --- 1. 【修改】Props 和 Emits ---
+// --- 1. Props 和 Emits (不变) ---
 
 const props = defineProps({
   isOpen: {
@@ -116,24 +158,20 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  // ⬇️ 【新增】
-  //    如果这个 prop 被传入，我们将进入"编辑"模式
-  //    它将包含 { id, username, nickname, roleId }
   userToEdit: {
     type: Object,
     default: null,
   }
 });
 
-// ⬇️ 【新增】添加 "user-updated" 信号
 const emit = defineEmits(['close', 'user-created', 'user-updated']);
 
-// --- 2. 【新增】计算属性 (Computed) ---
+// --- 2. 计算属性 (不变) ---
 const isEditMode = computed(() => !!props.userToEdit);
 const dialogTitle = computed(() => isEditMode.value ? '编辑用户' : '创建新用户');
 const submitButtonText = computed(() => isEditMode.value ? '保存更改' : '创建用户');
 
-// --- 3. 内部状态 (不变) ---
+// --- 3. 内部状态 (修改) ---
 const formData = ref({
   username: '',
   password: '',
@@ -142,35 +180,61 @@ const formData = ref({
 });
 const errorMessage = ref('');
 
-// --- 4. 【修改】核心逻辑 (handleSubmit) ---
+// ⬇️ 【新增】
+const allCountries = ref([]); // (用于存储 GET /api/admin/countries)
+const selectedSupervisedIds = ref([]); // (v-model for 主管国家)
+const selectedOperatedIds = ref([]);   // (v-model for 运营国家)
+
+// --- 4. 核心逻辑 (修改) ---
+
+// ⬇️ 【新增】 获取所有国家
+async function fetchCountries() {
+  try {
+    const response = await apiClient.get('/api/admin/countries');
+    allCountries.value = response.data;
+  } catch (error) {
+    console.error('获取国家列表失败:', error);
+    errorMessage.value = '无法加载国家列表。';
+  }
+}
 
 async function handleSubmit() {
   errorMessage.value = '';
 
   try {
     if (isEditMode.value) {
-      // (A) 【编辑】模式：调用 PUT
-      const response = await apiClient.put(
-        // URL: /api/admin/users/用户ID
-        `/admin/users/${props.userToEdit.id}`, 
-        // Payload: { nickname, roleId } (根据后端的 userUpdateSchema)
-        {
+      // (A) 【编辑】模式
+      
+      // ⬇️ 【修改】 添加国家 IDs
+      const payload = {
           nickname: formData.value.nickname,
           roleId: formData.value.roleId,
-        }
+          supervisedCountryIds: selectedSupervisedIds.value,
+          operatedCountryIds: selectedOperatedIds.value,
+        };
+      
+      const response = await apiClient.put(
+        `/admin/users/${props.userToEdit.id}`, 
+        payload
       );
-      // 发送 "user-updated" 信号，并附上更新后的用户信息
       emit('user-updated', response.data); 
 
     } else {
-      // (B) 【创建】模式：调用 POST (不变)
-      const response = await apiClient.post('/admin/users', formData.value);
+      // (B) 【创建】模式
+      
+      // ⬇️ 【修改】 添加国家 IDs
+      const payload = {
+        ...formData.value,
+        supervisedCountryIds: selectedSupervisedIds.value,
+        operatedCountryIds: selectedOperatedIds.value,
+      };
+      
+      const response = await apiClient.post('/admin/users', payload);
       emit('user-created', response.data);
     }
     closeModal();
 
   } catch (error) {
-    // (不变) 错误处理
     console.error('操作失败:', error);
     if (error.response && error.response.data.error) {
       errorMessage.value = error.response.data.error;
@@ -180,11 +244,14 @@ async function handleSubmit() {
   }
 }
 
-// --- 5. 【修改】辅助函数 ---
+// --- 5. 辅助函数 (修改) ---
 
-// 【修改】watch: 当弹窗打开时，根据模式填充表单
+// ⬇️ 【修改】 watch: 当弹窗打开时
 watch(() => props.isOpen, (newVal) => {
   if (newVal) { // 弹窗刚打开
+    // (总) 获取国家列表
+    fetchCountries();
+
     if (isEditMode.value) {
       // 【编辑】模式: 预填充表单
       formData.value = {
@@ -193,6 +260,10 @@ watch(() => props.isOpen, (newVal) => {
         roleId: props.userToEdit.roleId,
         password: '', // 密码字段是隐藏的
       };
+      // ⬇️ 【新增】 预填充国家
+      selectedSupervisedIds.value = props.userToEdit.supervisedCountryIds || [];
+      selectedOperatedIds.value = props.userToEdit.operatedCountryIds || [];
+
     } else {
       // 【创建】模式: 重置为空表单
       resetForm();
@@ -200,13 +271,29 @@ watch(() => props.isOpen, (newVal) => {
   }
 });
 
+// ⬇️ 【新增】 业务逻辑 A：主管自动成为运营
+watch(selectedSupervisedIds, (newSupervisorIds) => {
+  // (使用 Set 来合并，确保不重复)
+  const newOperatedSet = new Set([
+    ...selectedOperatedIds.value,
+    ...newSupervisorIds
+  ]);
+  selectedOperatedIds.value = Array.from(newOperatedSet);
+}, { deep: true }); // (deep: true 确保 v-model 数组变化时触发)
+
+// ⬇️ 【新增】 辅助函数：检查运营国家是否应被禁用
+function isOperatedCountryDisabled(countryId) {
+  return selectedSupervisedIds.value.includes(countryId);
+}
+
+
 // (不变) 关闭弹窗
 function closeModal() {
-  resetForm(); // 无论如何，关闭时都清空表单
+  resetForm(); 
   emit('close');
 }
 
-// (不变) 重置表单
+// (修改) 重置表单
 function resetForm() {
   formData.value = {
     username: '',
@@ -215,6 +302,10 @@ function resetForm() {
     roleId: '',
   };
   errorMessage.value = '';
+  // ⬇️ 【新增】
+  allCountries.value = [];
+  selectedSupervisedIds.value = [];
+  selectedOperatedIds.value = [];
 }
 
 </script>
@@ -238,7 +329,6 @@ function resetForm() {
   border-radius: 4px;
   font-size: 1rem;
 }
-/* 【新增】禁用输入框的样式 */
 .input-group input:disabled {
   background-color: #f3f4f6; /* bg-gray-100 */
   color: #6b7280; /* text-gray-500 */

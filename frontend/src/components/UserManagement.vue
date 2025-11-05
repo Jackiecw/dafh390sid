@@ -26,6 +26,17 @@
         >
           角色与权限
         </button>
+        <button 
+          @click="currentTab = 'countries'"
+          :class="[
+            'py-2 px-4 text-sm font-medium',
+            currentTab === 'countries' 
+              ? 'border-b-2 border-indigo-600 text-indigo-600' 
+              : 'text-stone-500 hover:text-stone-700'
+          ]"
+        >
+          国家管理
+        </button>
       </nav>
     </div>
 
@@ -44,6 +55,7 @@
                 <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">昵称</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">用户名 (登录账号)</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">角色</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">运营国家</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
               </tr>
             </thead>
@@ -55,6 +67,12 @@
                   <span :class="['px-2 py-1 rounded-full text-xs font-semibold', user.role.name === 'admin' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800']">
                     {{ user.role.description }}
                   </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
+                  <span v-if="user.operatedCountries.length > 0">
+                    {{ user.operatedCountries.map(c => c.code).join(', ') }}
+                  </span>
+                  <span v-else class="text-gray-400">无</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button @click="handleEdit(user)" class="text-indigo-600 hover:text-indigo-900">
@@ -108,6 +126,11 @@
           </table>
         </div>
       </div>
+
+      <div v-if="currentTab === 'countries'">
+        <CountryManagement />
+      </div>
+
     </div>
   </div>
 
@@ -134,17 +157,16 @@
 import { ref, onMounted } from 'vue';
 import apiClient from '../api';
 import UserFormModal from './UserFormModal.vue';
-import RoleFormModal from './RoleFormModal.vue'; // ⬅️ 【新增】导入“角色”弹窗
+import RoleFormModal from './RoleFormModal.vue'; 
+import CountryManagement from './CountryManagement.vue';
 
-// --- (不变) ---
-const currentTab = ref('users');
+// (不变)
+const currentTab = ref('users'); 
 const users = ref([]);
 const errorMessage = ref('');
 const rolesList = ref([]);
 const isModalOpen = ref(false); 
 const currentUserToEdit = ref(null);
-
-// --- 【新增】 "角色" 弹窗的状态 ---
 const isRoleModalOpen = ref(false);
 const currentRoleToEditId = ref(null);
 
@@ -153,7 +175,10 @@ onMounted(() => {
   fetchUsers();
   fetchRoles();
 });
-async function fetchUsers() { /* ... (代码不变) ... */ 
+
+// (不变) fetchUsers
+// (GET /admin/users 已经返回了国家数据)
+async function fetchUsers() { 
   errorMessage.value = '';
   try {
     const response = await apiClient.get('/admin/users');
@@ -167,7 +192,8 @@ async function fetchUsers() { /* ... (代码不变) ... */
     }
   }
 }
-async function fetchRoles() { /* ... (代码不变) ... */ 
+// (不变) fetchRoles
+async function fetchRoles() { 
   try {
     const response = await apiClient.get('/admin/roles');
     rolesList.value = response.data;
@@ -177,67 +203,47 @@ async function fetchRoles() { /* ... (代码不变) ... */
   }
 }
 
-// --- (不变) "用户" 弹窗控制 ---
+// --- (修改) "用户" 弹窗控制 ---
 function openModal() { isModalOpen.value = true; }
 function closeModal() {
   isModalOpen.value = false;
   currentUserToEdit.value = null; 
 }
+
+// ⬇️ 【修改】
 function handleEdit(user) {
+  // (user 对象来自 fetchUsers，已包含国家列表)
   currentUserToEdit.value = {
     id: user.id,
     username: user.username,
     nickname: user.nickname,
     roleId: user.role.id,
+    // ⬇️ 【新增】
+    // (我们将完整的国家对象数组转为 ID 数组，供弹窗 v-model 使用)
+    supervisedCountryIds: user.supervisedCountries.map(c => c.id),
+    operatedCountryIds: user.operatedCountries.map(c => c.id),
   };
   openModal();
 }
+
+// (不变) handleUserUpdated
+// (updatedUser 是从 API 返回的，已包含最新国家数据)
 function handleUserUpdated(updatedUser) {
   const index = users.value.findIndex(u => u.id === updatedUser.id);
   if (index !== -1) {
     users.value[index] = updatedUser;
   }
 }
+// (不变) handleUserCreated
 function handleUserCreated(newUser) {
   users.value.push(newUser);
 }
 
 
-// --- 【新增】 "角色" 弹窗控制 ---
-
-// "新建角色" 时调用
-function openRoleModal() {
-  isRoleModalOpen.value = true;
-}
-
-// "关闭角色" 弹窗时调用
-function closeRoleModal() {
-  isRoleModalOpen.value = false;
-  // (关键) 重置"编辑"状态
-  currentRoleToEditId.value = null;
-}
-
-// "编辑权限" 时调用
-function handleEditRole(role) {
-  // 1. 设置要编辑的 ID
-  currentRoleToEditId.value = role.id;
-  // 2. 打开弹窗 (弹窗会自动进入"编辑"模式)
-  openRoleModal();
-}
-
-// "角色创建" 成功后调用
-function handleRoleCreated(newRole) {
-  // 1. (关键) 将新角色添加到 rolesList
-  //    这会同时更新"角色"Tab的表格 和 "用户"Tab的下拉菜单
-  rolesList.value.push(newRole);
-}
-
-// "角色更新" 成功后调用
-function handleRoleUpdated(updatedRole) {
-  // 1. (关键) 查找并替换 rolesList 中的角色
-  const index = rolesList.value.findIndex(r => r.id === updatedRole.id);
-  if (index !== -1) {
-    rolesList.value[index] = updatedRole;
-  }
-}
+// --- (不变) "角色" 弹窗控制 ---
+function openRoleModal() { /* ... (代码不变) ... */ }
+function closeRoleModal() { /* ... (代码不变) ... */ }
+function handleEditRole(role) { /* ... (代码不变) ... */ }
+function handleRoleCreated(newRole) { /* ... (代码不变) ... */ }
+function handleRoleUpdated(updatedRole) { /* ... (代码不变) ... */ }
 </script>

@@ -28,11 +28,12 @@ async function main() {
     data: { key: 'ADMIN_USERS', name: '员工配置与管理' },
   });
   
-  // ⬇️ 【新增】
   const menuAdminStores = await prisma.menuItem.create({
     data: { key: 'ADMIN_STORES', name: '店铺管理' },
   });
-  // ⬇️ (修改 1/2) 删除了 menuAdminProducts 的创建
+  
+  // ⬇️ 【已删除】 menuAdminCountries (不再需要)
+
 
   // --- 2. 创建“角色”并【关联菜单】---
   
@@ -65,8 +66,8 @@ async function main() {
           { id: menuViewReports.id },
           { id: menuLinks.id },
           { id: menuAdminUsers.id },
-          { id: menuAdminStores.id }, // ⬅️ 【新增】
-          // ⬇️ (修改 2/2) 删除了 menuAdminProducts 的关联
+          { id: menuAdminStores.id },
+          // ⬅️ 【已删除】 menuAdminCountries.id (不再需要)
         ],
       },
     },
@@ -89,6 +90,21 @@ async function main() {
         },
       },
     },
+  });
+
+  // ⬇️ 【(不变) 新增】 创建默认的国家
+  console.log('正在创建默认国家...');
+  await prisma.managedCountry.createMany({
+    data: [
+      { code: 'ID', name: 'Indonesia' },
+      { code: 'TH', name: 'Thailand' },
+      { code: 'VN', name: 'Vietnam' },
+      { code: 'MY', name: 'Malaysia' },
+      { code: 'PH', name: 'Philippines' },
+      { code: 'SG', name: 'Singapore' },
+      { code: 'OTHER', name: 'Other' },
+    ],
+    skipDuplicates: true, // (如果已存在，则跳过)
   });
 
   console.log('...播种 (Seeding) 完成！');

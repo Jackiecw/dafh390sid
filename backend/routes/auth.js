@@ -9,23 +9,22 @@ const { z } = require('zod');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
-// 【修改】1. registerSchema 不再需要 "role"
+// (不变) registerSchema
 const registerSchema = z.object({
   username: z.string().min(3, "用户名至少需要3个字符"),
   password: z.string().min(8, "密码至少需要8个字符"),
   nickname: z.string().min(1, "昵称不能为空"),
 });
 
+// (不变) loginSchema
 const loginSchema = z.object({
   username: z.string().min(1, "用户名不能为空"),
   password: z.string().min(1, "密码不能为空")
 });
 
-// 接口 1: (POST) 用户注册
-// 【重大修改】此接口现在默认将新用户创建为“运营专员”
+// (不变) 接口 1: (POST) 用户注册
 router.post('/register', async (req, res) => {
   try {
-    // 1. 验证输入 (schema 已更新，不含 role)
     const validation = registerSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
@@ -36,35 +35,28 @@ router.post('/register', async (req, res) => {
 
     const { username, password, nickname } = validation.data;
 
-    // 2. 【新增】查找“运营专员”这个角色
     const operationRole = await prisma.role.findUnique({
       where: { name: 'operation' },
     });
 
     if (!operationRole) {
-      // 如果 "operation" 角色在数据库中不存在 (seed 失败)
       console.error('注册失败：未找到默认的 "operation" 角色');
       return res.status(500).json({ error: '服务器配置错误：无法分配角色' });
     }
 
-    // 3. (不变) 加密密码
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4. 【修改】创建新用户，并将其 roleId 关联到 "operation" 角色
     const newUser = await prisma.user.create({
       data: {
         username: username,
         passwordHash: hashedPassword,
         nickname: nickname,
-        // (旧: role: role || 'OPERATION')
-        // (新)
         role: {
           connect: { id: operationRole.id },
         },
       },
     });
 
-    // 5. (不变) 返回用户信息
     const { passwordHash, ...userWithoutPassword } = newUser;
     res.status(201).json(userWithoutPassword);
 
@@ -78,7 +70,7 @@ router.post('/register', async (req, res) => {
 });
 
 // 接口 2: (POST) 用户登录
-// 【重大修改】此接口现在返回带 "permissions" 数组的 Token
+// ⬇️ 【重大修改】此接口现在返回带 "operatedCountries" 数组的 Token
 router.post('/login', async (req, res) => {
   try {
     // 1. (不变) 验证输入
@@ -92,13 +84,18 @@ router.post('/login', async (req, res) => {
 
     const { username, password } = validation.data;
 
-    // 2. 【修改】在数据库中查找用户，并【包含】其角色及角色的菜单
+    // 2. 【修改】在数据库中查找用户，并【包含】其角色、菜单和【运营的国家】
     const user = await prisma.user.findUnique({
       where: { username: username },
       include: {
         role: { // 包含关联的 Role
           include: {
             menus: true // 包含该 Role 关联的所有 MenuItem
+          }
+        },
+        operatedCountries: { // ⬅️ 【新增】 包含用户运营的国家
+          select: {
+            code: true // ⬅️ 我们只需要国家的 "code"
           }
         }
       }
@@ -117,16 +114,20 @@ router.post('/login', async (req, res) => {
 
     // 5. 【修改】生成新的 JWT Token 负载 (Payload)
     
-    // (A) 从 user.role.menus 中提取所有菜单的 "key"
+    // (A) (不变) 提取菜单权限
     const permissions = user.role.menus.map(menu => menu.key);
 
-    // (B) 创建 Token
+    // (B) ⬅️ 【新增】 提取国家权限
+    const operatedCountries = user.operatedCountries.map(country => country.code);
+
+    // (C) 创建 Token
     const token = jwt.sign(
       { 
         userId: user.id, 
-        role: user.role.name, // ⬅️ (新) 使用角色的名字 (例如 "admin" 或 "operation")
+        role: user.role.name, 
         nickname: user.nickname,
-        permissions: permissions // ⬅️ (新) 包含权限列表
+        permissions: permissions, 
+        operatedCountries: operatedCountries // ⬅️ 【新增】
       },
       JWT_SECRET,
       { expiresIn: '7d' }

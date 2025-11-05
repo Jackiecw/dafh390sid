@@ -28,7 +28,8 @@
             <DialogPanel class="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
               
               <DialogTitle as="h3" class="text-lg font-medium leading-6 text-gray-900">
-                {{ dialogTitle }} </DialogTitle>
+                {{ dialogTitle }}
+              </DialogTitle>
               
               <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                 
@@ -59,14 +60,13 @@
 
                   <div class="input-group">
                     <label for="country">国家 *</label>
-                    <select id="country" v-model="formData.country">
+                    <select id="country" v-model="formData.countryCode">
                       <option disabled value="">请选择...</option>
-                      <option v-for="opt in options.countries" :key="opt" :value="opt">
-                        {{ opt }}
+                      <option v-for="opt in countriesList" :key="opt.code" :value="opt.code">
+                        {{ opt.name }} ({{ opt.code }})
                       </option>
                     </select>
                   </div>
-
                   <div class="input-group">
                     <label for="status">状态 *</label>
                     <select id="status" v-model="formData.status">
@@ -116,7 +116,8 @@
                   :disabled="isLoadingOptions"
                   class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none disabled:bg-indigo-300"
                 >
-                  {{ submitButtonText }} </button>
+                  {{ submitButtonText }}
+                </button>
               </div>
             </DialogPanel>
           </TransitionChild>
@@ -127,7 +128,6 @@
 </template>
 
 <script setup>
-// ⬇️ 【修改】 导入 computed
 import { ref, watch, computed } from 'vue';
 import {
   TransitionRoot,
@@ -138,26 +138,24 @@ import {
 } from '@headlessui/vue';
 import apiClient from '../api';
 
-// --- 1. 【修改】 Props 和 Emits ---
+// --- 1. Props 和 Emits (不变) ---
 const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false,
   },
-  // ⬇️ 【新增】
   storeToEditId: {
     type: String,
     default: null,
   }
 });
-// ⬇️ 【修改】
 const emit = defineEmits(['close', 'store-created', 'store-updated']);
 
-// --- 2. 【修改】 内部状态 ---
+// --- 2. 内部状态 (修改) ---
 const defaultFormData = () => ({
   name: '',
   platform: '',
-  country: '',
+  countryCode: '', // ⬅️ 【修改】 
   status: 'ACTIVE',
   platformStoreId: '',
   registeredAt: null,
@@ -169,28 +167,50 @@ const errorMessage = ref('');
 // (用于存储下拉菜单选项)
 const options = ref({
   platforms: [],
-  countries: [],
+  // countries: [], // (已删除)
   storeStatuses: [],
 });
+const countriesList = ref([]); // ⬅️ 【新增】
 const isLoadingOptions = ref(false);
 
-// ⬇️ 【新增】 计算属性 (Computed)
+// (不变) 计算属性
 const isEditMode = computed(() => !!props.storeToEditId);
 const dialogTitle = computed(() => isEditMode.value ? '编辑店铺' : '创建新店铺');
 const submitButtonText = computed(() => isEditMode.value ? '保存更改' : '创建店铺');
 
 
-// --- 3. 【修改】 核心逻辑 (API 调用) ---
+// --- 3. 核心逻辑 (API 调用) (修改) ---
 
-// (获取下拉菜单选项) (不变)
+// ⬇️ 【新增】 获取国家列表
+async function fetchCountries() {
+  if (countriesList.value.length > 0) return;
+  try {
+    const response = await apiClient.get('/admin/countries');
+    countriesList.value = response.data;
+  } catch (error) {
+    console.error('加载国家列表失败:', error);
+    errorMessage.value = "无法加载国家选项，请重试。";
+  }
+}
+
+// (获取下拉菜单选项) (修改)
 async function fetchOptions() {
-  if (options.value.platforms.length > 0) return; // (防止重复加载)
+  // (不变)
+  if (options.value.platforms.length > 0) return; 
   
   isLoadingOptions.value = true;
+  
+  // ⬇️ 【修改】
+  //    我们现在并行获取 options (平台, 状态) 和 countries (国家列表)
   try {
-    // (调用我们在 management.js 中创建的辅助接口)
-    const response = await apiClient.get('/admin/management-options');
-    options.value = response.data;
+    const [optionsResponse, countriesResponse] = await Promise.all([
+      apiClient.get('/admin/management-options'),
+      apiClient.get('/admin/countries')
+    ]);
+    
+    options.value = optionsResponse.data;
+    countriesList.value = countriesResponse.data;
+
   } catch (error) {
     console.error('加载表单选项失败:', error);
     errorMessage.value = "无法加载表单选项，请重试。";
@@ -199,21 +219,19 @@ async function fetchOptions() {
   }
 }
 
-// ⬇️ 【新增】 获取单个店铺的详情 (用于编辑)
+// (获取单个店铺的详情) (修改)
 async function fetchStoreDetails() {
   if (!isEditMode.value) return;
   try {
     const response = await apiClient.get(`/admin/stores/${props.storeToEditId}`);
     const store = response.data;
     
-    // 预填充表单
     formData.value = {
       name: store.name,
       platform: store.platform,
-      country: store.country,
+      countryCode: store.countryCode, // ⬅️ 【修改】
       status: store.status,
       platformStoreId: store.platformStoreId || '',
-      // (关键) HTML date input 需要 'YYYY-MM-DD' 格式
       registeredAt: store.registeredAt ? new Date(store.registeredAt).toISOString().split('T')[0] : null,
     };
   } catch (error) {
@@ -223,25 +241,32 @@ async function fetchStoreDetails() {
 }
 
 
-// ⬇️ 【修改】 提交表单 (POST 或 PUT)
+// (提交表单) (修改)
 async function handleSubmit() {
   errorMessage.value = '';
 
-  // (将空日期转为 null)
   const payload = {
     ...formData.value,
     registeredAt: formData.value.registeredAt || null
+    // ⬅️ (关键) `formData` 中现在是 `countryCode`，
+    //    这与我们后端 `storeSchema` 期望的一致
   };
 
   try {
     if (isEditMode.value) {
-      // (A) 【编辑】模式
       const response = await apiClient.put(`/admin/stores/${props.storeToEditId}`, payload);
-      emit('store-updated', response.data);
+      // ⬇️ 【修改】 返回的 response 仍然是 store 对象, 
+      //    但我们需要在主页上显示 store.country.name
+      //    因此我们必须重新获取列表
+      //    (或者, 让 PUT /stores/:id 返回一个包含 country 的对象)
+      //    (为了简单起见，我们先按原样发送，在下一个文件 `StoreManagement.vue` 中处理)
+      
+      // (为了正确更新UI, 我们需要返回包含country对象的数据)
+      // (简单起见，我们让父组件重新加载)
+      emit('store-updated'); // (修改) 不再发送数据，只发送信号
     } else {
-      // (B) 【创建】模式
       const response = await apiClient.post('/admin/stores', payload);
-      emit('store-created', response.data);
+      emit('store-created', response.data); // (不变)
     }
     closeModal();
   } catch (error) {
@@ -254,25 +279,25 @@ async function handleSubmit() {
   }
 }
 
-// --- 4. 【修改】 辅助函数 ---
+// --- 4. 辅助函数 (修改) ---
 
-// (当弹窗打开时，加载选项并重置表单)
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
     resetForm();
-    fetchOptions(); // (不变) 总是加载选项
+    fetchOptions(); // (修改) 此函数现在也获取国家
     
-    // ⬇️ 【新增】
     if (isEditMode.value) {
-      fetchStoreDetails(); // 编辑模式下加载详情
+      fetchStoreDetails();
     }
   }
 });
 
+// (不变)
 function closeModal() {
   emit('close');
 }
 
+// (不变)
 function resetForm() {
   formData.value = defaultFormData();
   errorMessage.value = '';
@@ -280,7 +305,7 @@ function resetForm() {
 </script>
 
 <style scoped>
-/* (复用 UserFormModal.vue 的样式) */
+/* (不变) */
 .input-group {
   display: flex;
   flex-direction: column;

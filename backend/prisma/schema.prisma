@@ -11,20 +11,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- 1. 用户模型 (不变) ---
+// --- 1. 用户模型 (更新) ---
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
   passwordHash String
   nickname     String
   createdAt    DateTime @default(now())
- 
+
   role         Role     @relation(fields: [roleId], references: [id])
   roleId       String
   
   // (关系不变)
   salesData     SalesData[]
   weeklyReports WeeklyReport[]
+
+  // ⬇️ 【新增】 主管和运营的国家
+  supervisedCountries ManagedCountry[] @relation("CountrySupervisors")
+  operatedCountries   ManagedCountry[] @relation("CountryOperators")
 }
 
 // --- 2. 角色模型 (不变) ---
@@ -47,21 +51,26 @@ model MenuItem {
 // --- 4. 商品模型 (Product) ---
 // (已删除)
 
-// --- 5. 店铺模型 (Store) ---
+// --- 5. 店铺模型 (Store) (更新) ---
 model Store {
   id              String   @id @default(cuid())
   name            String   @unique // e.g., "Shopee 印尼 Mall 店"
-  platform        Platform
-  country         Country
-  platformStoreId String?  // 店铺在平台上的真实 ID
-  status          StoreStatus
-  registeredAt    DateTime?  // 注册时间
+  platform        Platform      // (不变) Platform 枚举
+  platformStoreId String?       // 店铺在平台上的真实 ID
+  status          StoreStatus   // (不变) StoreStatus 枚举
+  registeredAt    DateTime?     // 注册时间
+
+  // ⬇️ 【重大修改】
+  // 不再使用 Country 枚举，而是关联到新的 ManagedCountry 模型
+  country         ManagedCountry @relation(fields: [countryCode], references: [code])
+  countryCode     String         // e.g., "ID", "VN" (这是外键)
 
   // 关系：此店铺产生了多少条销售记录
   salesData SalesData[]
 }
 
 // --- 6. 销售数据模型 (SalesData) ---
+// (不变)
 model SalesData {
   id          String   @id @default(cuid())
   recordDate  DateTime
@@ -70,22 +79,13 @@ model SalesData {
   adSpend     Float
   createdAt   DateTime @default(now())
 
-  // --- (旧字段已被移除) ---
-  // platform     String  (REMOVED)
-  // storeName    String  (REMOVED)
-  // country      String  (REMOVED)
-  // productSku   String? (REMOVED)
-  
-  // --- (关系字段) ---
   // (不变) 关联到创建者
   enteredBy   User   @relation(fields: [enteredById], references: [id])
   enteredById String
 
-  // (新) 关联到店铺 (必需)
+  // (不变) 关联到店铺 (必需)
   store       Store  @relation(fields: [storeId], references: [id])
   storeId     String
-
-  // (已删除) 关联到商品
 }
 
 // --- 7. (不变) 周报模型 (WeeklyReport) ---
@@ -101,6 +101,27 @@ model WeeklyReport {
   authorId            String
 }
 
+
+// ⬇️ 【新增】 国家管理模型
+model ManagedCountry {
+  id            String    @id @default(cuid())
+  code          String    @unique // 国家的唯一标识, e.g., "ID"
+  name          String    // 国家的易读名称, e.g., "Indonesia"
+  establishedAt DateTime? // 设立时间
+
+  // --- 关系字段 ---
+  
+  // 1. "负责人" (多对多)
+  supervisors User[] @relation("CountrySupervisors")
+  
+  // 2. "运营人" (多对多)
+  operators   User[] @relation("CountryOperators")
+  
+  // 3. 关联到店铺
+  stores      Store[]
+}
+
+
 // --- 8. 枚举 (Enums) ---
 
 // (用于 Store 表)
@@ -112,16 +133,7 @@ enum Platform {
   OTHER
 }
 
-enum Country {
-  ID // Indonesia
-  TH // Thailand
-  VN // Vietnam
-  MY // Malaysia
-  PH // Philippines
-  SG // Singapore
-  OTHER
-}
-
+// (用于 Store 表)
 enum StoreStatus {
   ACTIVE   // 活跃
   INACTIVE // 未活跃
@@ -129,4 +141,6 @@ enum StoreStatus {
   CLOSED   // 已关闭
 }
 
-// (ProductCategory 枚举已被删除)
+// ⬇️ 【重大修改】
+// enum Country { ... } 
+// (此枚举已被删除)

@@ -73,8 +73,7 @@
         <CommonLinks v-if="currentView === 'LINKS'" />
         <UserManagement v-if="currentView === 'ADMIN_USERS'" />
         <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-
-      </div>
+        </div>
     </main>
   </div>
 </template>
@@ -87,11 +86,12 @@ import CommonLinks from './CommonLinks.vue';
 import UserManagement from './UserManagement.vue';
 import ViewReports from './ViewReports.vue';
 import StoreManagement from './StoreManagement.vue'; 
+// ⬇️ 【已删除】 对 CountryManagement 的导入
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
 import { ChevronUpIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/20/solid';
 
-// (allMenuItems 列表已在上一版中完成，无需修改)
+// ⬇️ 【修改】 (allMenuItems 列表已还原)
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_FORM', name: '销售数据录入' },
@@ -99,13 +99,14 @@ const allMenuItems = [
   { key: 'VIEW_REPORTS', name: '周报查看' },
   { key: 'LINKS', name: '常用链接' },
   { key: 'ADMIN_STORES', name: '店铺管理' },
+  // ⬇️ 【已删除】 "ADMIN_COUNTRIES"
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
 
-// (其他 <script> 部分 ... 保持不变)
+// (不变)
 const visibleMenuItems = computed(() => {
   const userPermissions = authStore.permissions; 
   if (!userPermissions) {
@@ -116,10 +117,12 @@ const visibleMenuItems = computed(() => {
   );
 });
 
+// (不变)
 const setView = (viewName) => {
   currentView.value = viewName;
 };
 
+// (不变)
 const handleLogout = () => {
   authStore.logout();
 };

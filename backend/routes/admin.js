@@ -7,24 +7,28 @@ const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 
 const router = express.Router();
-router.use(adminMiddleware); // (不变) 应用“管理员守卫”
+router.use(adminMiddleware); // (不变)
 
 // -----------------------------------------------------------------
 // --- Zod 验证模式 ---
 // -----------------------------------------------------------------
 
-// (不变) "创建用户" 模式
+// ⬇️ 【修改】 "创建用户" 模式
 const userCreateSchema = z.object({
   username: z.string().min(3, "用户名至少需要3个字符"),
   password: z.string().min(8, "密码至少需要8个字符"),
   nickname: z.string().min(1, "昵称不能为空"),
   roleId: z.string().min(1, "必须选择一个角色"),
+  supervisedCountryIds: z.array(z.string()).optional(), // ⬅️ 【新增】
+  operatedCountryIds: z.array(z.string()).optional(),   // ⬅️ 【新增】
 });
 
-// (不变) "更新用户" 模式
+// ⬇️ 【修改】 "更新用户" 模式
 const userUpdateSchema = z.object({
   nickname: z.string().min(1, "昵称不能为空"),
   roleId: z.string().min(1, "必须选择一个角色"),
+  supervisedCountryIds: z.array(z.string()).optional(), // ⬅️ 【新增】
+  operatedCountryIds: z.array(z.string()).optional(),   // ⬅️ 【新增】
 });
 
 // (不变) "创建/更新角色" 模式
@@ -39,11 +43,15 @@ const roleSchema = z.object({
 // --- 用户管理 API (Users) ---
 // -----------------------------------------------------------------
 
-// 【修改】 移除了 '/admin' 前缀
+// ⬇️ 【修改】
 router.get('/users', async (req, res) => { 
   try {
     const users = await prisma.user.findMany({
-      include: { role: true },
+      include: { 
+        role: true,
+        supervisedCountries: true, // ⬅️ 【新增】
+        operatedCountries: true,   // ⬅️ 【新增】
+      },
       orderBy: { createdAt: 'asc' },
     });
     const usersWithoutPassword = users.map(user => {
@@ -57,49 +65,74 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// 【修改】 移除了 '/admin' 前缀
+// ⬇️ 【修改】
 router.get('/users/:id', async (req, res) => { 
   try {
     const { id } = req.params;
     const user = await prisma.user.findUnique({
       where: { id: id },
-      select: { 
-        id: true,
-        username: true,
-        nickname: true,
-        roleId: true,
+      // (我们将 select 改为 include 以获取所有数据)
+      include: {
+        role: true,
+        supervisedCountries: { select: { id: true, code: true } }, // ⬅️ 【新增】
+        operatedCountries: { select: { id: true, code: true } },   // ⬅️ 【新增】
       }
     });
+    
     if (!user) { return res.status(404).json({ error: '用户未找到' }); }
-    res.json(user);
+
+    // (移除密码)
+    const { passwordHash, ...userSafe } = user;
+    res.json(userSafe);
+    
   } catch (error) {
     console.error('获取单个用户失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
 
-// 【修改】 移除了 '/admin' 前缀
+// ⬇️ 【修改】
 router.post('/users', async (req, res) => { 
   try {
     const validation = userCreateSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
     }
-    const { username, password, nickname, roleId } = validation.data;
+    
+    // ⬅️ 【新增】
+    const { 
+      username, password, nickname, roleId, 
+      supervisedCountryIds, operatedCountryIds 
+    } = validation.data;
+
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) { return res.status(400).json({ error: '此用户名已被占用' }); }
     const roleExists = await prisma.role.findUnique({ where: { id: roleId } });
     if (!roleExists) { return res.status(400).json({ error: '所选角色无效' }); }
+    
     const hashedPassword = await bcrypt.hash(password, 10);
+    
     const newUser = await prisma.user.create({
       data: {
         username: username,
         passwordHash: hashedPassword,
         nickname: nickname,
         role: { connect: { id: roleId } },
+        // ⬅️ 【新增】
+        supervisedCountries: {
+          connect: supervisedCountryIds?.map(id => ({ id: id })) || []
+        },
+        operatedCountries: {
+          connect: operatedCountryIds?.map(id => ({ id: id })) || []
+        }
       },
-      include: { role: true }
+      include: { 
+        role: true,
+        supervisedCountries: true,
+        operatedCountries: true 
+      }
     });
+    
     const { passwordHash, ...userSafe } = newUser;
     res.status(201).json(userSafe);
   } catch (error) {
@@ -111,7 +144,7 @@ router.post('/users', async (req, res) => {
   }
 });
 
-// 【修改】 移除了 '/admin' 前缀
+// ⬇️ 【修改】
 router.put('/users/:id', async (req, res) => { 
   try {
     const { id } = req.params;
@@ -119,17 +152,37 @@ router.put('/users/:id', async (req, res) => {
     if (!validation.success) {
       return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
     }
-    const { nickname, roleId } = validation.data;
+    
+    // ⬅️ 【新增】
+    const { 
+      nickname, roleId, 
+      supervisedCountryIds, operatedCountryIds 
+    } = validation.data;
+    
     const roleExists = await prisma.role.findUnique({ where: { id: roleId } });
     if (!roleExists) { return res.status(400).json({ error: '所选角色无效' }); }
+    
     const updatedUser = await prisma.user.update({
       where: { id: id },
       data: {
         nickname: nickname,
         roleId: roleId,
+        // ⬅️ 【新增】
+        // "set" 会断开所有旧的关联，并连接所有新的关联
+        supervisedCountries: {
+          set: supervisedCountryIds?.map(id => ({ id: id })) || []
+        },
+        operatedCountries: {
+          set: operatedCountryIds?.map(id => ({ id: id })) || []
+        }
       },
-      include: { role: true }
+      include: { 
+        role: true,
+        supervisedCountries: true,
+        operatedCountries: true 
+      }
     });
+    
     const { passwordHash, ...userSafe } = updatedUser;
     res.json(userSafe);
   } catch (error) {
@@ -143,11 +196,11 @@ router.put('/users/:id', async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// --- 角色管理 API (Roles) ---
+// --- 角色管理 API (Roles) --- (不变)
 // -----------------------------------------------------------------
 
-// 【修改】 移除了 '/admin' 前缀
 router.get('/roles', async (req, res) => {
+  // (代码不变)
   try {
     const roles = await prisma.role.findMany({
       orderBy: { name: 'asc' },
@@ -159,8 +212,8 @@ router.get('/roles', async (req, res) => {
   }
 });
 
-// 【修改】 移除了 '/admin' 前缀
 router.post('/roles', async (req, res) => {
+  // (代码不变)
   try {
     const validation = roleSchema.safeParse(req.body);
     if (!validation.success) {
@@ -199,8 +252,8 @@ router.post('/roles', async (req, res) => {
 });
 
 
-// 【修改】 移除了 '/admin' 前缀
 router.get('/roles/:id', async (req, res) => {
+  // (代码不变)
   try {
     const { id } = req.params;
     const role = await prisma.role.findUnique({
@@ -222,8 +275,8 @@ router.get('/roles/:id', async (req, res) => {
   }
 });
 
-// 【修改】 移除了 '/admin' 前缀
 router.put('/roles/:id', async (req, res) => {
+  // (代码不变)
   try {
     const { id } = req.params;
 
@@ -266,11 +319,11 @@ router.put('/roles/:id', async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// --- 菜单项 API (Menu Items) ---
+// --- 菜单项 API (Menu Items) --- (不变)
 // -----------------------------------------------------------------
 
-// 【修改】 移除了 '/admin' 前缀
 router.get('/menu-items', async (req, res) => {
+  // (代码不变)
   try {
     const menuItems = await prisma.menuItem.findMany({
       orderBy: {

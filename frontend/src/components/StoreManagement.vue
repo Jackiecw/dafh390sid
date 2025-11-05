@@ -19,7 +19,7 @@
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">店铺名称</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">平台</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">国家</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">国家 (Code)</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">状态</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">注册日期</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
@@ -29,7 +29,11 @@
           <tr v-for="store in stores" :key="store.id">
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ store.name }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ store.platform }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ store.country }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
+              {{ store.country ? store.country.name : 'N/A' }} 
+              ({{ store.countryCode }})
+            </td>
+            
             <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
               <span :class="['px-2 py-1 rounded-full text-xs font-semibold', getStatusClass(store.status)]">
                 {{ store.status }}
@@ -53,9 +57,11 @@
 
   <StoreFormModal
     :is-open="isModalOpen"
-    :store-to-edit-id="currentStoreToEditId" @close="closeModal"
+    :store-to-edit-id="currentStoreToEditId" 
+    @close="closeModal"
     @store-created="handleStoreCreated"
-    @store-updated="handleStoreUpdated" />
+    @store-updated="handleStoreUpdated" 
+  />
 </template>
 
 <script setup>
@@ -67,8 +73,6 @@ const stores = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref('');
 const isModalOpen = ref(false);
-
-// ⬇️ 【新增】
 const currentStoreToEditId = ref(null);
 
 // (获取店铺列表) (不变)
@@ -76,7 +80,7 @@ async function fetchStores() {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    // (调用 management.js 中的 GET /stores)
+    // (GET /stores 已被更新，会包含 "country" 对象)
     const response = await apiClient.get('/admin/stores');
     stores.value = response.data;
   } catch (error) {
@@ -90,31 +94,29 @@ onMounted(() => {
   fetchStores();
 });
 
-// ⬇️ 【修改】 (弹窗控制)
+// (弹窗控制) (不变)
 function openModal() { isModalOpen.value = true; }
 function closeModal() { 
   isModalOpen.value = false; 
-  currentStoreToEditId.value = null; // (新增) 重置 ID
+  currentStoreToEditId.value = null; 
 }
 
-// (不变)
+// (创建后) (修改)
 function handleStoreCreated(newStore) {
-  // (在不刷新的情况下，将新店铺添加到列表顶部)
-  stores.value.unshift(newStore);
+  // (创建后，新的 store 对象没有 country 关联对象，所以我们重新加载)
+  fetchStores();
 }
 
-// ⬇️ 【新增】 (编辑逻辑)
+// (编辑) (不变)
 function handleEdit(store) {
   currentStoreToEditId.value = store.id;
   openModal();
 }
 
-// ⬇️ 【新增】 (更新 UI 逻辑)
-function handleStoreUpdated(updatedStore) {
-  const index = stores.value.findIndex(s => s.id === updatedStore.id);
-  if (index !== -1) {
-    stores.value[index] = updatedStore;
-  }
+// (更新后) (修改)
+function handleStoreUpdated() {
+  // (弹窗不再返回更新后的对象, 我们只需重新加载列表)
+  fetchStores();
 }
 
 

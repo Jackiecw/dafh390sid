@@ -4,10 +4,8 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { jwtDecode } from 'jwt-decode';
 
-// (不变)
 export const useAuthStore = defineStore('auth', () => {
   // 1. State (不变)
-  // token 会被存储，user 会在加载时被解码
   const token = ref(localStorage.getItem('token'));
   const user = ref(null); // 这个 ref 将保存完整的解码后的 Token 负载
 
@@ -15,12 +13,14 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!token.value);
   const nickname = computed(() => user.value?.nickname || '用户');
   const role = computed(() => user.value?.role || 'GUEST');
-
-  // ⬇️ 【新增】
-  //    创建一个新的 getter，专门从 user 负载中提取 permissions 数组
-  //    如果 user 不存在或 permissions 数组不存在，返回一个空数组 []
-  //    这能防止 v-for 或 .includes() 在 null 上出错
+  
+  // (不变) 菜单权限
   const permissions = computed(() => user.value?.permissions || []);
+
+  // ⬇️ 【新增】 国家权限
+  //    创建一个新的 getter，专门从 user 负载中提取 operatedCountries 数组
+  const operatedCountries = computed(() => user.value?.operatedCountries || []);
+
 
   // 3. (不变) 核心解码函数
   //    这个函数不需要修改，因为它会解码 *整个* Token 负载
@@ -31,8 +31,9 @@ export const useAuthStore = defineStore('auth', () => {
         const decoded = jwtDecode(token.value);
         // 检查 Token 是否过期
         if (decoded.exp * 1000 > Date.now()) {
+          
           // (不变)
-          // decoded 现在是 { userId, nickname, role, permissions, ... }
+          // decoded 现在是 { ..., permissions: [], operatedCountries: [] }
           // 我们把它完整存入 user ref
           user.value = decoded;
         } else {
@@ -49,7 +50,6 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   // 4. Actions (不变)
-  //    login 和 logout 也不需要修改。
   function login(newToken) {
     localStorage.setItem('token', newToken); // 存入“保险箱”
     token.value = newToken;
@@ -66,14 +66,15 @@ export const useAuthStore = defineStore('auth', () => {
   checkAndDecodeToken();
 
   // 6. ⬇️ 【修改】
-  //    暴露我们新创建的 "permissions" getter
+  //    暴露我们新创建的 "operatedCountries" getter
   return {
     token,
     user,
     isLoggedIn,
     nickname,
     role,
-    permissions, // ⬅️ 【新增】
+    permissions, 
+    operatedCountries, // ⬅️ 【新增】
     login,
     logout
   };
