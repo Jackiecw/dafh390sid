@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const dataRoutes = require('./routes/data');
 const adminRoutes = require('./routes/admin');
 const managementRoutes = require('./routes/management');
+const productRoutes = require('./routes/products'); // ⬅️ 【新增】 导入商品路由
 
 // 3. 初始化
 const app = express();
@@ -20,7 +21,10 @@ const app = express();
 app.use(cors()); // 允许跨域请求
 app.use(express.json()); // 允许 Express 解析 JSON 格式的请求体
 
-
+// (新增) 开放 /uploads 目录，允许前端访问图片
+// 这样 http://localhost:3000/uploads/products/image.png 才能被访问
+const path = require('path');
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // 5. 健康检查路由 (保留这个，用于测试服务器是否启动)
@@ -45,6 +49,8 @@ app.use('/api', dataRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use('/api/admin', managementRoutes);
+
+app.use('/api/admin', productRoutes); // ⬅️ 【新增】 挂载商品路由
 
 // (注意：所有旧的 app.post 和 app.get 路由都已被删除)
 

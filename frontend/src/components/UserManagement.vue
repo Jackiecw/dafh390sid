@@ -203,14 +203,14 @@ async function fetchRoles() {
   }
 }
 
-// --- (修改) "用户" 弹窗控制 ---
+// --- (不变) "用户" 弹窗控制 ---
 function openModal() { isModalOpen.value = true; }
 function closeModal() {
   isModalOpen.value = false;
   currentUserToEdit.value = null; 
 }
 
-// ⬇️ 【修改】
+// (不变)
 function handleEdit(user) {
   // (user 对象来自 fetchUsers，已包含国家列表)
   currentUserToEdit.value = {
@@ -218,7 +218,6 @@ function handleEdit(user) {
     username: user.username,
     nickname: user.nickname,
     roleId: user.role.id,
-    // ⬇️ 【新增】
     // (我们将完整的国家对象数组转为 ID 数组，供弹窗 v-model 使用)
     supervisedCountryIds: user.supervisedCountries.map(c => c.id),
     operatedCountryIds: user.operatedCountries.map(c => c.id),
@@ -240,10 +239,24 @@ function handleUserCreated(newUser) {
 }
 
 
-// --- (不变) "角色" 弹窗控制 ---
-function openRoleModal() { /* ... (代码不变) ... */ }
-function closeRoleModal() { /* ... (代码不变) ... */ }
-function handleEditRole(role) { /* ... (代码不变) ... */ }
-function handleRoleCreated(newRole) { /* ... (代码不变) ... */ }
-function handleRoleUpdated(updatedRole) { /* ... (代码不变) ... */ }
+// --- ⬇️ 【修改】 "角色" 弹窗控制 (补全缺失的逻辑) ---
+function openRoleModal() { 
+  isRoleModalOpen.value = true;
+}
+function closeRoleModal() { 
+  isRoleModalOpen.value = false; 
+  currentRoleToEditId.value = null;
+}
+function handleEditRole(role) { 
+  currentRoleToEditId.value = role.id;
+  isRoleModalOpen.value = true;
+}
+function handleRoleCreated(newRole) { 
+  // (创建后，重新获取列表)
+  fetchRoles();
+}
+function handleRoleUpdated(updatedRole) { 
+  // (更新后，重新获取列表)
+  fetchRoles();
+}
 </script>

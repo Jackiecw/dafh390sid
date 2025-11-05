@@ -9,37 +9,58 @@ async function main() {
 
   // --- 1. 创建所有“菜单项” ---
   console.log('正在创建菜单项...');
-  const menuDashboard = await prisma.menuItem.create({
-    data: { key: 'DASHBOARD', name: '仪表盘' },
+  const menuDashboard = await prisma.menuItem.upsert({
+    where: { key: 'DASHBOARD' },
+    update: {},
+    create: { key: 'DASHBOARD', name: '仪表盘' },
   });
-  const menuSalesForm = await prisma.menuItem.create({
-    data: { key: 'SALES_FORM', name: '销售数据录入' },
+  const menuSalesForm = await prisma.menuItem.upsert({
+    where: { key: 'SALES_FORM' },
+    update: {},
+    create: { key: 'SALES_FORM', name: '销售数据录入' },
   });
-  const menuWeeklyReport = await prisma.menuItem.create({
-    data: { key: 'WEEKLY_REPORT', name: '周报填写' },
+  const menuWeeklyReport = await prisma.menuItem.upsert({
+    where: { key: 'WEEKLY_REPORT' },
+    update: {},
+    create: { key: 'WEEKLY_REPORT', name: '周报填写' },
   });
-  const menuViewReports = await prisma.menuItem.create({
-    data: { key: 'VIEW_REPORTS', name: '周报查看' },
+  const menuViewReports = await prisma.menuItem.upsert({
+    where: { key: 'VIEW_REPORTS' },
+    update: {},
+    create: { key: 'VIEW_REPORTS', name: '周报查看' },
   });
-  const menuLinks = await prisma.menuItem.create({
-    data: { key: 'LINKS', name: '常用链接' },
+  const menuLinks = await prisma.menuItem.upsert({
+    where: { key: 'LINKS' },
+    update: {},
+    create: { key: 'LINKS', name: '常用链接' },
   });
-  const menuAdminUsers = await prisma.menuItem.create({
-    data: { key: 'ADMIN_USERS', name: '员工配置与管理' },
+  const menuAdminUsers = await prisma.menuItem.upsert({
+    where: { key: 'ADMIN_USERS' },
+    update: {},
+    create: { key: 'ADMIN_USERS', name: '员工配置与管理' },
   });
   
-  const menuAdminStores = await prisma.menuItem.create({
-    data: { key: 'ADMIN_STORES', name: '店铺管理' },
+  const menuAdminStores = await prisma.menuItem.upsert({
+    where: { key: 'ADMIN_STORES' },
+    update: {},
+    create: { key: 'ADMIN_STORES', name: '店铺管理' },
   });
   
-  // ⬇️ 【已删除】 menuAdminCountries (不再需要)
+  // ⬇️ 【新增】 创建商品管理菜单项
+  const menuAdminProducts = await prisma.menuItem.upsert({
+    where: { key: 'ADMIN_PRODUCTS' },
+    update: {},
+    create: { key: 'ADMIN_PRODUCTS', name: '商品管理' },
+  });
 
 
   // --- 2. 创建“角色”并【关联菜单】---
   
   console.log('正在创建“运营专员”角色...');
-  const roleOperation = await prisma.role.create({
-    data: {
+  const roleOperation = await prisma.role.upsert({
+    where: { name: 'operation' },
+    update: {}, // (如果已存在，不更新)
+    create: {
       name: 'operation',
       description: '运营专员 (仅限数据录入和周报)',
       menus: {
@@ -54,8 +75,23 @@ async function main() {
   });
 
   console.log('正在创建“超级管理员”角色...');
-  const roleAdmin = await prisma.role.create({
-    data: {
+  const roleAdmin = await prisma.role.upsert({
+    where: { name: 'admin' },
+    update: { // (如果已存在，确保权限是最新的)
+      menus: {
+        connect: [
+          { id: menuDashboard.id },
+          { id: menuSalesForm.id },
+          { id: menuWeeklyReport.id },
+          { id: menuViewReports.id },
+          { id: menuLinks.id },
+          { id: menuAdminUsers.id },
+          { id: menuAdminStores.id },
+          { id: menuAdminProducts.id }, // ⬅️ 【新增】
+        ],
+      },
+    },
+    create: {
       name: 'admin',
       description: '超级管理员 (拥有所有权限)',
       menus: {
@@ -67,7 +103,7 @@ async function main() {
           { id: menuLinks.id },
           { id: menuAdminUsers.id },
           { id: menuAdminStores.id },
-          // ⬅️ 【已删除】 menuAdminCountries.id (不再需要)
+          { id: menuAdminProducts.id }, // ⬅️ 【新增】
         ],
       },
     },
@@ -79,8 +115,10 @@ async function main() {
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   console.log('正在创建“超级管理员”用户...');
-  const adminUser = await prisma.user.create({
-    data: {
+  const adminUser = await prisma.user.upsert({
+    where: { username: 'admin' },
+    update: {}, // (如果已存在，不更新)
+    create: {
       username: 'admin',
       passwordHash: hashedPassword,
       nickname: '超级管理员',

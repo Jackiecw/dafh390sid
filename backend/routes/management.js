@@ -49,10 +49,16 @@ router.get('/stores', async (req, res) => {
   try {
     const stores = await prisma.store.findMany({
       orderBy: { name: 'asc' },
-      // ⬇️ 【新增】 包含关联的国家信息
+      // ⬇️ 【修改】
       include: {
-        country: true 
+        country: true, 
+        products: { // ⬅️ 【新增】
+          select: {
+            sku: true // 我们只需要商品的 SKU
+          }
+        }
       }
+      // ⬆️ 【修改】
     });
     res.json(stores);
   } catch (error) {
