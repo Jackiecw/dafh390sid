@@ -17,9 +17,11 @@ export const useAuthStore = defineStore('auth', () => {
   // (不变) 菜单权限
   const permissions = computed(() => user.value?.permissions || []);
 
-  // ⬇️ 【新增】 国家权限
-  //    创建一个新的 getter，专门从 user 负载中提取 operatedCountries 数组
+  // (不变) 国家权限
   const operatedCountries = computed(() => user.value?.operatedCountries || []);
+
+  // ⬇️ 【新增】 头像 Getter
+  const avatarUrl = computed(() => user.value?.avatarUrl || null);
 
 
   // 3. (不变) 核心解码函数
@@ -33,7 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (decoded.exp * 1000 > Date.now()) {
           
           // (不变)
-          // decoded 现在是 { ..., permissions: [], operatedCountries: [] }
+          // decoded 现在是 { ..., permissions: [], operatedCountries: [], avatarUrl: ... }
           // 我们把它完整存入 user ref
           user.value = decoded;
         } else {
@@ -65,8 +67,7 @@ export const useAuthStore = defineStore('auth', () => {
   // 5. (不变) 应用加载时，立即检查一次
   checkAndDecodeToken();
 
-  // 6. ⬇️ 【修改】
-  //    暴露我们新创建的 "operatedCountries" getter
+  // 6. ⬇️ 【修改】 (暴露新 Getter)
   return {
     token,
     user,
@@ -74,7 +75,8 @@ export const useAuthStore = defineStore('auth', () => {
     nickname,
     role,
     permissions, 
-    operatedCountries, // ⬅️ 【新增】
+    operatedCountries, 
+    avatarUrl, // ⬅️ 【新增】
     login,
     logout
   };

@@ -11,22 +11,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- 1. 用户模型 (更新) ---
+// --- 1. 用户模型 (不变) ---
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
   passwordHash String
   nickname     String
+  avatarUrl    String?  // (上一步已添加)
   createdAt    DateTime @default(now())
 
   role         Role     @relation(fields: [roleId], references: [id])
   roleId       String
   
-  // (关系不变)
   salesData     SalesData[]
   weeklyReports WeeklyReport[]
 
-  // ⬇️ 【新增】 主管和运营的国家
   supervisedCountries ManagedCountry[] @relation("CountrySupervisors")
   operatedCountries   ManagedCountry[] @relation("CountryOperators")
 }
@@ -48,10 +47,7 @@ model MenuItem {
   roles Role[]
 }
 
-// --- 4. 商品模型 (Product) ---
-// (已删除)
-
-// --- 5. 店铺模型 (Store) (更新) ---
+// --- 4. 店铺模型 (Store) (修改) ---
 model Store {
   id              String   @id @default(cuid())
   name            String   @unique
@@ -65,17 +61,19 @@ model Store {
 
   salesData SalesData[]
 
-  // ⬇️ 【新增】 与商品的多对多关系
-  products Product[] @relation("StoreProducts")
+  // ⬇️ 【修改】 关联到新的 "Listing" (上架) 模型
+  listings StoreProductListing[]
+  
+  // ⬆️ 【修改】 (旧的 "products" 关联已删除)
 }
 
-// --- 6. 销售数据模型 (SalesData) ---
+// --- 5. 销售数据模型 (SalesData) (不变) ---
 model SalesData {
   id          String   @id @default(cuid())
   recordDate  DateTime
   salesVolume Int
   revenue     Float
-  // adSpend     Float  // ⬅️ 【删除】
+  notes       String?  @db.Text // (上一步已添加)
   createdAt   DateTime @default(now())
 
   enteredBy   User   @relation(fields: [enteredById], references: [id])
@@ -84,12 +82,11 @@ model SalesData {
   store   Store  @relation(fields: [storeId], references: [id])
   storeId String
 
-  // ⬇️ 【新增】 重新关联商品
   product     Product @relation(fields: [productId], references: [id])
   productId   String
 }
 
-// --- 7. (不变) 周报模型 (WeeklyReport) ---
+// --- 6. (不变) 周报模型 (WeeklyReport) ---
 model WeeklyReport {
   id                  String   @id @default(cuid())
   weekStartDate       DateTime
@@ -103,47 +100,62 @@ model WeeklyReport {
 }
 
 
-// ⬇️ 【新增】 国家管理模型
+// --- 7. (不变) 国家管理模型 (ManagedCountry) ---
 model ManagedCountry {
   id            String    @id @default(cuid())
-  code          String    @unique // 国家的唯一标识, e.g., "ID"
-  name          String    // 国家的易读名称, e.g., "Indonesia"
-  establishedAt DateTime? // 设立时间
+  code          String    @unique 
+  name          String    
+  establishedAt DateTime? 
 
-  // --- 关系字段 ---
-  
-  // 1. "负责人" (多对多)
   supervisors User[] @relation("CountrySupervisors")
-  
-  // 2. "运营人" (多对多)
   operators   User[] @relation("CountryOperators")
-  
-  // 3. 关联到店铺
   stores      Store[]
 }
 
-// ⬇️ --- 【新增】 商品模型 ---
+// --- 8. 商品模型 (Product) (修改) ---
 model Product {
   id          String  @id @default(cuid())
-  sku         String  @unique // 商品SKU (型号)
-  name        String  // 商品可读名称
+  sku         String  @unique 
+  name        String  
   description String? @db.Text
-  imageUrl    String? // 图片URL (将存储相对路径)
+  imageUrl    String?
   
-  category    ProductCategory // 商品分类
+  category    ProductCategory 
 
-  cost        Float?  // 成本价
-  weightKg    Float?  // 重量
+  cost        Float?  
+  weightKg    Float?  
 
-  // 关系
-  stores    Store[]     @relation("StoreProducts")
+  // ⬇️ 【修改】 关联到新的 "Listing" (上架) 模型
+  listings StoreProductListing[]
+  // ⬆️ 【修改】 (旧的 "stores" 关联已删除)
+  
   salesData SalesData[]
 }
 
+// ⬇️ --- 【新增】 店铺商品上架 (StoreProductListing) 模型 ---
+// 这是新的多对多关联表，它存储 "售价"
+model StoreProductListing {
+  id        String  @id @default(cuid())
+  
+  // 关联
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade) // 店铺删除，上架信息也删除
+  storeId   String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade) // 商品删除，上架信息也删除
+  productId String
 
-// --- 8. 枚举 (Enums) ---
+  // 关键字段
+  currentPrice  Float   @default(0) // ⬅️ **售价 (价格同步的目标)**
+  platformUrl   String? // (可选) 该商品在 Shopee/TikTok 上的链接
+  lastSyncedAt  DateTime? @updatedAt // (可选) 上次同步时间
+  
+  // 确保一个店铺里一个商品只上架一次
+  @@unique([storeId, productId])
+}
+// ⬆️ --- 【新增】 ---
 
-// (用于 Store 表)
+
+// --- 9. 枚举 (Enums) (不变) ---
+
 enum Platform {
   SHOPEE
   TIKTOK_SHOP
@@ -152,15 +164,13 @@ enum Platform {
   OTHER
 }
 
-// (用于 Store 表)
 enum StoreStatus {
-  ACTIVE   // 活跃
-  INACTIVE // 未活跃
-  BANNED   // 被封
-  CLOSED   // 已关闭
+  ACTIVE   
+  INACTIVE 
+  BANNED   
+  CLOSED   
 }
 
-// ⬇️ 【新增】 商品分类枚举
 enum ProductCategory {
   PROJECTOR
   SCREEN

@@ -75,10 +75,17 @@
                   <span v-else class="text-gray-400">无</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button @click="handleEdit(user)" class="text-indigo-600 hover:text-indigo-900">
+                  <button @click="handleEdit(user)" class="text-indigo-600 hover:text-indigo-900 mr-4">
                     编辑
                   </button>
-                </td>
+                  <button 
+                    @click="handleResetPassword(user)" 
+                    :disabled="user.username === 'admin'"
+                    class="text-amber-600 hover:text-amber-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    重置密码
+                  </button>
+                  </td>
               </tr>
             </tbody>
           </table>
@@ -177,7 +184,6 @@ onMounted(() => {
 });
 
 // (不变) fetchUsers
-// (GET /admin/users 已经返回了国家数据)
 async function fetchUsers() { 
   errorMessage.value = '';
   try {
@@ -209,40 +215,30 @@ function closeModal() {
   isModalOpen.value = false;
   currentUserToEdit.value = null; 
 }
-
-// (不变)
 function handleEdit(user) {
-  // (user 对象来自 fetchUsers，已包含国家列表)
   currentUserToEdit.value = {
     id: user.id,
     username: user.username,
     nickname: user.nickname,
     roleId: user.role.id,
-    // (我们将完整的国家对象数组转为 ID 数组，供弹窗 v-model 使用)
     supervisedCountryIds: user.supervisedCountries.map(c => c.id),
     operatedCountryIds: user.operatedCountries.map(c => c.id),
   };
   openModal();
 }
-
-// (不变) handleUserUpdated
-// (updatedUser 是从 API 返回的，已包含最新国家数据)
 function handleUserUpdated(updatedUser) {
   const index = users.value.findIndex(u => u.id === updatedUser.id);
   if (index !== -1) {
     users.value[index] = updatedUser;
   }
 }
-// (不变) handleUserCreated
 function handleUserCreated(newUser) {
   users.value.push(newUser);
 }
 
 
-// --- ⬇️ 【修改】 "角色" 弹窗控制 (补全缺失的逻辑) ---
-function openRoleModal() { 
-  isRoleModalOpen.value = true;
-}
+// --- (不变) "角色" 弹窗控制 ---
+function openRoleModal() { isRoleModalOpen.value = true; }
 function closeRoleModal() { 
   isRoleModalOpen.value = false; 
   currentRoleToEditId.value = null;
@@ -251,12 +247,19 @@ function handleEditRole(role) {
   currentRoleToEditId.value = role.id;
   isRoleModalOpen.value = true;
 }
-function handleRoleCreated(newRole) { 
-  // (创建后，重新获取列表)
-  fetchRoles();
-}
-function handleRoleUpdated(updatedRole) { 
-  // (更新后，重新获取列表)
-  fetchRoles();
+function handleRoleCreated(newRole) { fetchRoles(); }
+function handleRoleUpdated(updatedRole) { fetchRoles(); }
+
+// ⬇️ 【新增】 重置密码
+async function handleResetPassword(user) {
+  if (confirm(`确定要将用户 "${user.nickname}" (${user.username}) 的密码重置为 'q1234567' 吗？`)) {
+    try {
+      const response = await apiClient.post(`/admin/users/${user.id}/reset-password`);
+      alert(response.data.message); // 显示成功信息
+    } catch (error) {
+      console.error('重置密码失败:', error);
+      alert(error.response?.data?.error || '操作失败');
+    }
+  }
 }
 </script>

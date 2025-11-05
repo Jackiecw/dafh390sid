@@ -23,6 +23,7 @@ const loginSchema = z.object({
 });
 
 // (不变) 接口 1: (POST) 用户注册
+// ... (router.post('/register', ...) 代码不变)
 router.post('/register', async (req, res) => {
   try {
     const validation = registerSchema.safeParse(req.body);
@@ -69,8 +70,9 @@ router.post('/register', async (req, res) => {
   }
 });
 
+
 // 接口 2: (POST) 用户登录
-// ⬇️ 【重大修改】此接口现在返回带 "operatedCountries" 数组的 Token
+// ⬇️ 【重大修改】此接口现在返回带 "avatarUrl" 的 Token
 router.post('/login', async (req, res) => {
   try {
     // 1. (不变) 验证输入
@@ -93,7 +95,7 @@ router.post('/login', async (req, res) => {
             menus: true // 包含该 Role 关联的所有 MenuItem
           }
         },
-        operatedCountries: { // ⬅️ 【新增】 包含用户运营的国家
+        operatedCountries: { // ⬅️ (不变) 包含用户运营的国家
           select: {
             code: true // ⬅️ 我们只需要国家的 "code"
           }
@@ -117,7 +119,7 @@ router.post('/login', async (req, res) => {
     // (A) (不变) 提取菜单权限
     const permissions = user.role.menus.map(menu => menu.key);
 
-    // (B) ⬅️ 【新增】 提取国家权限
+    // (B) (不变) 提取国家权限
     const operatedCountries = user.operatedCountries.map(country => country.code);
 
     // (C) 创建 Token
@@ -126,8 +128,9 @@ router.post('/login', async (req, res) => {
         userId: user.id, 
         role: user.role.name, 
         nickname: user.nickname,
+        avatarUrl: user.avatarUrl, // ⬅️ 【新增】
         permissions: permissions, 
-        operatedCountries: operatedCountries // ⬅️ 【新增】
+        operatedCountries: operatedCountries 
       },
       JWT_SECRET,
       { expiresIn: '7d' }

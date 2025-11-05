@@ -102,6 +102,7 @@ const selectedProductIds = ref([]); // v-model for checkboxes
 const isLoading = ref(false);
 const errorMessage = ref('');
 
+// ⬇️ 【修改】
 // (核心) 当弹窗打开时，获取所有商品和该店铺已选的商品
 async function fetchData() {
   if (!props.store) return;
@@ -124,8 +125,8 @@ async function fetchData() {
     allProducts.value = productsResponse.data;
     
     // (预先勾选已选的)
-    // (storeResponse.data.products 是一个 [{id: '...'}, ...])
-    selectedProductIds.value = storeResponse.data.products.map(p => p.id);
+    // ⬅️ 从 storeResponse.data.listings 读取
+    selectedProductIds.value = storeResponse.data.listings.map(l => l.productId);
 
   } catch (error) {
     console.error("加载数据失败:", error);
@@ -134,8 +135,10 @@ async function fetchData() {
     isLoading.value = false;
   }
 }
+// ⬆️ 【修改】
 
-// (核心) 提交
+// (核心) 提交 (不变)
+// (此函数发送的 payload { productIds: [...] } 仍然被新后端逻辑支持)
 async function handleSubmit() {
   if (!props.store) return;
   

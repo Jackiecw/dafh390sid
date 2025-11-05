@@ -19,8 +19,12 @@
         <Menu as="div" class="inline-block text-left w-full">
           <div>
             <MenuButton class="inline-flex w-full justify-center items-center rounded-md bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 shadow-sm hover:bg-stone-200 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-              {{ authStore.nickname }}
-              <ChevronUpIcon class="ml-2 -mr-1 h-5 w-5 text-stone-500" aria-hidden="true" />
+              
+              <img v-if="authStore.avatarUrl" :src="userAvatar" alt="Avatar" class="h-6 w-6 rounded-full mr-2 object-cover" />
+              <UserCircleIcon v-else class="h-6 w-6 rounded-full mr-2 text-stone-400" />
+              
+              <span class="truncate">{{ authStore.nickname }}</span>
+              <ChevronUpIcon class="ml-auto -mr-1 h-5 w-5 text-stone-500" aria-hidden="true" />
             </MenuButton>
           </div>
           <transition 
@@ -31,8 +35,21 @@
             leave-from-class="transform opacity-100 scale-100" 
             leave-to-class="transform opacity-0 scale-95"
           >
-            <MenuItems class="absolute left-64 bottom-4 ml-2 w-56 origin-bottom-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+            <MenuItems class="absolute left-0 bottom-16 mb-2 w-56 origin-bottom-left rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
               <div class="py-1">
+                <MenuItem v-slot="{ active }">
+                  <button 
+                    @click="setView('PROFILE_MGMT')"
+                    :class="[
+                      active ? 'bg-stone-100 text-stone-900' : 'text-stone-700', 
+                      'group flex w-full items-center rounded-md px-4 py-2 text-sm'
+                    ]"
+                  >
+                    <Cog6ToothIcon class="mr-3 h-5 w-5 text-stone-400 group-hover:text-stone-500" aria-hidden="true" />
+                    个人中心
+                  </button>
+                </MenuItem>
+                
                 <MenuItem v-slot="{ active }">
                   <button 
                     @click="handleLogout" 
@@ -67,13 +84,17 @@
           </div>
         </div>
 
-        <SalesForm v-if="currentView === 'SALES_FORM'" />
+        <SalesDataPage v-if="currentView === 'SALES_DATA'" />
         <WeeklyReportForm v-if="currentView === 'WEEKLY_REPORT'" />
         <ViewReports v-if="currentView === 'VIEW_REPORTS'" />
         <CommonLinks v-if="currentView === 'LINKS'" />
+        
+        <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
+        
         <UserManagement v-if="currentView === 'ADMIN_USERS'" />
         <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-        <ProductManagement v-if="currentView === 'ADMIN_PRODUCTS'" />
+        
+        <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
         </div>
     </main>
   </div>
@@ -81,39 +102,55 @@
 
 <script setup>
 import { ref, computed } from 'vue'; 
-import SalesForm from './SalesForm.vue';
+import SalesDataPage from './SalesDataPage.vue';
 import WeeklyReportForm from './WeeklyReportForm.vue';
 import CommonLinks from './CommonLinks.vue';
+import ProfileManagement from './ProfileManagement.vue';
 import UserManagement from './UserManagement.vue';
 import ViewReports from './ViewReports.vue';
 import StoreManagement from './StoreManagement.vue'; 
-// ⬇️ 【已删除】 对 CountryManagement 的导入
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
-import { ChevronUpIcon, ArrowRightOnRectangleIcon } from '@heroicons/vue/20/solid';
-import ProductManagement from './ProductManagement.vue';
+import { 
+  ChevronUpIcon, 
+  ArrowRightOnRectangleIcon, 
+  UserCircleIcon,
+  Cog6ToothIcon
+} from '@heroicons/vue/20/solid';
+// ⬇️ 【修改】
+import OnSaleProductsPage from './OnSaleProductsPage.vue'; // ⬅️ (指向新组件)
+// ⬆️ 【修改】 (删除了旧的 ProductManagement)
 
-// ⬇️ 【修改】 (allMenuItems 列表已还原)
+
+// ⬇️ 【修改】 (allMenuItems 列表已更新)
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
-  { key: 'SALES_FORM', name: '销售数据录入' },
+  { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'WEEKLY_REPORT', name: '周报填写' },
   { key: 'VIEW_REPORTS', name: '周报查看' },
+  { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, // ⬅️ 新的
   { key: 'LINKS', name: '常用链接' },
   { key: 'ADMIN_STORES', name: '店铺管理' },
-  { key: 'ADMIN_PRODUCTS', name: '商品管理' },
+  // (ADMIN_PRODUCTS 已删除)
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
 
+// ⬇️ 【(不变)】 (用于拼接头像 URL)
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+const userAvatar = computed(() => {
+  if (!authStore.avatarUrl) return null;
+  return authStore.avatarUrl.startsWith('http') 
+    ? authStore.avatarUrl 
+    : `${apiBaseUrl}${authStore.avatarUrl}`;
+});
+
 // (不变)
 const visibleMenuItems = computed(() => {
   const userPermissions = authStore.permissions; 
-  if (!userPermissions) {
-    return []; 
-  }
+  if (!userPermissions) return []; 
   return allMenuItems.filter(item => 
     userPermissions.includes(item.key)
   );

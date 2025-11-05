@@ -78,6 +78,11 @@
                  class="form-input" />
         </div>
         
+        <div class="space-y-2 md:col-span-2">
+          <label for="notes" class="block text-sm font-medium text-stone-700">备注 (可选)</label>
+          <textarea id="notes" rows="3" v-model="formOtherData.notes"
+                    class="form-input"></textarea>
+        </div>
         </div>
 
       <button type="submit" 
@@ -107,7 +112,6 @@ const selectedCountry = ref('');
 const selectedPlatform = ref('');
 const selectedStoreId = ref(''); 
 
-// ⬇️ 【新增】
 const selectedProductId = ref(''); 
 const storeProducts = ref([]);
 const isLoadingProducts = ref(false);
@@ -116,7 +120,7 @@ const formOtherData = ref({
   recordDate: new Date().toISOString().split('T')[0],
   salesVolume: null,
   revenue: null,
-  // ⬅️ 【删除】 adSpend
+  notes: '', // ⬅️ 【新增】
 });
 
 const successMessage = ref('');
@@ -185,13 +189,13 @@ const storeOptions = computed(() => {
 });
 
 
-// --- 4. 级联逻辑 (Watch) (修改) ---
+// --- 4. 级联逻辑 (Watch) (不变) ---
+// (这部分在上次修复中已完成)
 
 // (监视国家变化)
 watch(selectedCountry, (newCountry) => {
   selectedPlatform.value = '';
   selectedStoreId.value = '';
-  // ⬇️ 【新增】
   selectedProductId.value = '';
   storeProducts.value = [];
 });
@@ -199,22 +203,21 @@ watch(selectedCountry, (newCountry) => {
 // (监视平台变化)
 watch(selectedPlatform, (newPlatform) => {
   selectedStoreId.value = '';
-  // ⬇️ 【新增】
   selectedProductId.value = '';
   storeProducts.value = [];
 });
 
-// ⬇️ 【新增】 监视店铺变化，获取商品
+// (监视店铺变化，获取商品)
 watch(selectedStoreId, async (newStoreId) => {
   selectedProductId.value = '';
   storeProducts.value = [];
+  errorMessage.value = '';
   
-  if (!newStoreId) return; // 如果清空了店铺，则停止
+  if (!newStoreId) return; 
 
   isLoadingProducts.value = true;
   try {
-    // (调用我们在后端创建的新路由)
-    const response = await apiClient.get(`/api/stores/${newStoreId}/products`);
+    const response = await apiClient.get(`/stores/${newStoreId}/products`);
     storeProducts.value = response.data;
   } catch (error) {
     console.error('获取店铺商品失败:', error);
@@ -230,7 +233,6 @@ const handleSubmit = async () => {
   successMessage.value = '';
   errorMessage.value = '';
 
-  // ⬇️ 【修改】
   if (!selectedStoreId.value || !selectedProductId.value) {
     errorMessage.value = '请选择一个有效的店铺和商品';
     return;
@@ -240,16 +242,19 @@ const handleSubmit = async () => {
   const payload = {
     ...formOtherData.value,
     storeId: selectedStoreId.value, 
-    productId: selectedProductId.value, // ⬅️ 【新增】
+    productId: selectedProductId.value, 
     salesVolume: parseInt(formOtherData.value.salesVolume) || 0,
     revenue: parseFloat(formOtherData.value.revenue) || 0,
-    // adSpend... // ⬅️ 【删除】
+    notes: formOtherData.value.notes || null, // ⬅️ 【新增】
   };
 
   try {
     const response = await apiClient.post('/sales', payload);
     successMessage.value = '数据提交成功！(ID: ' + response.data.id + ')';
     
+    // (可选) 提交成功后清空备注
+    // formOtherData.value.notes = ''; 
+
   } catch (error) {
     console.error('提交失败:', error.response);
     if (error.response && error.response.data.error) {

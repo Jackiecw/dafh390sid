@@ -6,13 +6,15 @@ require('dotenv').config();
 // 2. 导入“零件”
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); // ⬅️ 【新增】 导入 path
 
 // (新增) 导入我们分离出去的路由文件
 const authRoutes = require('./routes/auth');
 const dataRoutes = require('./routes/data');
 const adminRoutes = require('./routes/admin');
 const managementRoutes = require('./routes/management');
-const productRoutes = require('./routes/products'); // ⬅️ 【新增】 导入商品路由
+const productRoutes = require('./routes/products'); 
+const profileRoutes = require('./routes/profile'); // ⬅️ 【新增】 
 
 // 3. 初始化
 const app = express();
@@ -21,9 +23,8 @@ const app = express();
 app.use(cors()); // 允许跨域请求
 app.use(express.json()); // 允许 Express 解析 JSON 格式的请求体
 
-// (新增) 开放 /uploads 目录，允许前端访问图片
-// 这样 http://localhost:3000/uploads/products/image.png 才能被访问
-const path = require('path');
+// ⬇️ 【修改】 开放整个 /uploads 目录
+// 这样 /uploads/products 和 /uploads/avatars 都能被访问
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
@@ -36,30 +37,21 @@ app.get('/', (req, res) => {
 // --- 挂载 API 路由 ---
 // ------------------------------------------
 
-// 告诉 Express：
-// - 任何以 /api 开头的请求，都转到 authRoutes 文件去匹配
-//   (例如: /api/register, /api/login)
+// (非 Admin 路由)
 app.use('/api', authRoutes);
-
-// - 如果 authRoutes 中没有匹配到，再转到 dataRoutes 文件去匹配
-//   (例如: /api/me, /api/sales, /api/reports)
 app.use('/api', dataRoutes);
+app.use('/api', profileRoutes); // ⬅️ 【新增】 (注意：没有 /admin 前缀)
 
-// ⬇️ 告诉 Express，所有 adminRoutes 里的路由都以 /api/admin 开头
+// (Admin 路由)
 app.use('/api/admin', adminRoutes);
-
 app.use('/api/admin', managementRoutes);
-
-app.use('/api/admin', productRoutes); // ⬅️ 【新增】 挂载商品路由
-
-// (注意：所有旧的 app.post 和 app.get 路由都已被删除)
+app.use('/api/admin', productRoutes); 
 
 // 6. 启动服务器
 const PORT = 3000;
-const HOST = '0.0.0.0'; // ⬅️ 【新增】监听所有网络接口
+const HOST = '0.0.0.0'; 
 
-app.listen(PORT, HOST, () => { // ⬅️ 【修改】添加 HOST
+app.listen(PORT, HOST, () => { 
   console.log(`🚀 服务器已启动，正在监听所有网络...`);
   console.log(`   - 本机访问: http://localhost:${PORT}`);
-  console.log(`   - 局域网访问: http://192.168.110.221:${PORT}`); // ⬅️ (这是您自己的 IP)
 });
