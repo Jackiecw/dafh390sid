@@ -190,7 +190,7 @@ const selectedOperatedIds = ref([]);   // (v-model for 运营国家)
 // ⬇️ 【新增】 获取所有国家
 async function fetchCountries() {
   try {
-    const response = await apiClient.get('/api/admin/countries');
+    const response = await apiClient.get('/admin/countries');
     allCountries.value = response.data;
   } catch (error) {
     console.error('获取国家列表失败:', error);
