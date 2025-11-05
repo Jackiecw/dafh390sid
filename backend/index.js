@@ -6,7 +6,8 @@ require('dotenv').config();
 // 2. 导入“零件”
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); // ⬅️ 【新增】 导入 path
+const path = require('path'); 
+const fs = require('fs'); // ⬅️ 【修复】 确保 fs 已导入 (虽然此文件不用，但 operation.js 用了)
 
 // (新增) 导入我们分离出去的路由文件
 const authRoutes = require('./routes/auth');
@@ -14,7 +15,8 @@ const dataRoutes = require('./routes/data');
 const adminRoutes = require('./routes/admin');
 const managementRoutes = require('./routes/management');
 const productRoutes = require('./routes/products'); 
-const profileRoutes = require('./routes/profile'); // ⬅️ 【新增】 
+const profileRoutes = require('./routes/profile'); 
+const operationRoutes = require('./routes/operation'); // ⬅️ 【修复】 必须添加这一行
 
 // 3. 初始化
 const app = express();
@@ -23,8 +25,7 @@ const app = express();
 app.use(cors()); // 允许跨域请求
 app.use(express.json()); // 允许 Express 解析 JSON 格式的请求体
 
-// ⬇️ 【修改】 开放整个 /uploads 目录
-// 这样 /uploads/products 和 /uploads/avatars 都能被访问
+// (不变) 开放整个 /uploads 目录
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
@@ -40,12 +41,16 @@ app.get('/', (req, res) => {
 // (非 Admin 路由)
 app.use('/api', authRoutes);
 app.use('/api', dataRoutes);
-app.use('/api', profileRoutes); // ⬅️ 【新增】 (注意：没有 /admin 前缀)
+app.use('/api', profileRoutes);
 
 // (Admin 路由)
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', managementRoutes);
 app.use('/api/admin', productRoutes); 
+
+// ⬇️ 【新增】 挂载新路由
+// (注意: 它同时处理 /api/operation/... 和 /api/admin/operation-...)
+app.use('/api', operationRoutes); // ⬅️ 这一行就是你报错的第 52 行
 
 // 6. 启动服务器
 const PORT = 3000;

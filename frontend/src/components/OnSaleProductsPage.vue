@@ -63,7 +63,8 @@
                   编辑商品
                 </button>
               </div>
-              <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+              
+              <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
                 <div>
                   <label class="block text-stone-500">成本</label>
                   <p class="font-semibold">{{ selectedProduct.cost ? `¥ ${selectedProduct.cost.toFixed(2)}` : 'N/A' }}</p>
@@ -73,11 +74,19 @@
                   <p class="font-semibold">{{ selectedProduct.weightKg ? `${selectedProduct.weightKg} kg` : 'N/A' }}</p>
                 </div>
                 <div>
+                  <label class="block text-stone-500">体积</label>
+                  <p class="font-semibold">{{ selectedProduct.volumeM3 ? `${selectedProduct.volumeM3} m³` : 'N/A' }}</p>
+                </div>
+                <div>
+                  <label class="block text-stone-500">尺寸</label>
+                  <p class="font-semibold">{{ selectedProduct.dimensionsMm ? `${selectedProduct.dimensionsMm} mm` : 'N/A' }}</p>
+                </div>
+                <div>
                   <label class="block text-stone-500">分类</label>
                   <p class="font-semibold">{{ selectedProduct.category }}</p>
                 </div>
               </div>
-            </div>
+              </div>
 
             <div class="mt-6">
               <h4 class="text-lg font-bold text-stone-900 mb-4">店铺售价 (价格同步)</h4>
@@ -179,6 +188,8 @@ async function fetchProducts() {
   isLoading.value = true;
   errorMessage.value = '';
   try {
+    // (不变) 此 API (GET /api/admin/products-list) 
+    // 已在后端自动返回所有新字段
     const response = await apiClient.get('/admin/products-list');
     products.value = response.data;
   } catch (error) {
@@ -205,7 +216,7 @@ function getProductImageUrl(imageUrl) {
   return `${apiBaseUrl}${imageUrl}`;
 }
 
-// (核心) 权限：只显示运营国家的店铺售价
+// (不变) (核心) 权限：只显示运营国家的店铺售价
 const filteredListings = computed(() => {
   if (!selectedProduct.value) return [];
   
@@ -224,10 +235,18 @@ const filteredListings = computed(() => {
 
 // --- 3. 价格同步 (Price Sync) 逻辑 ---
 
-// (权限) 检查是否有权修改价格
+// (不变) (权限) 检查是否有权修改价格
 function canManagePrice(countryCode) {
   if (authStore.role === 'admin') return true;
-  return authStore.supervisedCountries.includes(countryCode);
+  // ⬇️ 【修复】
+  // 你提供的 auth.js 中没有 supervisedCountries，
+  // 但 UserManagement.vue 中有。
+  // 我们检查 authStore 中是否有这个 getter
+  if (authStore.supervisedCountries) {
+     return authStore.supervisedCountries.includes(countryCode);
+  }
+  return false;
+  // ⬆️ 【修复】
 }
 
 function startEditPrice(listing) {
@@ -293,11 +312,13 @@ function closeModal() {
 
 // (当商品被创建或更新时)
 async function handleProductChange() {
+  const currentSelectedId = selectedProduct.value?.id;
+  
   await fetchProducts(); // 重新加载所有数据
   
   // (如果正在编辑，更新 selectedProduct 的数据)
-  if (productToEditId.value) {
-    const updatedProduct = products.value.find(p => p.id === productToEditId.value);
+  if (currentSelectedId) {
+    const updatedProduct = products.value.find(p => p.id === currentSelectedId);
     if (updatedProduct) {
       selectedProduct.value = updatedProduct;
     }

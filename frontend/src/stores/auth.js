@@ -17,16 +17,15 @@ export const useAuthStore = defineStore('auth', () => {
   // (不变) 菜单权限
   const permissions = computed(() => user.value?.permissions || []);
 
-  // (不变) 国家权限
+  // (修改) 国家权限
   const operatedCountries = computed(() => user.value?.operatedCountries || []);
+  const supervisedCountries = computed(() => user.value?.supervisedCountries || []); // ⬅️ 【新增】
 
-  // ⬇️ 【新增】 头像 Getter
+  // (不变) 头像 Getter
   const avatarUrl = computed(() => user.value?.avatarUrl || null);
 
 
   // 3. (不变) 核心解码函数
-  //    这个函数不需要修改，因为它会解码 *整个* Token 负载
-  //    并将其完整存入 user.value。
   function checkAndDecodeToken() {
     if (token.value) {
       try {
@@ -35,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (decoded.exp * 1000 > Date.now()) {
           
           // (不变)
-          // decoded 现在是 { ..., permissions: [], operatedCountries: [], avatarUrl: ... }
+          // decoded 现在是 { ..., permissions: [], operatedCountries: [], supervisedCountries: [], avatarUrl: ... }
           // 我们把它完整存入 user ref
           user.value = decoded;
         } else {
@@ -76,7 +75,8 @@ export const useAuthStore = defineStore('auth', () => {
     role,
     permissions, 
     operatedCountries, 
-    avatarUrl, // ⬅️ 【新增】
+    supervisedCountries, // ⬅️ 【新增】
+    avatarUrl, 
     login,
     logout
   };

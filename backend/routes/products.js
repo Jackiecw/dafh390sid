@@ -37,7 +37,7 @@ const upload = multer({
   limits: { fileSize: 1024 * 1024 * 5 } // 限制 5MB
 });
 
-// --- 2. Zod 验证模式 (不变) ---
+// --- 2. Zod 验证模式 (修改) ---
 const productSchema = z.object({
   sku: z.string().min(1, "SKU 不能为空"),
   name: z.string().min(1, "商品名称不能为空"),
@@ -45,9 +45,11 @@ const productSchema = z.object({
   category: z.nativeEnum(ProductCategory),
   cost: z.preprocess(val => parseFloat(val) || null, z.number().optional().nullable()),
   weightKg: z.preprocess(val => parseFloat(val) || null, z.number().optional().nullable()),
+  volumeM3: z.preprocess(val => parseFloat(val) || null, z.number().optional().nullable()),
+  dimensionsMm: z.string().optional().nullable(), // ⬅️ 【新增】
 });
 
-// ⬇️ 【新增】 价格同步 Zod
+// (不变) 价格同步 Zod
 const priceSyncSchema = z.object({
   currentPrice: z.coerce.number().min(0, "价格不能为负数")
 });
@@ -57,7 +59,6 @@ const priceSyncSchema = z.object({
 router.use(adminMiddleware);
 
 // GET /api/admin/products (不变)
-// (此接口被 "分配商品" 弹窗使用)
 router.get('/products', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
@@ -70,7 +71,6 @@ router.get('/products', async (req, res) => {
 });
 
 // GET /api/admin/product-options (不变)
-// (此接口被 "新建/编辑商品" 弹窗使用)
 router.get('/product-options', (req, res) => {
   res.json({
     categories: Object.values(ProductCategory),
@@ -78,6 +78,7 @@ router.get('/product-options', (req, res) => {
 });
 
 // POST /api/admin/products (不变)
+// (此路由逻辑不需要修改，因为它使用 ...validation.data 自动包含了新字段)
 router.post('/products', upload.single('productImage'), async (req, res) => {
   try {
     // 1. 验证文本数据
@@ -96,7 +97,7 @@ router.post('/products', upload.single('productImage'), async (req, res) => {
     }
 
     // 3. 准备数据库 payload
-    const payload = { ...data, sku: sku, };
+    const payload = { ...data, sku: sku, }; // ⬅️ 'data' 中已包含新字段
     
     // 4. (关键) 处理图片路径
     if (req.file) {
@@ -115,6 +116,7 @@ router.post('/products', upload.single('productImage'), async (req, res) => {
 });
 
 // PUT /api/admin/products/:id (不变)
+// (此路由逻辑也不需要修改)
 router.put('/products/:id', upload.single('productImage'), async (req, res) => {
   try {
     const { id } = req.params;
@@ -135,7 +137,7 @@ router.put('/products/:id', upload.single('productImage'), async (req, res) => {
     }
 
     // 3. 准备 payload
-    const payload = { ...data, sku: sku };
+    const payload = { ...data, sku: sku }; // ⬅️ 'data' 中已包含新字段
 
     // 4. (关键) 处理图片更新
     if (req.file) {
@@ -174,10 +176,6 @@ router.delete('/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // (注意：PRISMA 模式中设置了 onDelete: Cascade, 
-    // 删除商品会同时删除所有关联的 StoreProductListing 和 SalesData，
-    // 但 SalesData 是 RESTRICT，所以如果已有销售数据，这里会报错)
-    
     // 删除前先删除图片
     const product = await prisma.product.findUnique({ where: { id }, select: { imageUrl: true } });
     if (product && product.imageUrl) {
@@ -194,7 +192,6 @@ router.delete('/products/:id', async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: '商品未找到' });
     }
-    // (P2003: 外键约束失败，即 SalesData 仍有关联)
     if (error.code === 'P2003') { 
       return res.status(400).json({ error: '删除失败：该商品已有销售数据关联，无法删除' });
     }
@@ -204,23 +201,27 @@ router.delete('/products/:id', async (req, res) => {
 
 
 // ----------------------------------------------------
-// --- ⬇️ 【新增】 "在售商品" 模块 API ---
+// --- (不变) "在售商品" 模块 API ---
 // ----------------------------------------------------
 
 /**
  * GET /api/admin/products-list (获取商品卡片 + 售价详情)
- * (为新的 "在售商品" 页面提供数据)
  */
 router.get('/products-list', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       orderBy: { sku: 'asc' },
+      // ⬇️ 【修改】
+      // 默认的 findMany (不带 select) 会返回所有字段
+      // (包括我们新增的 weightKg, volumeM3, dimensionsMm)
+      // 所以这里的 include 逻辑保持不变
+      // ⬆️ 【修改】
       include: {
-        listings: { // ⬅️ 包含所有上架信息
+        listings: { 
           include: {
-            store: { // ⬅️ 包含上架的店铺
+            store: { 
               include: {
-                country: true // ⬅️ 包含店铺的国家
+                country: true 
               }
             }
           }
@@ -236,12 +237,11 @@ router.get('/products-list', async (req, res) => {
 
 /**
  * PUT /api/admin/listings/:id (价格同步)
- * (用于 "在售商品" 页面的 "价格同步" 功能)
  */
 router.put('/listings/:id', async (req, res) => {
   try {
     const { id: listingId } = req.params;
-    const { role, supervisedCountries } = req.user; // (从 authMiddleware 获取)
+    const { role, supervisedCountries } = req.user; 
 
     // 1. 验证输入
     const validation = priceSyncSchema.safeParse(req.body);
@@ -261,7 +261,6 @@ router.put('/listings/:id', async (req, res) => {
       return res.status(404).json({ error: '未找到该商品的上架信息' });
     }
     
-    // (检查是否为 Admin 或该国家的主管)
     const isAdmin = role === 'admin';
     const isSupervisor = supervisedCountries.includes(listing.store.countryCode);
     
@@ -274,9 +273,7 @@ router.put('/listings/:id', async (req, res) => {
       where: { id: listingId },
       data: {
         currentPrice: currentPrice,
-        // lastSyncedAt 会自动更新 (见 schema.prisma)
       },
-      // (返回更新后的完整数据，以便前端刷新)
       include: {
         store: { include: { country: true } }
       }
@@ -284,7 +281,8 @@ router.put('/listings/:id', async (req, res) => {
     
     res.json(updatedListing);
 
-  } catch (error) {
+  } catch (error)
+ {
     console.error('价格同步失败:', error);
     if (error.code === 'P2025') {
       return res.status(404).json({ error: '未找到该上架信息' });

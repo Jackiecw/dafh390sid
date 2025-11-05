@@ -45,11 +45,17 @@ async function main() {
     create: { key: 'ADMIN_STORES', name: '店铺管理' },
   });
   
-  // ⬇️ 【修改】 重命名
   const menuOnSaleProducts = await prisma.menuItem.upsert({
     where: { key: 'ON_SALE_PRODUCTS' },
     update: { name: '在售商品' },
     create: { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
+  });
+
+  // ⬇️ 【新增】
+  const menuOperationCenter = await prisma.menuItem.upsert({
+    where: { key: 'OPERATION_CENTER' },
+    update: {},
+    create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
   // (安全起见) 尝试删除旧的 ADMIN_PRODUCTS
@@ -74,12 +80,13 @@ async function main() {
           { id: menuSalesData.id }, 
           { id: menuWeeklyReport.id },
           { id: menuLinks.id },
-          { id: menuOnSaleProducts.id }, // ⬅️ 【修改】
+          { id: menuOnSaleProducts.id },
+          { id: menuOperationCenter.id }, // ⬅️ 【新增】
         ],
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
-          { key: 'ADMIN_PRODUCTS' } // ⬅️ 【新增】
+          { key: 'ADMIN_PRODUCTS' } 
         ]
       },
     },
@@ -92,7 +99,8 @@ async function main() {
           { id: menuSalesData.id }, 
           { id: menuWeeklyReport.id },
           { id: menuLinks.id },
-          { id: menuOnSaleProducts.id }, // ⬅️ 【修改】
+          { id: menuOnSaleProducts.id },
+          { id: menuOperationCenter.id }, // ⬅️ 【新增】
         ],
       },
     },
@@ -111,12 +119,13 @@ async function main() {
           { id: menuLinks.id },
           { id: menuAdminUsers.id },
           { id: menuAdminStores.id },
-          { id: menuOnSaleProducts.id }, // ⬅️ 【修改】
+          { id: menuOnSaleProducts.id }, 
+          { id: menuOperationCenter.id }, // ⬅️ 【新增】
         ],
         disconnect: [
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
-          { key: 'ADMIN_PRODUCTS' } // ⬅️ 【新增】
+          { key: 'ADMIN_PRODUCTS' }
         ]
       },
     },
@@ -132,14 +141,14 @@ async function main() {
           { id: menuLinks.id },
           { id: menuAdminUsers.id },
           { id: menuAdminStores.id },
-          { id: menuOnSaleProducts.id }, // ⬅️ 【修改】
+          { id: menuOnSaleProducts.id },
+          { id: menuOperationCenter.id }, // ⬅️ 【新增】
         ],
       },
     },
   });
 
   // --- 3. (不变) 创建您的第一个“超级管理员”用户 ---
-  // ... (代码不变) ...
   const adminPassword = 'your_secure_password123';
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
@@ -160,7 +169,6 @@ async function main() {
   });
 
   // --- 4. (不变) 创建默认的国家 ---
-  // ... (代码不变) ...
   console.log('正在创建默认国家...');
   await prisma.managedCountry.createMany({
     data: [

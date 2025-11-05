@@ -59,6 +59,20 @@
                   <input type="number" step="0.01" id="cost" v-model="formData.cost" />
                 </div>
                 
+                <div class="input-group">
+                  <label for="weightKg">重量 (kg)</label>
+                  <input type="number" step="0.01" id="weightKg" v-model="formData.weightKg" placeholder="例如: 1.25" />
+                </div>
+                
+                <div class="input-group">
+                  <label for="volumeM3">体积 (m³)</label>
+                  <input type="number" step="0.001" id="volumeM3" v-model="formData.volumeM3" placeholder="例如: 0.03" />
+                </div>
+
+                <div class="input-group col-span-2">
+                  <label for="dimensionsMm">尺寸 (mm)</label>
+                  <input type="text" id="dimensionsMm" v-model="formData.dimensionsMm" placeholder="例如: 300*200*100" />
+                </div>
                 <div class="input-group col-span-2">
                   <label for="description">简介</label>
                   <textarea id="description" rows="3" v-model="formData.description"></textarea>
@@ -127,40 +141,43 @@ const props = defineProps({
 });
 const emit = defineEmits(['close', 'product-created', 'product-updated']);
 
+// ⬇️ 【修改】
 const defaultFormData = () => ({
   sku: '',
   name: '',
   category: '',
   cost: null,
+  weightKg: null, 
+  volumeM3: null, 
+  dimensionsMm: '', // ⬅️ 新增
   description: '',
   imageUrl: ''
 });
 
 const formData = ref(defaultFormData());
 const options = ref({ categories: [] });
-const selectedFile = ref(null); // (关键) 存储文件对象
-const previewUrl = ref(null); // (关键) 存储预览 URL
+const selectedFile = ref(null); 
+const previewUrl = ref(null); 
 const errorMessage = ref('');
-// (关键) 拼接基础 URL 用于图片显示
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 
 const isEditMode = computed(() => !!props.productToEditId);
 const dialogTitle = computed(() => isEditMode.value ? '编辑商品' : '创建新商品');
 const submitButtonText = computed(() => isEditMode.value ? '保存更改' : '创建商品');
 
-// (关键) 文件选择
+// (不变) 文件选择
 function onFileSelected(event) {
   const file = event.target.files[0];
   if (file) {
     selectedFile.value = file;
-    // (安全) 释放掉旧的预览 URL
     if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl.value);
     }
-    previewUrl.value = URL.createObjectURL(file); // 创建本地预览
+    previewUrl.value = URL.createObjectURL(file); 
   }
 }
 
+// (不变) 获取选项
 async function fetchOptions() {
   try {
     const response = await apiClient.get('/admin/product-options');
@@ -170,19 +187,30 @@ async function fetchOptions() {
   }
 }
 
+// (修改) 获取详情
 async function fetchProductDetails() {
   if (!isEditMode.value) return;
   try {
-    // (优化：未来可以改成 GET /admin/products/:id)
     const response = await apiClient.get('/admin/products');
     const product = response.data.find(p => p.id === props.productToEditId);
 
     if (product) {
-      formData.value = { ...product };
-      // (注意) 清空文件选择，并设置预览
+      // ⬇️ 【修改】 确保所有字段都被填充
+      formData.value = {
+        sku: product.sku,
+        name: product.name,
+        category: product.category,
+        cost: product.cost,
+        weightKg: product.weightKg, 
+        volumeM3: product.volumeM3, 
+        dimensionsMm: product.dimensionsMm, // ⬅️ 新增
+        description: product.description,
+        imageUrl: product.imageUrl
+      };
+      
       selectedFile.value = null; 
       if (product.imageUrl) {
-        previewUrl.value = `${apiBaseUrl}${product.imageUrl}`; // 显示已存的图片
+        previewUrl.value = `${apiBaseUrl}${product.imageUrl}`; 
       } else {
         previewUrl.value = null;
       }
@@ -199,14 +227,17 @@ async function handleSubmit() {
   // 1. 创建 FormData
   const payload = new FormData();
   
-  // 2. 附加文本字段
+  // 2. ⬇️ 【修改】 附加所有文本字段
   payload.append('sku', formData.value.sku);
   payload.append('name', formData.value.name);
   payload.append('category', formData.value.category);
   payload.append('cost', formData.value.cost || '');
+  payload.append('weightKg', formData.value.weightKg || ''); 
+  payload.append('volumeM3', formData.value.volumeM3 || ''); 
+  payload.append('dimensionsMm', formData.value.dimensionsMm || ''); // ⬅️ 新增
   payload.append('description', formData.value.description || '');
 
-  // 3. 附加文件 (如果被选择了)
+  // 3. (不变) 附加文件
   if (selectedFile.value) {
     payload.append('productImage', selectedFile.value);
   }
@@ -214,7 +245,6 @@ async function handleSubmit() {
   try {
     let response;
     if (isEditMode.value) {
-      // (注意) PUT 请求发送 FormData
       response = await apiClient.put(`/admin/products/${props.productToEditId}`, payload);
       emit('product-updated', response.data);
     } else {
@@ -231,15 +261,15 @@ async function handleSubmit() {
   }
 }
 
+// (不变) Watch
 watch(() => props.isOpen, (newVal) => {
   if (newVal) {
-    resetForm(); // 总是重置表单
+    resetForm(); 
     fetchOptions();
     if (isEditMode.value) {
       fetchProductDetails();
     }
   } else {
-    // (安全) 关闭时释放 blob URL
     if (previewUrl.value && previewUrl.value.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl.value);
     }
@@ -248,6 +278,7 @@ watch(() => props.isOpen, (newVal) => {
 
 function closeModal() { emit('close'); }
 
+// (不变) Reset
 function resetForm() {
   formData.value = defaultFormData();
   selectedFile.value = null;

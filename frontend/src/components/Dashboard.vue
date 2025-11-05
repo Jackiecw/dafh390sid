@@ -95,6 +95,8 @@
         <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
         
         <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
+        
+        <OperationsCenter v-if="currentView === 'OPERATION_CENTER'" /> 
         </div>
     </main>
   </div>
@@ -117,28 +119,26 @@ import {
   UserCircleIcon,
   Cog6ToothIcon
 } from '@heroicons/vue/20/solid';
-// ⬇️ 【修改】
-import OnSaleProductsPage from './OnSaleProductsPage.vue'; // ⬅️ (指向新组件)
-// ⬆️ 【修改】 (删除了旧的 ProductManagement)
+import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
+import OperationsCenter from './OperationsCenter.vue'; // ⬅️ 【新增】
 
-
-// ⬇️ 【修改】 (allMenuItems 列表已更新)
+// ⬇️ 【修改】 菜单列表已更新
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'WEEKLY_REPORT', name: '周报填写' },
   { key: 'VIEW_REPORTS', name: '周报查看' },
-  { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, // ⬅️ 新的
+  { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 
+  { key: 'OPERATION_CENTER', name: '运营中心' }, // ⬅️ 【新增】
   { key: 'LINKS', name: '常用链接' },
   { key: 'ADMIN_STORES', name: '店铺管理' },
-  // (ADMIN_PRODUCTS 已删除)
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
 
-// ⬇️ 【(不变)】 (用于拼接头像 URL)
+// (不变)
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 const userAvatar = computed(() => {
   if (!authStore.avatarUrl) return null;

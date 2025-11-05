@@ -23,7 +23,6 @@ const loginSchema = z.object({
 });
 
 // (不变) 接口 1: (POST) 用户注册
-// ... (router.post('/register', ...) 代码不变)
 router.post('/register', async (req, res) => {
   try {
     const validation = registerSchema.safeParse(req.body);
@@ -72,7 +71,7 @@ router.post('/register', async (req, res) => {
 
 
 // 接口 2: (POST) 用户登录
-// ⬇️ 【重大修改】此接口现在返回带 "avatarUrl" 的 Token
+// ⬇️ 【重大修改】
 router.post('/login', async (req, res) => {
   try {
     // 1. (不变) 验证输入
@@ -86,19 +85,20 @@ router.post('/login', async (req, res) => {
 
     const { username, password } = validation.data;
 
-    // 2. 【修改】在数据库中查找用户，并【包含】其角色、菜单和【运营的国家】
+    // 2. 【修改】 包含 supervisedCountries
     const user = await prisma.user.findUnique({
       where: { username: username },
       include: {
-        role: { // 包含关联的 Role
+        role: { 
           include: {
-            menus: true // 包含该 Role 关联的所有 MenuItem
+            menus: true 
           }
         },
-        operatedCountries: { // ⬅️ (不变) 包含用户运营的国家
-          select: {
-            code: true // ⬅️ 我们只需要国家的 "code"
-          }
+        operatedCountries: { 
+          select: { code: true }
+        },
+        supervisedCountries: { // ⬅️ 【新增】
+          select: { code: true }
         }
       }
     });
@@ -122,15 +122,19 @@ router.post('/login', async (req, res) => {
     // (B) (不变) 提取国家权限
     const operatedCountries = user.operatedCountries.map(country => country.code);
 
-    // (C) 创建 Token
+    // (C) ⬅️ 【新增】 提取主管国家权限
+    const supervisedCountries = user.supervisedCountries.map(country => country.code);
+
+    // (D) 创建 Token
     const token = jwt.sign(
       { 
         userId: user.id, 
         role: user.role.name, 
         nickname: user.nickname,
-        avatarUrl: user.avatarUrl, // ⬅️ 【新增】
+        avatarUrl: user.avatarUrl,
         permissions: permissions, 
-        operatedCountries: operatedCountries 
+        operatedCountries: operatedCountries,
+        supervisedCountries: supervisedCountries // ⬅️ 【新增】
       },
       JWT_SECRET,
       { expiresIn: '7d' }

@@ -40,25 +40,14 @@ router.get('/management-options', (req, res) => {
 // --- 店铺 (Store) CRUD ---
 
 // (GET /api/admin/stores)
+// ⬇️ 【已修复】
 router.get('/stores', async (req, res) => {
   try {
-    const stores = await prisma.store.findMany({
-      orderBy: { name: 'asc' },
-      include: {
-        country: true,
-        // ⬇️ 【修改】 (为上一阶段的“SKU展示”功能)
-        products: { 
-          select: {
-            sku: true 
-          }
-        }
-        // ⬆️ 【修改】 
-        // (注意: `products` 是一个旧的残留，它现在指向 StoreProductListing.product)
-        // (为了安全，我们应该更新 StoreManagement.vue 来读取 listings)
-        // (在下一个文件中，我们将修正 StoreManagement.vue)
-      }
-    });
-    // (为了修复上个阶段留下的问题，我们重构一下返回的数据)
+    // 
+    // 【已删除】这里是原先导致崩溃的错误查询，已被移除
+    // 
+    
+    // (这是正确的查询逻辑)
     const storesWithListings = await prisma.store.findMany({
        orderBy: { name: 'asc' },
        include: {
@@ -89,6 +78,7 @@ router.get('/stores', async (req, res) => {
     res.status(500).json({ error: '获取店铺列表失败' });
   }
 });
+// ⬆️ 【已修复】
 
 // (POST /api/admin/stores) (不变)
 router.post('/stores', async (req, res) => {
@@ -115,15 +105,13 @@ router.post('/stores', async (req, res) => {
   }
 });
 
-// (GET /api/admin/stores/:id)
-// ⬇️ 【修改】
+// (GET /api/admin/stores/:id) (不变)
 router.get('/stores/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const store = await prisma.store.findUnique({
       where: { id: id },
       include: { 
-        // ⬅️ 从新的 listings 中获取已关联的 商品ID
         listings: { 
           select: { 
             productId: true 
@@ -139,7 +127,6 @@ router.get('/stores/:id', async (req, res) => {
     res.status(500).json({ error: '获取店铺详情失败' });
   }
 });
-// ⬆️ 【修改】
 
 // (PUT /api/admin/stores/:id) (不变)
 router.put('/stores/:id', async (req, res) => {
@@ -169,7 +156,6 @@ router.put('/stores/:id', async (req, res) => {
 });
 
 // --- (不变) 国家 (ManagedCountry) CRUD ---
-// ... (GET /countries, POST /countries, PUT /countries/:id 均不变)
 router.get('/countries', async (req, res) => {
   try {
     const countries = await prisma.managedCountry.findMany({
@@ -225,9 +211,7 @@ router.put('/countries/:id', async (req, res) => {
 });
 
 
-// --- ⬇️ 【修改】 店铺-商品 关联 ---
-// (PUT /api/admin/stores/:id/products)
-// 我们保持 API 路由和载荷 (payload) 不变，但彻底重写其内部逻辑
+// --- (不变) 店铺-商品 关联 ---
 router.put('/stores/:id/products', async (req, res) => {
   try {
     const { id: storeId } = req.params;
@@ -282,6 +266,5 @@ router.put('/stores/:id/products', async (req, res) => {
     res.status(500).json({ error: '更新商品关联失败' });
   }
 });
-// ⬆️ 【修改】
 
 module.exports = router;

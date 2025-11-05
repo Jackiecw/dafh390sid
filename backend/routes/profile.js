@@ -102,6 +102,7 @@ router.post('/profile/change-password', authMiddleware, async (req, res) => {
 
 
 // PUT /api/profile/update-details (修改昵称和/或头像)
+// ⬇️ 【重大修改】
 router.put(
   '/profile/update-details', 
   authMiddleware, // 1. 验证登录
@@ -147,21 +148,22 @@ router.put(
       });
       
       // 5. (核心) 重新生成 JWT Token
-      //    因为 Token 中包含了 nickname 和 avatarUrl，必须刷新
       
-      // 5a. 获取完整的权限信息 (同 /login 路由)
+      // 5a. 【修改】 获取完整的权限信息
       const userWithRoles = await prisma.user.findUnique({
         where: { id: userId },
         include: {
           role: { include: { menus: true } },
-          operatedCountries: { select: { code: true } }
+          operatedCountries: { select: { code: true } },
+          supervisedCountries: { select: { code: true } } // ⬅️ 【新增】
         }
       });
       
       const permissions = userWithRoles.role.menus.map(menu => menu.key);
       const operatedCountries = userWithRoles.operatedCountries.map(country => country.code);
+      const supervisedCountries = userWithRoles.supervisedCountries.map(country => country.code); // ⬅️ 【新增】
 
-      // 5b. 生成新 Token
+      // 5b. 【修改】 生成新 Token
       const newToken = jwt.sign(
         { 
           userId: updatedUser.id, 
@@ -169,7 +171,8 @@ router.put(
           nickname: updatedUser.nickname,   // ⬅️ 使用新昵称
           avatarUrl: updatedUser.avatarUrl, // ⬅️ 使用新头像
           permissions: permissions, 
-          operatedCountries: operatedCountries 
+          operatedCountries: operatedCountries,
+          supervisedCountries: supervisedCountries // ⬅️ 【新增】
         },
         JWT_SECRET,
         { expiresIn: '7d' }
