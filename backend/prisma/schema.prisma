@@ -54,38 +54,39 @@ model MenuItem {
 // --- 5. 店铺模型 (Store) (更新) ---
 model Store {
   id              String   @id @default(cuid())
-  name            String   @unique // e.g., "Shopee 印尼 Mall 店"
-  platform        Platform      // (不变) Platform 枚举
-  platformStoreId String?       // 店铺在平台上的真实 ID
-  status          StoreStatus   // (不变) StoreStatus 枚举
-  registeredAt    DateTime?     // 注册时间
+  name            String   @unique
+  platform        Platform
+  platformStoreId String?
+  status          StoreStatus
+  registeredAt    DateTime?
 
-  // ⬇️ 【重大修改】
-  // 不再使用 Country 枚举，而是关联到新的 ManagedCountry 模型
-  country         ManagedCountry @relation(fields: [countryCode], references: [code])
-  countryCode     String         // e.g., "ID", "VN" (这是外键)
+  country     ManagedCountry @relation(fields: [countryCode], references: [code])
+  countryCode String
 
-  // 关系：此店铺产生了多少条销售记录
   salesData SalesData[]
+
+  // ⬇️ 【新增】 与商品的多对多关系
+  products Product[] @relation("StoreProducts")
 }
 
 // --- 6. 销售数据模型 (SalesData) ---
-// (不变)
 model SalesData {
   id          String   @id @default(cuid())
   recordDate  DateTime
   salesVolume Int
   revenue     Float
-  adSpend     Float
+  // adSpend     Float  // ⬅️ 【删除】
   createdAt   DateTime @default(now())
 
-  // (不变) 关联到创建者
   enteredBy   User   @relation(fields: [enteredById], references: [id])
   enteredById String
 
-  // (不变) 关联到店铺 (必需)
-  store       Store  @relation(fields: [storeId], references: [id])
-  storeId     String
+  store   Store  @relation(fields: [storeId], references: [id])
+  storeId String
+
+  // ⬇️ 【新增】 重新关联商品
+  product     Product @relation(fields: [productId], references: [id])
+  productId   String
 }
 
 // --- 7. (不变) 周报模型 (WeeklyReport) ---
@@ -121,6 +122,24 @@ model ManagedCountry {
   stores      Store[]
 }
 
+// ⬇️ --- 【新增】 商品模型 ---
+model Product {
+  id          String  @id @default(cuid())
+  sku         String  @unique // 商品SKU (型号)
+  name        String  // 商品可读名称
+  description String? @db.Text
+  imageUrl    String? // 图片URL (将存储相对路径)
+  
+  category    ProductCategory // 商品分类
+
+  cost        Float?  // 成本价
+  weightKg    Float?  // 重量
+
+  // 关系
+  stores    Store[]     @relation("StoreProducts")
+  salesData SalesData[]
+}
+
 
 // --- 8. 枚举 (Enums) ---
 
@@ -141,6 +160,11 @@ enum StoreStatus {
   CLOSED   // 已关闭
 }
 
-// ⬇️ 【重大修改】
-// enum Country { ... } 
-// (此枚举已被删除)
+// ⬇️ 【新增】 商品分类枚举
+enum ProductCategory {
+  PROJECTOR
+  SCREEN
+  STAND
+  ACCESSORY
+  OTHER
+}

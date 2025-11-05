@@ -40,9 +40,12 @@
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDate(store.registeredAt) }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
               <button @click="handleEdit(store)" class="text-indigo-600 hover:text-indigo-900">
                 编辑
+              </button>
+              <button @click="handleAssignProducts(store)" class="text-green-600 hover:text-green-900">
+                分配商品
               </button>
             </td>
           </tr>
@@ -62,12 +65,19 @@
     @store-created="handleStoreCreated"
     @store-updated="handleStoreUpdated" 
   />
+
+  <StoreProductModal
+    :is-open="isStoreProductModalOpen"
+    :store="currentStoreToAssign"
+    @close="closeStoreProductModal"
+  />
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import apiClient from '../api';
 import StoreFormModal from './StoreFormModal.vue';
+import StoreProductModal from './StoreProductModal.vue'; // ⬅️ 【新增】 导入新弹窗
 
 const stores = ref([]);
 const isLoading = ref(true);
@@ -75,12 +85,15 @@ const errorMessage = ref('');
 const isModalOpen = ref(false);
 const currentStoreToEditId = ref(null);
 
+// ⬇️ 【新增】
+const isStoreProductModalOpen = ref(false);
+const currentStoreToAssign = ref(null);
+
 // (获取店铺列表) (不变)
 async function fetchStores() {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    // (GET /stores 已被更新，会包含 "country" 对象)
     const response = await apiClient.get('/admin/stores');
     stores.value = response.data;
   } catch (error) {
@@ -101,9 +114,8 @@ function closeModal() {
   currentStoreToEditId.value = null; 
 }
 
-// (创建后) (修改)
+// (创建后) (不变)
 function handleStoreCreated(newStore) {
-  // (创建后，新的 store 对象没有 country 关联对象，所以我们重新加载)
   fetchStores();
 }
 
@@ -113,10 +125,19 @@ function handleEdit(store) {
   openModal();
 }
 
-// (更新后) (修改)
+// (更新后) (不变)
 function handleStoreUpdated() {
-  // (弹窗不再返回更新后的对象, 我们只需重新加载列表)
   fetchStores();
+}
+
+// ⬇️ 【新增】 分配商品弹窗的控制
+function handleAssignProducts(store) {
+  currentStoreToAssign.value = store;
+  isStoreProductModalOpen.value = true;
+}
+function closeStoreProductModal() {
+  isStoreProductModalOpen.value = false;
+  currentStoreToAssign.value = null;
 }
 
 

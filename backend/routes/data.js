@@ -73,16 +73,16 @@ router.get('/me', authMiddleware, async (req, res) => {
 // 路径: POST /api/sales
 router.post('/sales', authMiddleware, async (req, res) => {
   try {
-    // ⬇️ (修改 1/2) 移除了 platform, storeName, country, productSku
-    //    新增了 storeId
+    // ⬇️ 【修改 1/3】
     const { 
-      recordDate, storeId,
-      salesVolume, revenue, adSpend 
+      recordDate, storeId, productId, // ⬅️ 新增 productId
+      salesVolume, revenue 
+      // adSpend // ⬅️ 删除 adSpend
     } = req.body;
 
-    // ⬇️ (修改 2/2) 更新验证逻辑
-    if (!recordDate || !storeId || !salesVolume || !revenue) {
-      return res.status(400).json({ error: '日期、店铺、销量和销售额是必填项' });
+    // ⬇️ 【修改 2/3】
+    if (!recordDate || !storeId || !productId || !salesVolume || !revenue) {
+      return res.status(400).json({ error: '日期、店铺、商品、销量和销售额是必填项' });
     }
     const userId = req.user.userId;
 
@@ -91,9 +91,10 @@ router.post('/sales', authMiddleware, async (req, res) => {
         recordDate: new Date(recordDate),
         salesVolume: parseInt(salesVolume),
         revenue: parseFloat(revenue),
-        adSpend: parseFloat(adSpend || 0),
+        // adSpend: parseFloat(adSpend || 0), // ⬅️ 删除 adSpend
         enteredById: userId, 
-        storeId: storeId, // ⬅️ (关键) 现在我们关联 Store
+        storeId: storeId,
+        productId: productId, // ⬅️ 新增 productId
       }
     });
     res.status(201).json(newSalesData);
@@ -135,6 +136,34 @@ router.post('/reports', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('提交周报失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// --- ⬇️ 【新增】 获取特定店铺可销售的商品 (受保护) ---
+
+// (GET /api/stores/:id/products)
+// (注意：这个不在 /admin 路径下，但同样需要登录)
+router.get('/stores/:id/products', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const store = await prisma.store.findUnique({
+      where: { id: id },
+      include: {
+        products: {
+          select: { id: true, sku: true, name: true },
+          orderBy: { sku: 'asc' }
+        }
+      }
+    });
+
+    if (!store) {
+      return res.status(404).json({ error: '店铺未找到' });
+    }
+    // 只返回商品列表
+    res.json(store.products);
+
+  } catch (error) {
+    res.status(500).json({ error: '获取店铺商品失败' });
   }
 });
 

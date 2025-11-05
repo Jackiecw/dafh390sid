@@ -94,6 +94,8 @@ router.get('/stores/:id', async (req, res) => {
     const { id } = req.params;
     const store = await prisma.store.findUnique({
       where: { id: id },
+      // ⬇️ 【修改】
+      include: { products: { select: { id: true } } } // 只需要已关联商品的ID
     });
     if (!store) {
       return res.status(404).json({ error: '店铺未找到' });
@@ -190,6 +192,34 @@ router.put('/countries/:id', async (req, res) => {
     if (error.code === 'P2002') return res.status(400).json({ error: '此国家代码 (Code) 已被占用' });
     if (error.code === 'P2025') return res.status(404).json({ error: '国家未找到' });
     res.status(500).json({ error: '更新国家失败' });
+  }
+});
+
+// --- ⬇️ 【新增】 店铺-商品 关联 ---
+
+// (PUT /api/admin/stores/:id/products)
+router.put('/stores/:id/products', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { productIds } = req.body; // 期望: { productIds: ["id1", "id2"] }
+
+    if (!Array.isArray(productIds)) {
+      return res.status(400).json({ error: 'productIds 必须是一个数组' });
+    }
+
+    const updatedStore = await prisma.store.update({
+      where: { id: id },
+      data: {
+        products: {
+          // 'set' 会自动断开旧关联，连接新关联
+          set: productIds.map(pid => ({ id: pid })) 
+        }
+      }
+    });
+    res.json(updatedStore);
+  } catch (error) {
+    if (error.code === 'P2025') return res.status(404).json({ error: '店铺未找到' });
+    res.status(500).json({ error: '更新商品关联失败' });
   }
 });
 
