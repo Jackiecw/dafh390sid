@@ -6,33 +6,33 @@
       <div class="space-y-6">
         
         <div class="space-y-2">
-          <label for="weekStartDate" class="block text-sm font-medium text-stone-700">周开始日期 *</label>
+          <label for="weekStartDate" class="form-label">周开始日期 *</label>
           <input type="date" id="weekStartDate" v-model="formData.weekStartDate" required 
-                 class="block w-full rounded-md border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                 class="form-input" />
         </div>
 
         <div class="space-y-2">
-          <label for="summaryThisWeek" class="block text-sm font-medium text-stone-700">本周总结 *</label>
+          <label for="summaryThisWeek" class="form-label">本周总结 *</label>
           <textarea id="summaryThisWeek" rows="5" v-model="formData.summaryThisWeek" required
-                    class="block w-full rounded-md border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                    class="form-input"></textarea>
         </div>
 
         <div class="space-y-2">
-          <label for="planNextWeek" class="block text-sm font-medium text-stone-700">下周计划 *</label>
+          <label for="planNextWeek" class="form-label">下周计划 *</label>
           <textarea id="planNextWeek" rows="5" v-model="formData.planNextWeek" required
-                    class="block w-full rounded-md border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                    class="form-input"></textarea>
         </div>
 
         <div class="space-y-2">
-          <label for="problemsEncountered" class="block text-sm font-medium text-stone-700">遇到的问题</label>
+          <label for="problemsEncountered" class="form-label">遇到的问题</label>
           <textarea id="problemsEncountered" rows="3" v-model="formData.problemsEncountered"
-                    class="block w-full rounded-md border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                    class="form-input"></textarea>
         </div>
 
         <div class="space-y-2">
-          <label for="other" class="block text-sm font-medium text-stone-700">其他</label>
+          <label for="other" class="form-label">其他</label>
           <textarea id="other" rows="3" v-model="formData.other"
-                    class="block w-full rounded-md border-stone-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                    class="form-input"></textarea>
         </div>
       </div>
 
@@ -78,3 +78,26 @@ const handleSubmit = async () => {
   }
 };
 </script>
+
+<style scoped>
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-weight: bold;
+  font-size: 0.875rem; /* 14px */
+}
+.form-input {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+.form-input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+  outline: none;
+}
+</style>

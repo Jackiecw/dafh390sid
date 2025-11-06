@@ -188,9 +188,11 @@ async function fetchProducts() {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    // (不变) 此 API (GET /api/admin/products-list) 
-    // 已在后端自动返回所有新字段
-    const response = await apiClient.get('/admin/products-list');
+    // ⬇️ 【修复】 
+    // (调用我们刚刚在 data.js 中创建的新 API)
+    const response = await apiClient.get('/products-list');
+    // ⬆️ 【修复】
+    
     products.value = response.data;
   } catch (error) {
     console.error('获取在售商品列表失败:', error);
@@ -238,15 +240,12 @@ const filteredListings = computed(() => {
 // (不变) (权限) 检查是否有权修改价格
 function canManagePrice(countryCode) {
   if (authStore.role === 'admin') return true;
-  // ⬇️ 【修复】
-  // 你提供的 auth.js 中没有 supervisedCountries，
-  // 但 UserManagement.vue 中有。
-  // 我们检查 authStore 中是否有这个 getter
+  
+  // (auth.js 和 auth.js 均已更新, 包含 supervisedCountries)
   if (authStore.supervisedCountries) {
      return authStore.supervisedCountries.includes(countryCode);
   }
   return false;
-  // ⬆️ 【修复】
 }
 
 function startEditPrice(listing) {
@@ -269,9 +268,12 @@ async function savePrice(listingId) {
   priceSyncError.value = '';
   
   try {
-    const response = await apiClient.put(`/admin/listings/${listingId}`, {
+    // ⬇️ 【修复】 
+    // (调用我们刚刚在 data.js 中创建的新 API)
+    const response = await apiClient.put(`/listings/${listingId}`, {
       currentPrice: editPrice.value
     });
+    // ⬆️ 【修复】
     
     // (成功) 在前端立即更新数据，避免重新加载
     const productIndex = products.value.findIndex(p => p.id === selectedProduct.value.id);

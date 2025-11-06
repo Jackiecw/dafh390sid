@@ -65,6 +65,7 @@
 import { ref, onMounted } from 'vue';
 import apiClient from '../api';
 import ResponsibilityTable from './ResponsibilityTable.vue'; // ⬅️ 导入核心组件
+import { useAuthStore } from '../stores/auth'; // ⬅️ 【新增】 1. 导入 auth store
 
 const countries = ref([]);
 const isLoadingCountries = ref(true);
@@ -73,14 +74,29 @@ const errorMessage = ref('');
 const currentCountryCode = ref(null); // (例如: 'ID')
 const currentSubTab = ref('matrix'); // (默认显示 'matrix')
 
+const authStore = useAuthStore(); // ⬅️ 【新增】 2. 获取 auth store 实例
+
 async function fetchCountries() {
   isLoadingCountries.value = true;
   errorMessage.value = '';
   try {
-    // (我们从 /admin/countries 获取列表，因为所有用户都能看，但只有 admin 能改)
-    // (如果未来普通用户也要用，我们可以创建一个 /api/countries)
-    const response = await apiClient.get('/admin/countries');
-    countries.value = response.data;
+    // (我们从 /api/countries 获取列表，这是一个受 authMiddleware 保护的路由)
+    const response = await apiClient.get('/countries');
+    
+    // ⬇️ 【修改】 3. 根据角色过滤国家列表
+    const allCountries = response.data;
+    
+    if (authStore.role === 'admin') {
+      // (A) 管理员：看到所有国家
+      countries.value = allCountries;
+    } else {
+      // (B) 运营专员：只看自己“运营”的国家
+      const userOperatedCodes = authStore.operatedCountries; // (例如: ['ID', 'VN'])
+      countries.value = allCountries.filter(country => 
+        userOperatedCodes.includes(country.code)
+      );
+    }
+    // ⬆️ 【修改】
     
     // (关键) 默认选中第一个国家
     if (countries.value.length > 0) {

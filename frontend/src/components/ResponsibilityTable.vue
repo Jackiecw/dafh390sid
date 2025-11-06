@@ -214,9 +214,13 @@ watch(() => props.countryCode, (newCode) => {
   }
 }, { immediate: true });
 
-// (启动时) 获取一次用户列表
+// (启动时)
 onMounted(() => {
-  fetchUsers();
+  // ⬇️ 【修复】 只有 Admin 才需要加载用户列表（用于编辑下拉框）
+  // 运营专员仅查看，不需要此列表，从而避免 403 错误
+  if (isAdmin.value) {
+    fetchUsers();
+  }
 });
 
 
@@ -241,7 +245,12 @@ async function handleSave(value, id, field, type) {
 
     if (type === 'module') {
       // (后端返回了更新后的 module，替换它)
-      modules.value[moduleIndex] = response.data;
+      // ⬇️ 【修复】
+      // 确保在替换模块时，保留已经加载的任务
+      // (或者，更好的方式是让 PUT /admin/operation-modules 返回完整的 module，包括 tasks)
+      // (为了安全，我们只更新 owner 和 name)
+      modules.value[moduleIndex].name = response.data.name;
+      modules.value[moduleIndex].owner = response.data.owner;
     } else {
       // (后端返回了更新后的 task，替换它)
       const taskIndex = modules.value[moduleIndex].tasks.findIndex(t => t.id === id);
@@ -249,6 +258,7 @@ async function handleSave(value, id, field, type) {
         modules.value[moduleIndex].tasks[taskIndex] = response.data;
       }
     }
+    // ⬆️ 【修复】
   } catch (error) {
     console.error('更新失败:', error);
     errorMessage.value = '更新失败，请刷新页面。';

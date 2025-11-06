@@ -29,6 +29,15 @@ async function main() {
     update: {},
     create: { key: 'VIEW_REPORTS', name: '周报查看' },
   });
+  
+  // ⬇️ 【新增】 创建新的父菜单
+  const menuReports = await prisma.menuItem.upsert({
+    where: { key: 'REPORTS' },
+    update: {},
+    create: { key: 'REPORTS', name: '周报 (父菜单)' },
+  });
+  // ⬆️ 【新增】
+  
   const menuLinks = await prisma.menuItem.upsert({
     where: { key: 'LINKS' },
     update: {},
@@ -51,21 +60,20 @@ async function main() {
     create: { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
   });
 
-  // ⬇️ 【新增】
+  // (不变)
   const menuOperationCenter = await prisma.menuItem.upsert({
     where: { key: 'OPERATION_CENTER' },
     update: {},
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
-  // (安全起见) 尝试删除旧的 ADMIN_PRODUCTS
+  // (不变)
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
     console.log('旧的 "ADMIN_PRODUCTS" 菜单项已删除。');
   } catch (e) {
     // (如果不存在或已被关联，忽略错误)
   }
-  // ⬆️ 【修改】
 
 
   // --- 2. 创建“角色”并【关联菜单】---
@@ -78,15 +86,17 @@ async function main() {
         connect: [
           { id: menuDashboard.id },
           { id: menuSalesData.id }, 
-          { id: menuWeeklyReport.id },
+          { id: menuWeeklyReport.id }, // ⬅️ 保留 (作为权限)
           { id: menuLinks.id },
           { id: menuOnSaleProducts.id },
-          { id: menuOperationCenter.id }, // ⬅️ 【新增】
+          { id: menuOperationCenter.id },
+          { id: menuReports.id }, // ⬅️ 【新增】 (用于显示主菜单)
         ],
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
-          { key: 'ADMIN_PRODUCTS' } 
+          { key: 'ADMIN_PRODUCTS' },
+          { id: menuViewReports.id } // ⬅️ 确保 operation 角色默认没有“查看”权限
         ]
       },
     },
@@ -97,10 +107,11 @@ async function main() {
         connect: [
           { id: menuDashboard.id },
           { id: menuSalesData.id }, 
-          { id: menuWeeklyReport.id },
+          { id: menuWeeklyReport.id }, // ⬅️ (权限)
           { id: menuLinks.id },
           { id: menuOnSaleProducts.id },
-          { id: menuOperationCenter.id }, // ⬅️ 【新增】
+          { id: menuOperationCenter.id },
+          { id: menuReports.id }, // ⬅️ (菜单)
         ],
       },
     },
@@ -114,13 +125,14 @@ async function main() {
         connect: [
           { id: menuDashboard.id },
           { id: menuSalesData.id },
-          { id: menuWeeklyReport.id },
-          { id: menuViewReports.id },
+          { id: menuWeeklyReport.id }, // ⬅️ (权限)
+          { id: menuViewReports.id },  // ⬅️ (权限)
           { id: menuLinks.id },
           { id: menuAdminUsers.id },
           { id: menuAdminStores.id },
           { id: menuOnSaleProducts.id }, 
-          { id: menuOperationCenter.id }, // ⬅️ 【新增】
+          { id: menuOperationCenter.id },
+          { id: menuReports.id }, // ⬅️ 【新增】 (菜单)
         ],
         disconnect: [
           { key: 'SALES_FORM' },
@@ -142,7 +154,8 @@ async function main() {
           { id: menuAdminUsers.id },
           { id: menuAdminStores.id },
           { id: menuOnSaleProducts.id },
-          { id: menuOperationCenter.id }, // ⬅️ 【新增】
+          { id: menuOperationCenter.id },
+          { id: menuReports.id }, // ⬅️ 【新增】
         ],
       },
     },

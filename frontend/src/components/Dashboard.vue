@@ -41,7 +41,7 @@
                   <button 
                     @click="setView('PROFILE_MGMT')"
                     :class="[
-                      active ? 'bg-stone-100 text-stone-900' : 'text-stone-700', 
+                      active ? 'bg-stone-100 text-stone-900' : 'text-stone-900', 
                       'group flex w-full items-center rounded-md px-4 py-2 text-sm'
                     ]"
                   >
@@ -85,8 +85,8 @@
         </div>
 
         <SalesDataPage v-if="currentView === 'SALES_DATA'" />
-        <WeeklyReportForm v-if="currentView === 'WEEKLY_REPORT'" />
-        <ViewReports v-if="currentView === 'VIEW_REPORTS'" />
+        
+        <WeeklyReportPage v-if="currentView === 'REPORTS'" />
         <CommonLinks v-if="currentView === 'LINKS'" />
         
         <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
@@ -105,11 +105,14 @@
 <script setup>
 import { ref, computed } from 'vue'; 
 import SalesDataPage from './SalesDataPage.vue';
-import WeeklyReportForm from './WeeklyReportForm.vue';
+// ⬇️ 【修改】 
+// import WeeklyReportForm from './WeeklyReportForm.vue'; (移除)
+// import ViewReports from './ViewReports.vue'; (移除)
+import WeeklyReportPage from './WeeklyReportPage.vue'; // (新增)
+// ⬆️ 【修改】
 import CommonLinks from './CommonLinks.vue';
 import ProfileManagement from './ProfileManagement.vue';
 import UserManagement from './UserManagement.vue';
-import ViewReports from './ViewReports.vue';
 import StoreManagement from './StoreManagement.vue'; 
 import { useAuthStore } from '../stores/auth';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/vue';
@@ -120,16 +123,17 @@ import {
   Cog6ToothIcon
 } from '@heroicons/vue/20/solid';
 import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
-import OperationsCenter from './OperationsCenter.vue'; // ⬅️ 【新增】
+import OperationsCenter from './OperationsCenter.vue'; 
 
 // ⬇️ 【修改】 菜单列表已更新
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_DATA', name: '销售数据' }, 
-  { key: 'WEEKLY_REPORT', name: '周报填写' },
-  { key: 'VIEW_REPORTS', name: '周报查看' },
+  { key: 'REPORTS', name: '周报' }, // ⬅️ 【修改】
+  // { key: 'WEEKLY_REPORT', name: '周报填写' }, (移除)
+  // { key: 'VIEW_REPORTS', name: '周报查看' }, (移除)
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 
-  { key: 'OPERATION_CENTER', name: '运营中心' }, // ⬅️ 【新增】
+  { key: 'OPERATION_CENTER', name: '运营中心' },
   { key: 'LINKS', name: '常用链接' },
   { key: 'ADMIN_STORES', name: '店铺管理' },
   { key: 'ADMIN_USERS', name: '员工配置与管理' },

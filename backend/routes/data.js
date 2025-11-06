@@ -373,4 +373,118 @@ router.delete('/sales-data/:id', authMiddleware, async (req, res) => {
 });
 
 
+// ------------------------------------------
+// --- ⬇️ 【修复】为非 Admin 用户新增的路由 ---
+// ------------------------------------------
+
+/**
+ * 【新增】 GET /api/countries
+ * (供“运营中心”使用，替代 /api/admin/countries)
+ */
+router.get('/countries', authMiddleware, async (req, res) => {
+  try {
+    const countries = await prisma.managedCountry.findMany({
+      orderBy: { name: 'asc' },
+    });
+    res.json(countries);
+  } catch (error) {
+    console.error('获取国家列表失败:', error);
+    res.status(500).json({ error: '获取国家列表失败' });
+  }
+});
+
+/**
+ * 【新增】 GET /api/products-list
+ * (供“在售商品”页面使用，替代 /api/admin/products-list)
+ */
+router.get('/products-list', authMiddleware, async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: { sku: 'asc' },
+      include: {
+        listings: { 
+          include: {
+            store: { 
+              include: {
+                country: true 
+              }
+            }
+          }
+        }
+      }
+    });
+    res.json(products);
+  } catch (error) {
+    console.error("获取在售商品列表失败:", error);
+    res.status(500).json({ error: '获取在售商品列表失败' });
+  }
+});
+
+/**
+ * 【新增】 Zod 验证 (用于价格同步)
+ */
+const priceSyncSchema = z.object({
+  currentPrice: z.coerce.number().min(0, "价格不能为负数")
+});
+
+/**
+ * 【新增】 PUT /api/listings/:id
+ * (供“在售商品”页面 - 价格同步 使用，替代 /api/admin/listings/:id)
+ */
+router.put('/listings/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id: listingId } = req.params;
+    // 从 authMiddleware 获取 req.user
+    const { role, supervisedCountries } = req.user; 
+
+    // 1. 验证输入
+    const validation = priceSyncSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
+    }
+    
+    const { currentPrice } = validation.data;
+
+    // 2. (权限) 检查权限
+    const listing = await prisma.storeProductListing.findUnique({
+      where: { id: listingId },
+      include: { store: { select: { countryCode: true } } }
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: '未找到该商品的上架信息' });
+    }
+    
+    const isAdmin = role === 'admin';
+    // (安全) 确保 supervisedCountries 是一个数组
+    const isSupervisor = Array.isArray(supervisedCountries) && supervisedCountries.includes(listing.store.countryCode);
+    
+    if (!isAdmin && !isSupervisor) {
+      return res.status(403).json({ error: '权限不足：您不是该国家的主管' });
+    }
+    
+    // 3. (执行) 更新价格
+    const updatedListing = await prisma.storeProductListing.update({
+      where: { id: listingId },
+      data: {
+        currentPrice: currentPrice,
+      },
+      include: {
+        store: { include: { country: true } }
+      }
+    });
+    
+    res.json(updatedListing);
+
+  } catch (error)
+ {
+    console.error('价格同步失败:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '未找到该上架信息' });
+    }
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+
 module.exports = router;
