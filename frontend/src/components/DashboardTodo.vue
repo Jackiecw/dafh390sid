@@ -115,7 +115,8 @@ async function handleNewTodo() {
 </script>
 
 <style lang="postcss" scoped>
-@import "tailwindcss" reference; /* ⬅️ 【修复】 添加此行 */
+/* ⬇️ 【修复】 重新添加此行 */
+@import "tailwindcss" reference;
 
 /* (复用样式) */
 .form-input {

@@ -69,30 +69,33 @@
       </div>
     </nav>
 
-    <main class="flex-1 p-6 md:p-10 overflow-auto">
+    <main class="flex-1 flex flex-col overflow-hidden">
       
-      <DashboardHome v-if="currentView === 'DASHBOARD'" />
-      <SalesDataPage v-if="currentView === 'SALES_DATA'" />
-      
-      <WeeklyReportPage v-if="currentView === 'REPORTS'" />
-      <CalendarPage v-if="currentView === 'CALENDAR'" /> 
-      
-      <CommonLinks v-if="currentView === 'LINKS'" />
-      
-      <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
-      
-      <UserManagement v-if="currentView === 'ADMIN_USERS'" />
-      <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-      
-      <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
-      
-      <OperationsCenter v-if="currentView === 'OPERATION_CENTER'" /> 
-      
+      <div 
+        class="flex-1 p-6 md:p-10"
+        :class="[
+          currentView === 'CALENDAR' ? 'overflow-hidden' : 'overflow-auto'
+        ]"
+      >
+        <DashboardHome v-if="currentView === 'DASHBOARD'" />
+        <SalesDataPage v-if="currentView === 'SALES_DATA'" />
+        
+        <CalendarPage v-if="currentView === 'CALENDAR'" /> 
+        
+        <WeeklyReportPage v-if="currentView === 'REPORTS'" />
+        <CommonLinks v-if="currentView === 'LINKS'" />
+        <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
+        <UserManagement v-if="currentView === 'ADMIN_USERS'" />
+        <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
+        <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
+        <OperationsCenter v-if="currentView === 'OPERATION_CENTER'" /> 
+      </div>
     </main>
     </div>
 </template>
 
 <script setup>
+// (Script 部分保持不变)
 import { ref, computed } from 'vue'; 
 import SalesDataPage from './SalesDataPage.vue';
 import WeeklyReportPage from './WeeklyReportPage.vue'; 

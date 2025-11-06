@@ -161,11 +161,9 @@ import {
 } from '@headlessui/vue';
 import { ChevronUpDownIcon } from '@heroicons/vue/20/solid';
 
-// ⬇️ 【新增】 导入新组件
 import DashboardTodo from './DashboardTodo.vue';
 import DashboardSchedule from './DashboardSchedule.vue';
 import DashboardRecurringTask from './DashboardRecurringTask.vue';
-// ⬆️ 【新增】
 
 const authStore = useAuthStore();
 
@@ -196,25 +194,21 @@ const isLoading = ref({
   filters: true,
 });
 
-// (数据 - 不变)
 const summaryData = ref({
   gmv: { today: 0, thisWeek: 0, thisMonth: 0, currency: '?', cnyEquivalent: { today: 0, thisWeek: 0, thisMonth: 0 }},
   schedule: { planNextWeek: '加载中...' }
 });
 const ratesData = ref({});
 
-// (筛选器 - 不变)
 const allCountries = ref([]);
 const allStores = ref([]);
 const selectedCountryCode = ref(null);
 const selectedStoreId = ref(null);
 
-// ⬇️ 【新增】 弹窗状态
 const isScheduleOpen = ref(false);
 
 // --- 3. 筛选器逻辑 (不变) ---
 
-// (国家按钮)
 const countryFilterOptions = computed(() => {
   let countries = allCountries.value.map(c => ({ code: c.code, name: c.name }));
   if (authStore.role === 'admin') {
@@ -223,7 +217,6 @@ const countryFilterOptions = computed(() => {
   return countries;
 });
 
-// (店铺下拉菜单)
 const storeFilterOptions = computed(() => {
   let stores = allStores.value;
   if (selectedCountryCode.value && selectedCountryCode.value !== 'ALL') {
@@ -232,13 +225,11 @@ const storeFilterOptions = computed(() => {
   return [{ id: 'ALL', name: `所有${selectedCountryCode.value || ''}店铺` }, ...stores];
 });
 
-// (获取选中的店铺名称)
 const selectedStoreName = computed(() => {
   const store = storeFilterOptions.value.find(s => s.id === selectedStoreId.value);
   return store ? store.name : '选择店铺...';
 });
 
-// (汇率显示逻辑)
 const userCountryCodesForRates = computed(() => {
   if (authStore.role === 'admin') {
     return ['IDR', 'VND', 'THB', 'MYR', 'PHP', 'SGD']; 
@@ -251,7 +242,6 @@ const userCountryCodesForRates = computed(() => {
 
 // --- 4. 数据加载 (不变) ---
 
-// (获取激励文案)
 async function fetchHitokoto() {
   try {
     const response = await fetch('https://v1.hitokoto.cn/?c=i&encode=text');
@@ -261,7 +251,6 @@ async function fetchHitokoto() {
   }
 }
 
-// (获取筛选器选项)
 async function fetchFilterOptions() {
   isLoading.value.filters = true;
   try {
@@ -282,9 +271,7 @@ async function fetchFilterOptions() {
   }
 }
 
-// (获取 GMV 和 汇率)
 async function fetchDashboardData() {
-  // (防止在筛选器未加载完成时调用)
   if (!selectedCountryCode.value || !selectedStoreId.value) return;
 
   isLoading.value.summary = true;
@@ -310,15 +297,12 @@ async function fetchDashboardData() {
   }
 }
 
-// (初始化加载)
 onMounted(async () => {
   fetchHitokoto();
   await fetchFilterOptions();
-  // (等待筛选器加载完默认值后再获取数据)
   fetchDashboardData();
 });
 
-// (筛选器联动 - 不变)
 function selectCountry(code) {
   selectedCountryCode.value = code;
   selectedStoreId.value = storeFilterOptions.value[0].id; // 重置店铺
@@ -333,11 +317,10 @@ watch(selectedCountryCode, (newVal, oldVal) => {
 });
 
 watch(selectedStoreId, (newVal, oldVal) => {
-  if (newVal === oldVal || !newVal) return; // 防止初始化时重复调用
+  if (newVal === oldVal || !newVal) return;
   fetchDashboardData();
 });
 
-// --- 5. 辅助函数 (不变) ---
 function formatCurrency(value, currency) {
   if (currency === 'CNY') {
     return (value || 0).toFixed(2);
@@ -348,7 +331,8 @@ function formatCurrency(value, currency) {
 </script>
 
 <style lang="postcss">
-@import "tailwindcss" reference; /* ⬅️ 【修复】 添加此行 */
+/* ⬇️ 【修复】 重新添加此行 */
+@import "tailwindcss" reference;
 
 .dashboard-widget {
   @apply bg-white p-6 rounded-lg shadow-lg h-full flex flex-col;

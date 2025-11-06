@@ -250,16 +250,18 @@ function handleSave() {
 </script>
 
 <style lang="postcss">
-@import "../style.css" reference;
+/* ⬇️ 【修复】 重新添加此行 */
+@import "tailwindcss" reference;
 
-/* ⬇️ 【修改】 确保 v-calendar 容器和周视图撑满高度 */
+/* (原有的正确样式) 
+  确保 v-calendar 容器和周视图撑满高度 
+*/
 .custom-calendar.vc-container {
   @apply border-0 h-full w-full flex flex-col;
 }
 .custom-calendar .vc-weeks {
   @apply flex-1 grid grid-rows-6 w-full;
 }
-/* ⬆️ 【修改】 */
 
 .custom-calendar .vc-header {
   @apply mb-4;
@@ -271,14 +273,13 @@ function handleSave() {
   @apply text-stone-500 font-semibold;
 }
 
-/* ⬇️ 【修改】 让日期格子撑满所在的网格行 */
+/* 让日期格子撑满所在的网格行 */
 .custom-calendar .vc-day {
   @apply h-full;
 }
 .custom-calendar .vc-day-content {
   @apply flex flex-col h-full overflow-hidden;
 }
-/* ⬆️ 【修改】 */
 
 .custom-calendar .day-label {
   @apply text-sm text-stone-800;
