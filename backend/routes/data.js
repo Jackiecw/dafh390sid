@@ -9,9 +9,29 @@ const axios = require('axios');
 
 const router = express.Router();
 
+// --- Zod 验证模式 (用于 sales-data，保持不变) ---
+const salesDataSchema = z.object({
+  recordDate: z.string().datetime(),
+  storeId: z.string().min(1),
+  productId: z.string().min(1),
+  salesVolume: z.number().int().min(0),
+  revenue: z.number().min(0),
+  notes: z.string().optional().nullable(),
+});
+
+// ⬇️ --- 【新增】 日历事件 Zod 验证模式 ---
+const calendarEventSchema = z.object({
+  title: z.string().min(1, "标题不能为空"),
+  startAt: z.string().datetime("开始时间无效"),
+  endAt: z.string().datetime("结束时间无效"),
+  isAllDay: z.boolean().default(false),
+  color: z.string().default('blue'),
+});
+// ⬆️ --- 【新增】 ---
+
 
 // ------------------------------------------
-// --- ⬇️ 仪表盘 API (Dashboard) - 真实实现 ---
+// --- ⬇️ (不变) 仪表盘 API (Dashboard) ---
 // ------------------------------------------
 
 // (Zod 验证)
@@ -31,27 +51,11 @@ let ratesCache = {
   lastFetched: 0,
 };
 const CACHE_DURATION = 1000 * 60 * 60; // 1 小时
-
-// (货币符号映射 - 不变)
 const currencySymbols = {
-  CNY: '¥',
-  USD: '$',
-  IDR: 'Rp',
-  VND: '₫',
-  THB: '฿',
-  MYR: 'RM',
-  PHP: '₱',
-  SGD: 'S$'
+  CNY: '¥', USD: '$', IDR: 'Rp', VND: '₫', THB: '฿', MYR: 'RM', PHP: '₱', SGD: 'S$'
 };
-
-// (国家货币映射 - 不变)
 const countryCurrencyMap = {
-  ID: 'IDR',
-  VN: 'VND',
-  TH: 'THB',
-  MY: 'MYR',
-  PH: 'PHP',
-  SG: 'SGD',
+  ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD',
 };
 
 // --- 日期辅助函数 (东八区 - 不变) ---
@@ -256,7 +260,7 @@ router.get('/dashboard/filter-options', authMiddleware, async (req, res) => {
 });
 
 
-// --- ⬇️ 【修改】 待办事项 (Todo) API (实现) ---
+// --- (不变) 待办事项 (Todo) API ---
 
 // GET /api/todos
 router.get('/todos', authMiddleware, async (req, res) => {
@@ -348,19 +352,16 @@ router.delete('/todos/:id', authMiddleware, async (req, res) => {
 });
 
 
-// --- ⬇️ 【修改】 周期任务 (Recurring Task) API (实现) ---
+// --- (不变) 周期任务 (Recurring Task) API ---
 
 // GET /api/recurring-tasks
 router.get('/recurring-tasks', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
-    // (逻辑：自动重置)
-    // 1. 找出需要重置的任务
     const todayStart = getStartOfToday();
     const weekStart = getStartOfWeek();
     const monthStart = getStartOfMonth();
 
-    // (重置 DAILY 任务)
     await prisma.recurringTask.updateMany({
       where: {
         authorId: userId,
@@ -369,7 +370,6 @@ router.get('/recurring-tasks', authMiddleware, async (req, res) => {
       },
       data: { lastCompletedAt: null }
     });
-    // (重置 WEEKLY 任务)
     await prisma.recurringTask.updateMany({
       where: {
         authorId: userId,
@@ -378,7 +378,6 @@ router.get('/recurring-tasks', authMiddleware, async (req, res) => {
       },
       data: { lastCompletedAt: null }
     });
-    // (重置 MONTHLY 任务)
     await prisma.recurringTask.updateMany({
       where: {
         authorId: userId,
@@ -388,10 +387,9 @@ router.get('/recurring-tasks', authMiddleware, async (req, res) => {
       data: { lastCompletedAt: null }
     });
 
-    // 2. 返回所有任务 (包括刚重置的)
     const tasks = await prisma.recurringTask.findMany({
       where: { authorId: userId },
-      orderBy: { period: 'asc' } // (让 DAILY, WEEKLY, MONTHLY 排序)
+      orderBy: { period: 'asc' } 
     });
     res.json(tasks);
   } catch (error) {
@@ -422,12 +420,12 @@ router.post('/recurring-tasks', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/recurring-tasks/:id/toggle (用于勾选/取消勾选)
+// PUT /api/recurring-tasks/:id/toggle
 router.put('/recurring-tasks/:id/toggle', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
     const { id } = req.params;
-    const { isCompleted } = req.body; // (期望 { isCompleted: true/false })
+    const { isCompleted } = req.body; 
 
     if (typeof isCompleted !== 'boolean') {
        return res.status(400).json({ error: '输入无效: 必须提供 isCompleted 字段' });
@@ -439,7 +437,6 @@ router.put('/recurring-tasks/:id/toggle', authMiddleware, async (req, res) => {
         authorId: userId 
       },
       data: {
-        // 如果勾选为 "完成"，则记录时间；如果 "取消完成"，则设为 null
         lastCompletedAt: isCompleted ? new Date() : null,
       }
     });
@@ -453,7 +450,7 @@ router.put('/recurring-tasks/:id/toggle', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/recurring-tasks/:id (新增，用于删除)
+// DELETE /api/recurring-tasks/:id
 router.delete('/recurring-tasks/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -479,12 +476,11 @@ router.delete('/recurring-tasks/:id', authMiddleware, async (req, res) => {
 // --- ⬇️ (不变) 现有 API ---
 // ------------------------------------------
 
-// (... 此处省略不变的 /reports, /me, /sales, /reports (POST), /stores/:id/products, 
+// (此处省略不变的 /reports, /me, /sales, /reports (POST), /stores/:id/products, 
 //    /sales-data, /sales-data/:id, /sales-data/:id (DELETE), 
 //    /countries, /products-list, /listings/:id, /links ...)
-// (保持您上一版本中这些函数的实现不变)
 
-// (不变) GET /api/reports
+// GET /api/reports (不变)
 router.get('/reports', adminMiddleware, async (req, res) => {
   try {
     const reports = await prisma.weeklyReport.findMany({
@@ -498,7 +494,7 @@ router.get('/reports', adminMiddleware, async (req, res) => {
   }
 });
 
-// (不变) GET /api/me
+// GET /api/me (不变)
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -521,7 +517,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// (不变) POST /api/sales
+// POST /api/sales (不变)
 router.post('/sales', authMiddleware, async (req, res) => {
   try {
     const validation = salesDataSchema.safeParse(req.body);
@@ -556,7 +552,7 @@ router.post('/sales', authMiddleware, async (req, res) => {
   }
 });
 
-// (不变) POST /api/reports
+// POST /api/reports (不变)
 router.post('/reports', authMiddleware, async (req, res) => {
   try {
     const { 
@@ -586,21 +582,30 @@ router.post('/reports', authMiddleware, async (req, res) => {
   }
 });
 
-// (不变) GET /api/stores/:id/products
+// GET /api/stores/:id/products (不变)
 router.get('/stores/:id/products', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
+    // 修正：我们现在用 listings
     const store = await prisma.store.findUnique({
       where: { id: id },
       include: {
-        products: {
-          select: { id: true, sku: true, name: true },
-          orderBy: { sku: 'asc' }
+        listings: {
+          include: {
+            product: {
+              select: { id: true, sku: true, name: true }
+            }
+          },
+          orderBy: { product: { sku: 'asc' } }
         }
       }
     });
     if (!store) return res.status(404).json({ error: '店铺未找到' });
-    res.json(store.products);
+    
+    // 将 listings 转换回 products 数组，保持 API 兼容性
+    const products = store.listings.map(l => l.product);
+    res.json(products);
+    
   } catch (error) {
     res.status(500).json({ error: '获取店铺商品失败' });
   }
@@ -687,6 +692,34 @@ router.get('/sales-data', authMiddleware, async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
+
+// (辅助函数，不变)
+async function checkManagementPermission(userId, salesDataId) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: { select: { name: true } }, supervisedCountries: { select: { code: true } } }
+  });
+
+  if (user.role.name === 'admin') {
+    return { canManage: true };
+  }
+
+  const data = await prisma.salesData.findUnique({
+    where: { id: salesDataId },
+    include: { store: { select: { countryCode: true } } }
+  });
+
+  if (!data) {
+    return { canManage: false, error: '数据未找到', status: 404 };
+  }
+
+  const supervisedCodes = user.supervisedCountries.map(c => c.code);
+  if (supervisedCodes.includes(data.store.countryCode)) {
+    return { canManage: true };
+  }
+  
+  return { canManage: false, error: '权限不足：您不是该国家的主管', status: 403 };
+}
 
 router.put('/sales-data/:id', authMiddleware, async (req, res) => {
   try {
@@ -871,5 +904,134 @@ router.get('/links', authMiddleware, async (req, res) => {
   }
 });
 
+
+// ⬇️ --- 【新增】 工作日历 API (员工) ---
+// ------------------------------------------
+
+// GET /api/calendar/events?start=...&end=...
+router.get('/calendar/events', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { start, end } = req.query;
+
+    if (!start || !end) {
+      return res.status(400).json({ error: '必须提供 start 和 end 查询参数' });
+    }
+
+    const events = await prisma.calendarEvent.findMany({
+      where: {
+        authorId: userId,
+        startAt: { lte: new Date(end) },
+        endAt: { gte: new Date(start) }
+      },
+      orderBy: {
+        startAt: 'asc'
+      }
+    });
+    res.json(events);
+  } catch (error) {
+    console.error('获取日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// POST /api/calendar/events (员工创建自己的)
+router.post('/calendar/events', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const validation = calendarEventSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+
+    const newEvent = await prisma.calendarEvent.create({
+      data: {
+        ...validation.data,
+        authorId: userId,
+        createdByAdmin: false // 明确这是用户自己创建的
+      }
+    });
+    res.status(201).json(newEvent);
+  } catch (error) {
+    console.error('创建日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// PUT /api/calendar/events/:id (员工修改自己的)
+router.put('/calendar/events/:id', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { id } = req.params;
+    const validation = calendarEventSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+
+    const updatedEvent = await prisma.calendarEvent.update({
+      where: {
+        id: id,
+        authorId: userId,
+        createdByAdmin: false // (安全) 只能修改自己创建的
+      },
+      data: validation.data
+    });
+    res.json(updatedEvent);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '事件未找到，或您无权修改此事件' });
+    }
+    console.error('更新日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// DELETE /api/calendar/events/:id (员工删除自己的)
+router.delete('/calendar/events/:id', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { id } = req.params;
+
+    await prisma.calendarEvent.delete({
+      where: {
+        id: id,
+        authorId: userId,
+        createdByAdmin: false // (安全) 只能删除自己创建的
+      }
+    });
+    res.status(204).send();
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '事件未找到，或您无权删除此事件' });
+    }
+    console.error('删除日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// GET /api/calendar/weekly-focus?week=... (获取每周重点)
+router.get('/calendar/weekly-focus', authMiddleware, async (req, res) => {
+  try {
+    const { week } = req.query; // 期望 'YYYY-MM-DD' (周一)
+    if (!week) {
+      return res.status(400).json({ error: '必须提供 week (周一) 查询参数' });
+    }
+
+    const focus = await prisma.weeklyFocus.findUnique({
+      where: {
+        weekStartDate: new Date(week)
+      }
+    });
+    
+    if (!focus) {
+      return res.json(null); // (未找到)
+    }
+    res.json(focus);
+  } catch (error) {
+    console.error('获取每周重点失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+// ⬆️ --- 【新增】 ---
 
 module.exports = router;

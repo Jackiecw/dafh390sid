@@ -151,7 +151,9 @@ function handleTaskCreated(newTask) {
 
 </script>
 
-<style scoped>
+<style lang="postcss" scoped>
+@import "tailwindcss" reference; /* ⬅️ 【修复】 添加此行 */
+
 /* (复用样式) */
 .dashboard-widget {
   @apply bg-white p-6 rounded-lg shadow-lg h-full flex flex-col;

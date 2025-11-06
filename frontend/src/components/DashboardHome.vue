@@ -14,7 +14,7 @@
         
         <div class="bg-white p-6 rounded-lg shadow-lg">
           <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-stone-900 mb-2 md:mb-0">领售数据 (GMV)</h3>
+            <h3 class="text-xl font-bold text-stone-900 mb-2 md:mb-0">销售数据 (GMV)</h3>
             
             <div class="flex items-center space-x-2">
               <div class="flex items-center p-1 bg-stone-100 rounded-lg">
@@ -347,7 +347,9 @@ function formatCurrency(value, currency) {
 
 </script>
 
-<style>
+<style lang="postcss">
+@import "tailwindcss" reference; /* ⬅️ 【修复】 添加此行 */
+
 .dashboard-widget {
   @apply bg-white p-6 rounded-lg shadow-lg h-full flex flex-col;
 }

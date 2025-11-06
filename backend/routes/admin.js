@@ -38,21 +38,43 @@ const roleSchema = z.object({
   menuIds: z.array(z.string()).default([]), 
 });
 
-// ⬇️ --- 【新增】 "常用链接" 模式 ---
+// (不变) "常用链接" 模式
 const linkSchema = z.object({
   title: z.string().min(1, "标题不能为空"),
   url: z.string().url("必须是有效的 URL (例如: https://...)"),
   description: z.string().optional().nullable(),
   displayOrder: z.coerce.number().int().default(0),
 });
+
+// ⬇️ --- 【新增】 "管理员指派日程" 模式 ---
+const adminEventCreateSchema = z.object({
+  // 事件内容
+  title: z.string().min(1, "标题不能为空"),
+  startAt: z.string().datetime("开始时间无效"),
+  endAt: z.string().datetime("结束时间无效"),
+  isAllDay: z.boolean().default(false),
+  color: z.string().default('red'), // 管理员默认为红色
+  
+  // 指派目标
+  target: z.object({
+    type: z.enum(['GLOBAL', 'COUNTRY', 'USER']),
+    id: z.string().optional(), // GLOBAL 时为空, COUNTRY 时为 code, USER 时为 id
+  })
+});
+
+// ⬇️ --- 【新增】 "每周重点" 模式 ---
+const weeklyFocusSchema = z.object({
+  weekStartDate: z.string().datetime("必须提供有效的周开始日期"),
+  content: z.string().min(1, "内容不能为空"),
+});
 // ⬆️ --- 【新增】 ---
 
 
 // -----------------------------------------------------------------
-// --- 用户管理 API (Users) --- (不变)
+// --- (不变) 用户管理 API (Users) ---
 // -----------------------------------------------------------------
 
-// (不变) GET /users
+// (GET /users)
 router.get('/users', async (req, res) => { 
   try {
     const users = await prisma.user.findMany({
@@ -74,7 +96,7 @@ router.get('/users', async (req, res) => {
   }
 });
 
-// (不变) GET /users/:id
+// (GET /users/:id)
 router.get('/users/:id', async (req, res) => { 
   try {
     const { id } = req.params;
@@ -97,7 +119,7 @@ router.get('/users/:id', async (req, res) => {
   }
 });
 
-// (不变) POST /users
+// (POST /users)
 router.post('/users', async (req, res) => { 
   try {
     const validation = userCreateSchema.safeParse(req.body);
@@ -148,7 +170,7 @@ router.post('/users', async (req, res) => {
   }
 });
 
-// (不变) PUT /users/:id
+// (PUT /users/:id)
 router.put('/users/:id', async (req, res) => { 
   try {
     const { id } = req.params;
@@ -195,7 +217,7 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
-// (不变) 重置用户密码
+// (POST /users/:id/reset-password)
 router.post('/users/:id/reset-password', async (req, res) => {
   try {
     const { id } = req.params;
@@ -228,10 +250,10 @@ router.post('/users/:id/reset-password', async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// --- 角色管理 API (Roles) --- (不变)
+// --- (不变) 角色管理 API (Roles) ---
 // -----------------------------------------------------------------
 
-// (不变) GET /roles
+// (GET /roles)
 router.get('/roles', async (req, res) => {
   try {
     const roles = await prisma.role.findMany({
@@ -244,7 +266,7 @@ router.get('/roles', async (req, res) => {
   }
 });
 
-// (不变) POST /roles
+// (POST /roles)
 router.post('/roles', async (req, res) => {
   try {
     const validation = roleSchema.safeParse(req.body);
@@ -284,7 +306,7 @@ router.post('/roles', async (req, res) => {
 });
 
 
-// (不变) GET /roles/:id
+// (GET /roles/:id)
 router.get('/roles/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -307,7 +329,7 @@ router.get('/roles/:id', async (req, res) => {
   }
 });
 
-// (不变) PUT /roles/:id
+// (PUT /roles/:id)
 router.put('/roles/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -351,7 +373,7 @@ router.put('/roles/:id', async (req, res) => {
 
 
 // -----------------------------------------------------------------
-// --- 菜单项 API (Menu Items) --- (不变)
+// --- (不变) 菜单项 API (Menu Items) ---
 // -----------------------------------------------------------------
 
 router.get('/menu-items', async (req, res) => {
@@ -368,7 +390,8 @@ router.get('/menu-items', async (req, res) => {
   }
 });
 
-// ⬇️ --- 【新增】 常用链接管理 API (Links) ---
+// -----------------------------------------------------------------
+// --- (不变) 常用链接管理 API (Links) ---
 // -----------------------------------------------------------------
 
 // POST /api/admin/links
@@ -424,7 +447,102 @@ router.delete('/links/:id', async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
-// ⬆️ --- 【新增】 ---
 
+
+// ⬇️ --- 【新增】 工作日历 API (管理员) ---
+// -----------------------------------------------------------------
+
+// POST /api/admin/calendar/events (指派日程)
+router.post('/calendar/events', async (req, res) => {
+  try {
+    const { userId: adminId } = req.user;
+    const validation = adminEventCreateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+
+    const { target, ...eventData } = validation.data;
+    let targetUserIds = [];
+
+    // 1. 获取目标用户 ID
+    if (target.type === 'GLOBAL') {
+      const users = await prisma.user.findMany({ select: { id: true } });
+      targetUserIds = users.map(u => u.id);
+    } 
+    else if (target.type === 'USER') {
+      if (!target.id) return res.status(400).json({ error: '必须提供目标用户 ID' });
+      targetUserIds = [target.id];
+    } 
+    else if (target.type === 'COUNTRY') {
+      if (!target.id) return res.status(400).json({ error: '必须提供目标国家 Code' });
+      const users = await prisma.user.findMany({
+        where: {
+          operatedCountries: { some: { code: target.id } }
+        },
+        select: { id: true }
+      });
+      targetUserIds = users.map(u => u.id);
+    }
+
+    if (targetUserIds.length === 0) {
+      return res.status(400).json({ error: '未找到符合条件的目标用户' });
+    }
+
+    // 2. 准备批量创建的数据
+    const eventsToCreate = targetUserIds.map(userId => ({
+      ...eventData,
+      authorId: userId, // 关联到每个用户的日历
+      createdByAdmin: true,
+      adminCreatorId: adminId, // 记录是哪个管理员创建的
+    }));
+
+    // 3. 批量创建
+    await prisma.calendarEvent.createMany({
+      data: eventsToCreate,
+      skipDuplicates: true, // (安全)
+    });
+
+    res.status(201).json({ message: `成功为 ${targetUserIds.length} 名用户指派了日程` });
+
+  } catch (error) {
+    console.error('指派日程失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// POST /api/admin/calendar/weekly-focus (创建/更新每周重点)
+router.post('/calendar/weekly-focus', async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const validation = weeklyFocusSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+    
+    const { weekStartDate, content } = validation.data;
+    const date = new Date(weekStartDate); // 确保是日期对象
+
+    const focus = await prisma.weeklyFocus.upsert({
+      where: {
+        weekStartDate: date,
+      },
+      update: {
+        content: content,
+        authorId: userId, // 记录最后修改人
+      },
+      create: {
+        weekStartDate: date,
+        content: content,
+        authorId: userId,
+      }
+    });
+
+    res.status(201).json(focus);
+  } catch (error) {
+    console.error('更新每周重点失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+// ⬆️ --- 【新增】 ---
 
 module.exports = router;

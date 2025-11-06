@@ -70,25 +70,26 @@
     </nav>
 
     <main class="flex-1 p-6 md:p-10 overflow-auto">
-      <div>
-        <DashboardHome v-if="currentView === 'DASHBOARD'" />
-        <SalesDataPage v-if="currentView === 'SALES_DATA'" />
-        
-        <WeeklyReportPage v-if="currentView === 'REPORTS'" />
-        
-        <CommonLinks v-if="currentView === 'LINKS'" />
-        
-        <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
-        
-        <UserManagement v-if="currentView === 'ADMIN_USERS'" />
-        <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-        
-        <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
-        
-        <OperationsCenter v-if="currentView === 'OPERATION_CENTER'" /> 
-        </div>
+      
+      <DashboardHome v-if="currentView === 'DASHBOARD'" />
+      <SalesDataPage v-if="currentView === 'SALES_DATA'" />
+      
+      <WeeklyReportPage v-if="currentView === 'REPORTS'" />
+      <CalendarPage v-if="currentView === 'CALENDAR'" /> 
+      
+      <CommonLinks v-if="currentView === 'LINKS'" />
+      
+      <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
+      
+      <UserManagement v-if="currentView === 'ADMIN_USERS'" />
+      <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
+      
+      <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
+      
+      <OperationsCenter v-if="currentView === 'OPERATION_CENTER'" /> 
+      
     </main>
-  </div>
+    </div>
 </template>
 
 <script setup>
@@ -109,11 +110,12 @@ import {
 } from '@heroicons/vue/20/solid';
 import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
 import OperationsCenter from './OperationsCenter.vue'; 
-import DashboardHome from './DashboardHome.vue'; // ⬅️ 【新增】 导入新组件
+import DashboardHome from './DashboardHome.vue'; 
+import CalendarPage from './CalendarPage.vue'; 
 
-// (不变) 菜单列表
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
+  { key: 'CALENDAR', name: '工作日历' },
   { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'REPORTS', name: '周报' },
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 
@@ -126,7 +128,6 @@ const allMenuItems = [
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
 
-// (不变)
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 const userAvatar = computed(() => {
   if (!authStore.avatarUrl) return null;
@@ -135,7 +136,6 @@ const userAvatar = computed(() => {
     : `${apiBaseUrl}${authStore.avatarUrl}`;
 });
 
-// (不变)
 const visibleMenuItems = computed(() => {
   const userPermissions = authStore.permissions; 
   if (!userPermissions) return []; 
@@ -144,12 +144,10 @@ const visibleMenuItems = computed(() => {
   );
 });
 
-// (不变)
 const setView = (viewName) => {
   currentView.value = viewName;
 };
 
-// (不变)
 const handleLogout = () => {
   authStore.logout();
 };
@@ -157,7 +155,6 @@ const handleLogout = () => {
 
 
 <style scoped>
-/* (样式 ... 保持不变) */
 .active-border {
   position: relative;
 }
