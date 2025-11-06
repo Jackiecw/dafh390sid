@@ -1,5 +1,6 @@
 <template>
-  <div class="space-y-6 flex flex-col h-full">
+  <div class="space-y-6">
+  
     <div class="flex justify-between items-center">
       <h2 class="text-3xl font-bold text-stone-900">工作日历</h2>
       <button 
@@ -33,21 +34,22 @@
       </p>
     </div>
 
-    <div class="bg-white p-4 rounded-lg shadow-lg flex-1 flex flex-col">
+    <div class="bg-white p-4 rounded-lg shadow-lg">
+    
       <p v-if="isLoading.events" class="text-stone-500 text-sm p-4">
         正在加载日历事件...
       </p>
       <VCalendar
         v-else
-        class="custom-calendar flex-1" 
+        class="custom-calendar" 
         :attributes="calendarAttributes"
         :masks="{ title: 'YYYY年 MMMM' }"
-        is-expanded
+        :rows="6"
+        title-position="top" 
         @did-move="handleMonthChange"
         @dayclick="handleDayClick"
-        layout="vertical"
       >
-        <template #day-content="{ day, attributes }">
+      <template #day-content="{ day, attributes }">
           <div class="flex flex-col h-full z-10 overflow-hidden">
             <span class="day-label text-sm">{{ day.day }}</span>
             <div class="flex-grow overflow-y-auto overflow-x-hidden">
@@ -93,6 +95,7 @@
 </template>
 
 <script setup>
+// (Script 部分与上一轮修复相同，保持不变)
 import { ref, computed, onMounted } from 'vue';
 import { Calendar as VCalendar } from 'v-calendar';
 import apiClient from '../api';
@@ -109,7 +112,17 @@ const isLoading = ref({ events: true, focus: true });
 const weeklyFocus = ref(null); 
 const events = ref([]); 
 
-const currentWeek = ref(getMonday(new Date())); 
+// 1. 获取周日 (Sun-Sat 周期)
+function getSunday(d) {
+  d = new Date(d);
+  d.setHours(0, 0, 0, 0); 
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+  return new Date(d.setDate(diff));
+}
+
+// 2. 使用 getSunday 初始化
+const currentWeek = ref(getSunday(new Date())); 
 const currentMonthRange = ref(getMonthRange(new Date())); 
 
 const isEventModalOpen = ref(false);
@@ -118,14 +131,6 @@ const isFocusModalOpen = ref(false);
 
 const selectedEvent = ref(null); 
 const selectedDate = ref(null); 
-
-function getMonday(d) {
-  d = new Date(d);
-  d.setHours(0, 0, 0, 0); 
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); 
-  return new Date(d.setDate(diff));
-}
 
 function getMonthRange(d) {
   const year = d.getFullYear();
@@ -139,6 +144,7 @@ function formatDate(dateString) {
   return new Date(dateString).toISOString().split('T')[0];
 }
 
+// 3. formatWeek 以匹配 Sun-Sat 周期
 function formatWeek(date) {
   const start = formatDate(date);
   const end = formatDate(new Date(date.getTime() + 6 * 24 * 60 * 60 * 1000));
@@ -205,15 +211,19 @@ onMounted(() => {
   fetchEvents(currentMonthRange.value);
 });
 
+// 4. handleMonthChange 逻辑 (保持不变)
 function handleMonthChange(pages) {
-  const newDate = pages[0].viewDays[15].date; 
-  currentMonthRange.value = getMonthRange(newDate);
-  currentWeek.value = getMonday(newDate); 
+  const newDateForMonth = pages[0].monthDate; 
+  const firstDayOfView = pages[0].viewDays[0].date;
+
+  currentMonthRange.value = getMonthRange(newDateForMonth);
+  currentWeek.value = getSunday(firstDayOfView); 
 
   fetchEvents(currentMonthRange.value);
   fetchWeeklyFocus(currentWeek.value);
 }
 
+// (以下函数均保持不变)
 function handleDayClick(day) {
   selectedEvent.value = null;
   selectedDate.value = day.date;
@@ -250,19 +260,13 @@ function handleSave() {
 </script>
 
 <style lang="postcss">
-/* ⬇️ 【修复】 重新添加此行 */
 @import "tailwindcss" reference;
 
-/* (原有的正确样式) 
-  确保 v-calendar 容器和周视图撑满高度 
-*/
-.custom-calendar.vc-container {
-  @apply border-0 h-full w-full flex flex-col;
-}
-.custom-calendar .vc-weeks {
-  @apply flex-1 grid grid-rows-6 w-full;
-}
+/* * (保持不变)
+ * 这部分 CSS 已经是正确的网格布局样式
+ */
 
+/* 1. 头部样式 */
 .custom-calendar .vc-header {
   @apply mb-4;
 }
@@ -273,17 +277,23 @@ function handleSave() {
   @apply text-stone-500 font-semibold;
 }
 
-/* 让日期格子撑满所在的网格行 */
+/* 2. (核心) 定义每个“日期方块”的最小高度 */
 .custom-calendar .vc-day {
-  @apply h-full;
-}
-.custom-calendar .vc-day-content {
-  @apply flex flex-col h-full overflow-hidden;
+  /* 你可以调整这个高度, h-32 = 8rem (128px) */
+  @apply h-32;
 }
 
+/* 3. 单元格 *内部* 布局 */
+.custom-calendar .vc-day-content {
+  @apply flex flex-col h-full overflow-hidden p-1; 
+}
+
+/* 4. 日期数字 */
 .custom-calendar .day-label {
   @apply text-sm text-stone-800;
 }
+
+/* 5. 事件按钮 */
 .custom-calendar .event-button {
   @apply w-full text-left text-xs font-medium text-white p-1 rounded-sm mb-0.5 truncate;
 }

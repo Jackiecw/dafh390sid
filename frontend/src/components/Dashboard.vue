@@ -71,13 +71,8 @@
 
     <main class="flex-1 flex flex-col overflow-hidden">
       
-      <div 
-        class="flex-1 p-6 md:p-10"
-        :class="[
-          currentView === 'CALENDAR' ? 'overflow-hidden' : 'overflow-auto'
-        ]"
-      >
-        <DashboardHome v-if="currentView === 'DASHBOARD'" />
+      <div class="flex-1 p-6 md:p-10 overflow-auto">
+      <DashboardHome v-if="currentView === 'DASHBOARD'" />
         <SalesDataPage v-if="currentView === 'SALES_DATA'" />
         
         <CalendarPage v-if="currentView === 'CALENDAR'" /> 
