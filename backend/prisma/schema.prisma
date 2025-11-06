@@ -11,7 +11,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- 1. 用户模型 (修改) ---
+// --- 1. 用户模型 (User) ---
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
@@ -29,12 +29,15 @@ model User {
   supervisedCountries ManagedCountry[] @relation("CountrySupervisors")
   operatedCountries   ManagedCountry[] @relation("CountryOperators")
 
-  // ⬇️ 【新增】
   ownedOperationModules OperationModule[] @relation("ModuleOwner")
   ownedOperationTasks   OperationTask[]   @relation("TaskOwner")
+  
+  // ⬇️ 【新增】 关联待办和周期任务
+  todos          Todo[]
+  recurringTasks RecurringTask[]
 }
 
-// --- 2. 角色模型 (不变) ---
+// --- 2. 角色模型 (Role) ---
 model Role {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -43,7 +46,7 @@ model Role {
   menus       MenuItem[]
 }
 
-// --- 3. 菜单项模型 (不变) ---
+// --- 3. 菜单项模型 (MenuItem) ---
 model MenuItem {
   id    String @id @default(cuid())
   key   String @unique
@@ -51,7 +54,7 @@ model MenuItem {
   roles Role[]
 }
 
-// --- 4. 店铺模型 (Store) (不变) ---
+// --- 4. 店铺模型 (Store) ---
 model Store {
   id              String   @id @default(cuid())
   name            String   @unique
@@ -68,7 +71,7 @@ model Store {
   listings StoreProductListing[]
 }
 
-// --- 5. 销售数据模型 (SalesData) (不变) ---
+// --- 5. 销售数据模型 (SalesData) ---
 model SalesData {
   id          String   @id @default(cuid())
   recordDate  DateTime
@@ -87,7 +90,7 @@ model SalesData {
   productId   String
 }
 
-// --- 6. (不变) 周报模型 (WeeklyReport) ---
+// --- 6. 周报模型 (WeeklyReport) ---
 model WeeklyReport {
   id                  String   @id @default(cuid())
   weekStartDate       DateTime
@@ -101,7 +104,7 @@ model WeeklyReport {
 }
 
 
-// --- 7. (不变) 国家管理模型 (ManagedCountry) ---
+// --- 7. 国家管理模型 (ManagedCountry) ---
 model ManagedCountry {
   id            String    @id @default(cuid())
   code          String    @unique 
@@ -114,7 +117,7 @@ model ManagedCountry {
   operationModules OperationModule[]
 }
 
-// --- 8. 商品模型 (Product) (不变) ---
+// --- 8. 商品模型 (Product) ---
 model Product {
   id           String  @id @default(cuid())
   sku          String  @unique 
@@ -133,7 +136,7 @@ model Product {
   salesData SalesData[]
 }
 
-// --- 9. (不变) 店铺商品上架 (StoreProductListing) 模型 ---
+// --- 9. 店铺商品上架 (StoreProductListing) 模型 ---
 model StoreProductListing {
   id        String  @id @default(cuid())
   
@@ -149,47 +152,72 @@ model StoreProductListing {
   @@unique([storeId, productId])
 }
 
-// ⬇️ --- 【修改】 SOP/责任人 (OperationModule) 模型 ---
+// --- 10. SOP/责任人 (OperationModule) 模型 ---
 model OperationModule {
   id           String   @id @default(cuid())
-  name         String // "板块"
+  name         String
   displayOrder Int      @default(0)
-
-  // 关联国家
   country   ManagedCountry @relation(fields: [countryCode], references: [code])
   countryCode String
-
-  // 关联事项
   tasks OperationTask[]
-  
-  // ⬇️ 【已修复】 关联板块责任人
   owner   User?   @relation("ModuleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerId String? // ⬅️ 移除了多余的 @relation
-
+  ownerId String?
   @@index([countryCode, displayOrder])
 }
 
-// ⬇️ --- 【修改】 SOP/责任人 (OperationTask) 模型 ---
+// --- 11. SOP/责任人 (OperationTask) 模型 ---
 model OperationTask {
   id           String   @id @default(cuid())
-  name         String // "事项"
-  notes        String? // "备注"
+  name         String
+  notes        String?
   displayOrder Int      @default(0)
-
-  // 关联板块
   module   OperationModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleId String
-  
-  // ⬇️ 【已修复】 关联事项责任人
   owner   User?   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerId String? // ⬅️ 移除了多余的 @relation
-
+  ownerId String?
   @@index([moduleId, displayOrder])
 }
-// ⬆️ --- 【修改】 ---
+
+// --- 12. 常用链接 (CommonLink) 模型 ---
+model CommonLink {
+  id           String   @id @default(cuid())
+  title        String
+  url          String
+  description  String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+// ⬇️ --- 【新增】 待办事项 (Todo) 模型 ---
+model Todo {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  author    User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  
+  @@index([authorId, createdAt])
+}
+
+// ⬇️ --- 【新增】 周期任务 (RecurringTask) 模型 ---
+model RecurringTask {
+  id          String   @id @default(cuid())
+  content     String   @db.Text
+  period      TaskPeriod // DAILY, WEEKLY, MONTHLY
+  
+  lastCompletedAt DateTime? // 用于重置
+  
+  author    User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+  
+  @@index([authorId, period])
+}
+// ⬆️ --- 【新增】 ---
 
 
-// --- (不变) 枚举 (Enums) ---
+// --- 枚举 (Enums) ---
 
 enum Platform {
   SHOPEE
@@ -213,3 +241,11 @@ enum ProductCategory {
   ACCESSORY
   OTHER
 }
+
+// ⬇️ --- 【新增】 任务周期枚举 ---
+enum TaskPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+// ⬆️ --- 【新增】 ---

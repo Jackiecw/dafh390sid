@@ -38,9 +38,18 @@ const roleSchema = z.object({
   menuIds: z.array(z.string()).default([]), 
 });
 
+// ⬇️ --- 【新增】 "常用链接" 模式 ---
+const linkSchema = z.object({
+  title: z.string().min(1, "标题不能为空"),
+  url: z.string().url("必须是有效的 URL (例如: https://...)"),
+  description: z.string().optional().nullable(),
+  displayOrder: z.coerce.number().int().default(0),
+});
+// ⬆️ --- 【新增】 ---
+
 
 // -----------------------------------------------------------------
-// --- 用户管理 API (Users) ---
+// --- 用户管理 API (Users) --- (不变)
 // -----------------------------------------------------------------
 
 // (不变) GET /users
@@ -186,12 +195,11 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
-// ⬇️ 【新增】 接口：重置用户密码
+// (不变) 重置用户密码
 router.post('/users/:id/reset-password', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // (安全) 不允许重置 admin 账号的密码
     const userToReset = await prisma.user.findUnique({ where: { id: id }, select: { username: true } });
     if (userToReset && userToReset.username === 'admin') {
       return res.status(403).json({ error: '禁止重置超级管理员的密码' });
@@ -359,5 +367,64 @@ router.get('/menu-items', async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
+
+// ⬇️ --- 【新增】 常用链接管理 API (Links) ---
+// -----------------------------------------------------------------
+
+// POST /api/admin/links
+router.post('/links', async (req, res) => {
+  try {
+    const validation = linkSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+    const newLink = await prisma.commonLink.create({ 
+      data: validation.data 
+    });
+    res.status(201).json(newLink);
+  } catch (error) {
+    console.error('创建链接失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// PUT /api/admin/links/:id
+router.put('/links/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const validation = linkSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+    const updatedLink = await prisma.commonLink.update({
+      where: { id: id },
+      data: validation.data,
+    });
+    res.json(updatedLink);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '链接未找到' });
+    }
+    console.error('更新链接失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// DELETE /api/admin/links/:id
+router.delete('/links/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.commonLink.delete({ where: { id: id } });
+    res.status(204).send();
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '链接未找到' });
+    }
+    console.error('删除链接失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+// ⬆️ --- 【新增】 ---
+
 
 module.exports = router;

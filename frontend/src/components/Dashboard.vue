@@ -70,23 +70,12 @@
     </nav>
 
     <main class="flex-1 p-6 md:p-10 overflow-auto">
-      <header class="mb-6">
-        <h2 class="text-3xl font-bold text-stone-900">
-          欢迎您，{{ authStore.nickname }}！
-        </h2>
-      </header>
-
       <div>
-        <div v-if="currentView === 'DASHBOARD'">
-          <div class="p-6 bg-white rounded-lg shadow">
-            <h1 class="text-xl font-semibold">仪表盘首页</h1>
-            <p class="mt-2 text-stone-600">这里是您未来放置可视化图表的地方。</p>
-          </div>
-        </div>
-
+        <DashboardHome v-if="currentView === 'DASHBOARD'" />
         <SalesDataPage v-if="currentView === 'SALES_DATA'" />
         
         <WeeklyReportPage v-if="currentView === 'REPORTS'" />
+        
         <CommonLinks v-if="currentView === 'LINKS'" />
         
         <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
@@ -105,11 +94,7 @@
 <script setup>
 import { ref, computed } from 'vue'; 
 import SalesDataPage from './SalesDataPage.vue';
-// ⬇️ 【修改】 
-// import WeeklyReportForm from './WeeklyReportForm.vue'; (移除)
-// import ViewReports from './ViewReports.vue'; (移除)
-import WeeklyReportPage from './WeeklyReportPage.vue'; // (新增)
-// ⬆️ 【修改】
+import WeeklyReportPage from './WeeklyReportPage.vue'; 
 import CommonLinks from './CommonLinks.vue';
 import ProfileManagement from './ProfileManagement.vue';
 import UserManagement from './UserManagement.vue';
@@ -124,14 +109,13 @@ import {
 } from '@heroicons/vue/20/solid';
 import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
 import OperationsCenter from './OperationsCenter.vue'; 
+import DashboardHome from './DashboardHome.vue'; // ⬅️ 【新增】 导入新组件
 
-// ⬇️ 【修改】 菜单列表已更新
+// (不变) 菜单列表
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'SALES_DATA', name: '销售数据' }, 
-  { key: 'REPORTS', name: '周报' }, // ⬅️ 【修改】
-  // { key: 'WEEKLY_REPORT', name: '周报填写' }, (移除)
-  // { key: 'VIEW_REPORTS', name: '周报查看' }, (移除)
+  { key: 'REPORTS', name: '周报' },
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 
   { key: 'OPERATION_CENTER', name: '运营中心' },
   { key: 'LINKS', name: '常用链接' },
