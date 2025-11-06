@@ -127,8 +127,7 @@ model Product {
   cost         Float?
   weightKg     Float?  
   volumeM3     Float? 
-  dimensionsMm String? 
-
+  dimensionsMm String?
   listings StoreProductListing[]
   
   salesData SalesData[]
@@ -163,9 +162,9 @@ model OperationModule {
   // 关联事项
   tasks OperationTask[]
   
-  // ⬇️ 【修改】 关联板块责任人
+  // ⬇️ 【已修复】 关联板块责任人
   owner   User?   @relation("ModuleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerId String? @relation("ModuleOwner")
+  ownerId String? // ⬅️ 移除了多余的 @relation
 
   @@index([countryCode, displayOrder])
 }
@@ -181,9 +180,9 @@ model OperationTask {
   module   OperationModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleId String
   
-  // ⬇️ 【修改】 关联事项责任人
+  // ⬇️ 【已修复】 关联事项责任人
   owner   User?   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerId String? @relation("TaskOwner")
+  ownerId String? // ⬅️ 移除了多余的 @relation
 
   @@index([moduleId, displayOrder])
 }
