@@ -1,3 +1,7 @@
 /* ./frontend/src/style.css */
 
 @import "tailwindcss";
+
+/* (确保这里没有 @import "@fullcalendar/...")
+  (所有 FullCalendar 样式已在 main.js 中正确导入)
+*/

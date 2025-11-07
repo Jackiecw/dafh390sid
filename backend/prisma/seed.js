@@ -14,6 +14,15 @@ async function main() {
     update: {},
     create: { key: 'DASHBOARD', name: '仪表盘' },
   });
+  
+  // ⬇️ --- 【新增】 ---
+  const menuCalendar = await prisma.menuItem.upsert({
+    where: { key: 'CALENDAR' },
+    update: { name: '工作日历' },
+    create: { key: 'CALENDAR', name: '工作日历' },
+  });
+  // ⬆️ --- 【新增】 ---
+
   const menuSalesData = await prisma.menuItem.upsert({
     where: { key: 'SALES_DATA' },
     update: {},
@@ -64,13 +73,9 @@ async function main() {
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
-  // ⬇️ --- 【删除】 ---
-  // (删除 menuCalendar)
-  try {
-    await prisma.menuItem.delete({ where: { key: 'CALENDAR' } });
-    console.log('旧的 "CALENDAR" 菜单项已删除。');
-  } catch (e) {}
-  // ⬆️ --- 【删除】 ---
+  // ⬇️ --- 【已修正】 ---
+  // (旧的 "CALENDAR" 删除块已被移除)
+  // ⬆️ --- 【已修正】 ---
 
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
@@ -95,9 +100,7 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          // ⬇️ 【删除】
-          // { id: menuCalendar.id }, 
-          // ⬆️ 【删除】
+          { id: menuCalendar.id }, // ⬅️ 【新增】
         ],
         disconnect: [ 
           { key: 'SALES_FORM' },
@@ -120,9 +123,7 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          // ⬇️ 【删除】
-          // { id: menuCalendar.id }, 
-          // ⬆️ 【删除】
+          { id: menuCalendar.id }, // ⬅️ 【新增】
         ],
       },
     },
@@ -144,9 +145,7 @@ async function main() {
           { id: menuOnSaleProducts.id }, 
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          // ⬇️ 【删除】
-          // { id: menuCalendar.id }, 
-          // ⬆️ 【删除】
+          { id: menuCalendar.id }, // ⬅️ 【新增】
         ],
         disconnect: [
           { key: 'SALES_FORM' },
@@ -171,9 +170,7 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          // ⬇️ 【删除】
-          // { id: menuCalendar.id }, 
-          // ⬆️ 【删除】
+          { id: menuCalendar.id }, // ⬅️ 【新增】
         ],
       },
     },

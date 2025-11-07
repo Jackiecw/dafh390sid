@@ -27,6 +27,19 @@ const calendarEventSchema = z.object({
   isAllDay: z.boolean().default(false),
   color: z.string().default('blue'),
 });
+
+// (用于 PUT)
+const calendarEventUpdateSchema = z.object({
+  title: z.string().min(1, "标题不能为空").optional(),
+  startAt: z.string().datetime("开始时间无效").optional(),
+  endAt: z.string().datetime("结束时间无效").optional(),
+  isAllDay: z.boolean().optional(),
+  color: z.string().optional(),
+});
+
+const weeklyFocusUpdateSchema = z.object({
+  content: z.string().min(1, "内容不能为空"),
+});
 // ⬆️ --- 【新增】 ---
 
 
@@ -130,7 +143,7 @@ router.get('/rates', authMiddleware, async (req, res) => {
 
 
 /**
- * 【GET /api/dashboard/summary】 (不变)
+ * 【GET /api/dashboard/summary】 (修改)
  */
 router.get('/dashboard/summary', authMiddleware, async (req, res) => {
   try {
@@ -168,11 +181,54 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
       }),
     ]);
 
-    const latestReport = await prisma.weeklyReport.findFirst({
-      where: { authorId: userId },
-      orderBy: { weekStartDate: 'desc' },
-      select: { planNextWeek: true }
-    });
+    // ⬇️ --- 【修改】 ---
+    // (逻辑修改：获取或创建本周的 WeeklyFocus)
+    let planNextWeek = '加载中...';
+    try {
+      const currentWeekStart = getStartOfWeek(); // (使用辅助函数)
+      
+      let focus = await prisma.weeklyFocus.findFirst({
+        where: { 
+          weekStartDate: currentWeekStart, // 查找本周一的
+          authorId: userId 
+        },
+      });
+
+      if (focus) {
+        planNextWeek = focus.content;
+      } else {
+        // (如果本周的 Focus 还没有，就从上周的 Report 里找)
+        const prevWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+        
+        const lastReport = await prisma.weeklyReport.findFirst({
+          where: {
+            authorId: userId,
+            weekStartDate: {
+              gte: prevWeekStart,
+              lt: currentWeekStart
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          select: { planNextWeek: true }
+        });
+
+        const content = lastReport?.planNextWeek || '（暂无计划，请填写）';
+        
+        // (创建新的 Focus)
+        const newFocus = await prisma.weeklyFocus.create({
+          data: {
+            weekStartDate: currentWeekStart,
+            content: content,
+            authorId: userId
+          }
+        });
+        planNextWeek = newFocus.content;
+      }
+    } catch (e) {
+      console.error("获取/创建每周重点失败:", e);
+      planNextWeek = '获取计划失败';
+    }
+    // ⬆️ --- 【修改】 ---
     
     let currency = 'CNY'; 
     let rateToCny = 1;
@@ -210,7 +266,7 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
         }
       },
       schedule: {
-        planNextWeek: latestReport?.planNextWeek || '您尚未填写上周周报的“下周计划”。'
+        planNextWeek: planNextWeek // ⬅️ 使用我们新逻辑的结果
       }
     });
 
@@ -908,7 +964,7 @@ router.get('/links', authMiddleware, async (req, res) => {
 // ⬇️ --- 【新增】 工作日历 API (员工) ---
 // ------------------------------------------
 
-// GET /api/calendar/events?start=...&end=...
+// GET /api/calendar/events?start=...&end=... (获取“我的”日历)
 router.get('/calendar/events', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -920,12 +976,15 @@ router.get('/calendar/events', authMiddleware, async (req, res) => {
 
     const events = await prisma.calendarEvent.findMany({
       where: {
-        authorId: userId,
+        authorId: userId, // (关键) 只获取我自己的
         startAt: { lte: new Date(end) },
         endAt: { gte: new Date(start) }
       },
       orderBy: {
         startAt: 'asc'
+      },
+      include: {
+        author: { select: { nickname: true } } // (为 FullCalendar 扩展属性)
       }
     });
     res.json(events);
@@ -948,7 +1007,7 @@ router.post('/calendar/events', authMiddleware, async (req, res) => {
       data: {
         ...validation.data,
         authorId: userId,
-        createdByAdmin: false // 明确这是用户自己创建的
+        createdByAdmin: false // (关键) 明确这是用户自己创建的
       }
     });
     res.status(201).json(newEvent);
@@ -963,17 +1022,29 @@ router.put('/calendar/events/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
     const { id } = req.params;
-    const validation = calendarEventSchema.safeParse(req.body);
+    const validation = calendarEventUpdateSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: '输入无效', details: validation.error.errors });
     }
 
-    const updatedEvent = await prisma.calendarEvent.update({
+    // (安全) 检查用户是否有权修改
+    const event = await prisma.calendarEvent.findFirst({
       where: {
         id: id,
         authorId: userId,
-        createdByAdmin: false // (安全) 只能修改自己创建的
-      },
+      }
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: '事件未找到' });
+    }
+
+    if (event.createdByAdmin) {
+      return res.status(403).json({ error: '权限不足：无法修改由管理员指派的日程' });
+    }
+
+    const updatedEvent = await prisma.calendarEvent.update({
+      where: { id: id },
       data: validation.data
     });
     res.json(updatedEvent);
@@ -992,12 +1063,24 @@ router.delete('/calendar/events/:id', authMiddleware, async (req, res) => {
     const { userId } = req.user;
     const { id } = req.params;
 
-    await prisma.calendarEvent.delete({
+    // (安全) 检查用户是否有权删除
+    const event = await prisma.calendarEvent.findFirst({
       where: {
         id: id,
         authorId: userId,
-        createdByAdmin: false // (安全) 只能删除自己创建的
       }
+    });
+    
+    if (!event) {
+      return res.status(404).json({ error: '事件未找到' });
+    }
+
+    if (event.createdByAdmin) {
+      return res.status(403).json({ error: '权限不足：无法删除由管理员指派的日程' });
+    }
+
+    await prisma.calendarEvent.delete({
+      where: { id: id }
     });
     res.status(204).send();
   } catch (error) {
@@ -1009,29 +1092,110 @@ router.delete('/calendar/events/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/calendar/weekly-focus?week=... (获取每周重点)
+// ⬇️ --- 【新增】 每周重点 API (员工) ---
+// ------------------------------------------
+
+// GET /api/calendar/weekly-focus?weekStartDate=... (获取或创建每周重点)
 router.get('/calendar/weekly-focus', authMiddleware, async (req, res) => {
   try {
-    const { week } = req.query; // 期望 'YYYY-MM-DD' (周一)
-    if (!week) {
+    const { userId } = req.user;
+    const { weekStartDate } = req.query; // 期望 'YYYY-MM-DD' (周一)
+    
+    if (!weekStartDate) {
       return res.status(400).json({ error: '必须提供 week (周一) 查询参数' });
     }
+    
+    const weekStart = new Date(weekStartDate);
 
-    const focus = await prisma.weeklyFocus.findUnique({
+    // 1. (使用 findFirst 替代 findUnique)
+    let focus = await prisma.weeklyFocus.findFirst({
       where: {
-        weekStartDate: new Date(week)
+        weekStartDate: weekStart,
+        authorId: userId
       }
     });
     
-    if (!focus) {
-      return res.json(null); // (未找到)
+    if (focus) {
+      return res.json(focus);
     }
-    res.json(focus);
+    
+    // 2. 如果没找到，从上周的报告中创建
+    const prevWeekStart = new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    const lastReport = await prisma.weeklyReport.findFirst({
+      where: {
+        authorId: userId,
+        weekStartDate: {
+          gte: prevWeekStart,
+          lt: weekStart
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { planNextWeek: true }
+    });
+
+    const content = lastReport?.planNextWeek || '（暂无计划，请填写）';
+    
+    // 3. 创建新的 (使用 create，因为我们已用 findFirst 检查过)
+    const newFocus = await prisma.weeklyFocus.create({
+      data: {
+        weekStartDate: weekStart,
+        content: content,
+        authorId: userId
+      }
+    });
+
+    res.status(201).json(newFocus);
+
   } catch (error) {
+    // (处理并发创建时的唯一约束冲突)
+    if (error.code === 'P2002') {
+      // (如果发生冲突，说明刚刚被创建，再次查询)
+      const focus = await prisma.weeklyFocus.findFirst({
+        where: {
+          weekStartDate: new Date(weekStartDate),
+          authorId: req.user.userId
+        }
+      });
+      return res.json(focus);
+    }
     console.error('获取每周重点失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
+
+// PUT /api/calendar/weekly-focus/:id (更新每周重点)
+router.put('/calendar/weekly-focus/:id', authMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const { id } = req.params;
+
+    const validation = weeklyFocusUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+
+    const updatedFocus = await prisma.weeklyFocus.update({
+      where: {
+        id: id,
+        authorId: userId // (安全) 只能改自己的
+      },
+      data: {
+        content: validation.data.content
+      }
+    });
+    
+    res.json(updatedFocus);
+
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '未找到该重点任务，或无权限修改' });
+    }
+    console.error('更新每周重点失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
 // ⬆️ --- 【新增】 ---
 
 module.exports = router;

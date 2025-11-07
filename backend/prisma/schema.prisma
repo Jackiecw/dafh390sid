@@ -35,9 +35,11 @@ model User {
   todos          Todo[]
   recurringTasks RecurringTask[]
   
-  // ⬇️ --- 【已删除】 ---
-  // (此处已删除 calendarEvents 和 weeklyFocuses 的关联)
-  // ⬆️ --- 【已删除】 ---
+  // ⬇️ --- 【新增】 日历功能关联 ---
+  calendarEvents      CalendarEvent[] @relation("UserEvents")
+  createdCalendarEvents CalendarEvent[] @relation("AdminCreatedEvents")
+  weeklyFocuses       WeeklyFocus[]
+  // ⬆️ --- 【新增】 ---
 }
 
 // --- 2. 角色模型 (Role) ---
@@ -62,7 +64,6 @@ model Store {
   id              String    @id @default(cuid())
   name            String    @unique
   platform        Platform
-  
   platformStoreId String?
   status          StoreStatus
   registeredAt    DateTime?
@@ -70,8 +71,7 @@ model Store {
   countryCode     String
 
   salesData SalesData[]
-
-  listings StoreProductListing[]
+  listings  StoreProductListing[]
 }
 
 // --- 5. 销售数据模型 (SalesData) ---
@@ -110,11 +110,11 @@ model WeeklyReport {
 // --- 7. 国家管理模型 (ManagedCountry) ---
 model ManagedCountry {
   id            String    @id @default(cuid())
-  code          String    @unique 
-  name          String    
+  code          String    @unique
+  name          String
   establishedAt DateTime?
-  supervisors   User[] @relation("CountrySupervisors")
-  operators     User[] @relation("CountryOperators")
+  supervisors   User[]    @relation("CountrySupervisors")
+  operators     User[]    @relation("CountryOperators")
   stores        Store[]
   
   operationModules OperationModule[]
@@ -123,16 +123,16 @@ model ManagedCountry {
 // --- 8. 商品模型 (Product) ---
 model Product {
   id           String  @id @default(cuid())
-  sku          String  @unique 
-  name         String  
+  sku          String  @unique
+  name         String
   description  String? @db.Text
   imageUrl     String?
   
   category     ProductCategory 
 
   cost         Float?
-  weightKg     Float?  
-  volumeM3     Float? 
+  weightKg     Float?
+  volumeM3     Float?
   dimensionsMm String?
   listings     StoreProductListing[]
   
@@ -160,11 +160,11 @@ model OperationModule {
   id           String   @id @default(cuid())
   name         String
   displayOrder Int      @default(0)
-  country   ManagedCountry @relation(fields: [countryCode], references: [code])
-  countryCode String
-  tasks OperationTask[]
-  owner   User? @relation("ModuleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerId String?
+  country      ManagedCountry @relation(fields: [countryCode], references: [code])
+  countryCode  String
+  tasks        OperationTask[]
+  owner        User?    @relation("ModuleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId      String?
   @@index([countryCode, displayOrder])
 }
 
@@ -174,10 +174,10 @@ model OperationTask {
   name         String
   notes        String?
   displayOrder Int      @default(0)
-  module   OperationModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  moduleId String
-  owner   User? @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  ownerId String?
+  module       OperationModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId     String
+  owner        User?    @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  ownerId      String?
   @@index([moduleId, displayOrder])
 }
 
@@ -206,8 +206,8 @@ model Todo {
 
 // --- 14. 周期任务 (RecurringTask) 模型 ---
 model RecurringTask {
-  id        String   @id @default(cuid())
-  content     String   @db.Text
+  id          String     @id @default(cuid())
+  content     String     @db.Text
   period      TaskPeriod // DAILY, WEEKLY, MONTHLY
   
   lastCompletedAt DateTime? // 用于重置
@@ -218,9 +218,40 @@ model RecurringTask {
   @@index([authorId, period])
 }
 
-// ⬇️ --- 【已删除】 ---
-// (15. CalendarEvent 和 16. WeeklyFocus 已被删除)
-// ⬆️ --- 【已删除】 ---
+// ⬇️ --- 【新增】 工作日历 (CalendarEvent) 模型 ---
+model CalendarEvent {
+  id        String   @id @default(cuid())
+  title     String
+  startAt   DateTime
+  endAt     DateTime
+  isAllDay  Boolean  @default(false)
+  color     String   @default("blue")
+
+  // “属于谁” (员工)
+  author    User     @relation("UserEvents", fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+
+  // “由谁创建” (管理员)
+  createdByAdmin Boolean  @default(false)
+  adminCreator   User?    @relation("AdminCreatedEvents", fields: [adminCreatorId], references: [id], onDelete: SetNull)
+  adminCreatorId String?
+
+  @@index([authorId, startAt, endAt])
+}
+
+// ⬇️ --- 【新增】 每周重点 (WeeklyFocus) 模型 ---
+model WeeklyFocus {
+  id            String   @id @default(cuid())
+  weekStartDate DateTime @unique // (周一的日期)
+  content       String   @db.Text
+  
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+// ⬆️ --- 【新增】 ---
 
 
 // --- 枚举 (Enums) ---

@@ -73,6 +73,8 @@
       
       <div class="flex-1 p-6 md:p-10 overflow-auto">
       <DashboardHome v-if="currentView === 'DASHBOARD'" />
+        
+        <CalendarPage v-if="currentView === 'CALENDAR'" />
         <SalesDataPage v-if="currentView === 'SALES_DATA'" />
         
         <WeeklyReportPage v-if="currentView === 'REPORTS'" />
@@ -106,15 +108,15 @@ import {
 import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
 import OperationsCenter from './OperationsCenter.vue'; 
 import DashboardHome from './DashboardHome.vue'; 
-// ⬇️ 【删除】
-// import CalendarPage from './CalendarPage.vue'; 
-// ⬆️ 【删除】
+// ⬇️ --- 【新增】 ---
+import CalendarPage from './CalendarPage.vue'; 
+// ⬆️ --- 【新增】 ---
 
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
-  // ⬇️ 【删除】
-  // { key: 'CALENDAR', name: '工作日历' },
-  // ⬆️ 【删除】
+  // ⬇️ --- 【新增】 ---
+  { key: 'CALENDAR', name: '工作日历' },
+  // ⬆️ --- 【新增】 ---
   { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'REPORTS', name: '周报' },
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 

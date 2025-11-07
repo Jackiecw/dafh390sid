@@ -46,10 +46,30 @@ const linkSchema = z.object({
   displayOrder: z.coerce.number().int().default(0),
 });
 
-// ⬇️ --- 【删除】 ---
-// (删除 adminEventCreateSchema)
-// (删除 weeklyFocusSchema)
-// ⬆️ --- 【删除】 ---
+// ⬇️ --- 【已删除】 ---
+// (已删除旧的 adminEventCreateSchema)
+// (已删除旧的 weeklyFocusSchema)
+// ⬆️ --- 【已删除】 ---
+
+// ⬇️ --- 【新增】 日历 Zod 验证模式 ---
+const adminCalendarEventSchema = z.object({
+  title: z.string().min(1, "标题不能为空"),
+  startAt: z.string().datetime("开始时间无效"),
+  endAt: z.string().datetime("结束时间无效"),
+  isAllDay: z.boolean().default(false),
+  color: z.string().default('blue'),
+  userId: z.string().min(1, "必须指定一个用户"), // (关键)
+});
+
+const adminCalendarEventUpdateSchema = z.object({
+  title: z.string().min(1, "标题不能为空").optional(),
+  startAt: z.string().datetime("开始时间无效").optional(),
+  endAt: z.string().datetime("结束时间无效").optional(),
+  isAllDay: z.boolean().optional(),
+  color: z.string().optional(),
+  userId: z.string().min(1, "必须指定一个用户").optional(), // (允许修改归属人)
+});
+// ⬆️ --- 【新增】 ---
 
 
 // -----------------------------------------------------------------
@@ -431,8 +451,130 @@ router.delete('/links/:id', async (req, res) => {
 });
 
 
-// ⬇️ --- 【删除】 ---
-// (删除所有 /api/admin/calendar/... 相关的路由)
-// ⬆️ --- 【删除】 ---
+// ⬇️ --- 【已删除】 ---
+// (已删除所有 /api/admin/calendar/... 相关的旧路由)
+// ⬆️ --- 【已删除】 ---
+
+
+// ⬇️ --- 【新增】 工作日历 API (Admin) ---
+// ------------------------------------------
+
+// GET /api/admin/calendar/events (获取汇总或指定用户的)
+router.get('/calendar/events', async (req, res) => {
+  try {
+    const { start, end, userId } = req.query;
+
+    if (!start || !end) {
+      return res.status(400).json({ error: '必须提供 start 和 end 查询参数' });
+    }
+    
+    const where = {
+      startAt: { lte: new Date(end) },
+      endAt: { gte: new Date(start) }
+    };
+
+    if (userId) {
+      // (B) 模式B：获取指定用户的
+      where.authorId = userId;
+    } else {
+      // (A) 模式A：获取所有“管理员指派”的
+      where.createdByAdmin = true;
+    }
+
+    const events = await prisma.calendarEvent.findMany({
+      where: where,
+      orderBy: { startAt: 'asc' },
+      include: {
+        author: { select: { nickname: true, id: true } } // (附带作者信息)
+      }
+    });
+    res.json(events);
+  } catch (error) {
+    console.error('Admin 获取日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// POST /api/admin/calendar/events (Admin 指派日程)
+router.post('/calendar/events', async (req, res) => {
+  try {
+    const { userId: adminId } = req.user; // (这是管理员的ID)
+    
+    const validation = adminCalendarEventSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+    
+    const { userId, ...data } = validation.data; // (userId 是目标用户的ID)
+
+    const newEvent = await prisma.calendarEvent.create({
+      data: {
+        ...data,
+        authorId: userId,         // (关键) 归属于目标用户
+        createdByAdmin: true,     // (关键) 标记为 Admin 创建
+        adminCreatorId: adminId   // (关键) 标记创建者
+      }
+    });
+    res.status(201).json(newEvent);
+  } catch (error) {
+    if (error.code === 'P2003') {
+      return res.status(404).json({ error: '指派的用户 (userId) 未找到' });
+    }
+    console.error('Admin 创建日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// PUT /api/admin/calendar/events/:id (Admin 修改任意日程)
+router.put('/calendar/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const validation = adminCalendarEventUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: '输入无效', details: validation.error.errors });
+    }
+    
+    const { userId, ...data } = validation.data;
+    const payload = { ...data };
+    
+    if (userId) {
+      payload.authorId = userId; // (允许修改归属人)
+    }
+
+    const updatedEvent = await prisma.calendarEvent.update({
+      where: { id: id }, // (Admin 可以修改任何事件)
+      data: payload
+    });
+    res.json(updatedEvent);
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '事件未找到' });
+    }
+    if (error.code === 'P2003') {
+      return res.status(404).json({ error: '指派的用户 (userId) 未找到' });
+    }
+    console.error('Admin 更新日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// DELETE /api/admin/calendar/events/:id (Admin 删除任意日程)
+router.delete('/calendar/events/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.calendarEvent.delete({
+      where: { id: id } // (Admin 可以删除任何事件)
+    });
+    res.status(204).send();
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '事件未找到' });
+    }
+    console.error('Admin 删除日历事件失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+// ⬆️ --- 【新增】 ---
 
 module.exports = router;
