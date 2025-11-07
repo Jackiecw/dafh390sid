@@ -1,216 +1,293 @@
 <template>
   <div class="space-y-6">
-    <div class="flex justify-between items-center">
-      <h2 class="text-3xl font-bold text-stone-900">工作日历</h2>
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center space-x-4">
+        <h2 class="text-3xl font-bold text-stone-900">工作日历</h2>
+        
+        <div class="flex items-center space-x-2">
+          <button @click="onClickNav('prev')" class="p-2 rounded-lg hover:bg-stone-200 transition">
+            <ChevronLeftIcon class="h-5 w-5 text-stone-600" />
+          </button>
+          <button @click="onClickNav('next')" class="p-2 rounded-lg hover:bg-stone-200 transition">
+            <ChevronRightIcon class="h-5 w-5 text-stone-600" />
+          </button>
+          <button @click="onClickNav('today')" class="text-sm font-medium text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition">
+            今天
+          </button>
+        </div>
+        <h3 class="text-xl font-semibold text-stone-700">
+          {{ currentMonthDisplay }}
+        </h3>
+      </div>
+
       <button 
         @click="handleNewEventClick" 
-        class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition"
+        class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition w-full md:w-auto"
       >
         <PlusIcon class="h-5 w-5 inline-block -mt-1 mr-1" />
         新建日程
       </button>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg">
-      <FullCalendar :options="calendarOptions" />
+    <div class="bg-white p-6 rounded-lg shadow-lg" style="height: 75vh;">
+      <Calendar
+        ref="calendarRef"
+        :view="'month'"
+        :options="tuiOptions"
+        :events="events"
+        @selectDateTime="onSelectDateTime"
+        @clickEvent="onClickEvent"
+        @beforeUpdateEvent="onBeforeUpdateEvent"
+      />
     </div>
 
     <p v-if="apiError" class="text-red-600">{{ apiError }}</p>
   </div>
 
-  </template>
+  <EventModal
+    :is-open="isModalOpen"
+    :event-to-edit="selectedEvent"
+    :selected-date-range="selectedDateRange"
+    @close="closeModal"
+    @save="handleEventSave"
+    @delete="handleEventDelete"
+  />
+</template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import apiClient from '../api';
 
-// 1. 导入 FullCalendar
-import FullCalendar from '@fullcalendar/vue3';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
-// (我们将在下一阶段导入 timeGridPlugin)
+import Calendar from 'toast-ui-calendar-vue3';
+import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid';
 
-// ⬇️ (为按钮导入图标)
-import { PlusIcon } from '@heroicons/vue/20/solid';
+import EventModal from './EventModal.vue';
 
-// (为模态框导入, 但在下一阶段才使用)
-// import EventModal from './EventModal.vue';
-
-// --- 状态定义 ---
+// --- 状态定义 (不变) ---
 const authStore = useAuthStore();
 const apiError = ref(null);
-const calendarRef = ref(null); // (用于访问 FullCalendar 实例)
-
-// (模态框状态 - 下一阶段使用)
+const calendarRef = ref(null); 
+const events = ref([]); 
+const currentMonthDisplay = ref('');
 const isModalOpen = ref(false);
-const selectedEvent = ref(null);
-const selectedDate = ref(null);
+const selectedEvent = ref(null); 
+const selectedDateRange = ref(null); 
 
-// --- 核心：FullCalendar 配置 ---
-const calendarOptions = ref({
-  plugins: [ dayGridPlugin, interactionPlugin ],
-  initialView: 'dayGridMonth',
-  locale: 'zh-cn', // (使用中文)
-  buttonText: {
-    today: '今天',
-    month: '月',
+// --- 核心：Toast UI 配置 (不变) ---
+const tuiOptions = {
+  defaultView: 'month',
+  useCreationPopup: false, 
+  useDetailPopup: false,   
+  isReadOnly: false,
+  gridSelection: true,     
+  month: {
+    visibleWeeksCount: 6,
   },
-  headerToolbar: {
-    left: 'prev,next today',
-    center: 'title',
-    right: 'dayGridMonth' // (未来我们将添加 timeGridDay)
-  },
-  
-  editable: true,       // (允许拖拽修改)
-  selectable: true,       // (允许点击选择)
-  
-  // --- 1. (关键) 异步获取事件 ---
-  // (此函数会在日历加载/翻页时自动调用)
-  events: async (fetchInfo, successCallback, failureCallback) => {
-    apiError.value = null;
-    try {
-      // (调用我们为“用户”创建的 API)
-      const response = await apiClient.get('/calendar/events', {
-        params: {
-          start: fetchInfo.startStr,
-          end: fetchInfo.endStr,
-          // (未来 Admin 在此切换 userId)
-          // userId: selectedUserId.value
-        }
-      });
-
-      // (将我们的数据格式转换为 FullCalendar 的格式)
-      const events = response.data.map(event => ({
-        id: event.id,
-        title: event.title,
-        start: event.startAt,
-        end: event.endAt,
-        allDay: event.isAllDay,
-        color: event.color,
-        // (存储原始数据，用于判断权限)
-        extendedProps: {
-          author: event.author, // { nickname: '...' }
-          createdByAdmin: event.createdByAdmin
-        }
-      }));
-      
-      successCallback(events);
-
-    } catch (error) {
-      console.error("获取日历事件失败:", error);
-      apiError.value = "无法加载日历事件，请刷新重试。";
-      failureCallback(error);
-    }
-  },
-
-  // --- 2. (关键) 交互事件 ---
-
-  // (点击空白日期 - 用于新建)
-  dateClick: (clickInfo) => {
-    // (在下一阶段，我们将打开模态框)
-    // selectedDate.value = clickInfo.dateStr;
-    // selectedEvent.value = null;
-    // isModalOpen.value = true;
-    
-    // (本阶段的临时提示)
-    alert(`[临时] 你点击了日期: ${clickInfo.dateStr}。下一步将打开新建模态框。`);
-  },
-
-  // (点击已有事件 - 用于编辑/查看)
-  eventClick: (clickInfo) => {
-    // (在下一阶段，我们将打开模态框)
-    // selectedEvent.value = clickInfo.event;
-    // isModalOpen.value = true;
-    
-    // (本阶段的临时提示)
-    const createdBy = clickInfo.event.extendedProps.createdByAdmin 
-      ? `(由管理员指派给 ${clickInfo.event.extendedProps.author.nickname})`
-      : "(由您自己创建)";
-      
-    alert(`[临时] 你点击了事件: "${clickInfo.event.title}" ${createdBy}`);
-  },
-
-  // (拖拽/拉伸事件)
-  eventChange: async (changeInfo) => {
-    const event = changeInfo.event;
-    
-    // (权限检查：用户只能修改自己创建的)
-    if (event.extendedProps.createdByAdmin && authStore.role !== 'admin') {
-      alert('权限不足：无法修改由管理员指派的日程。');
-      changeInfo.revert(); // (撤销拖拽)
-      return;
-    }
-
-    // (准备 API)
-    const url = authStore.role === 'admin' 
-      ? `/api/admin/calendar/events/${event.id}` 
-      : `/api/calendar/events/${event.id}`;
-      
-    const payload = {
-      title: event.title,
-      startAt: event.start.toISOString(),
-      endAt: event.end ? event.end.toISOString() : event.start.toISOString(), // (处理全天事件)
-      isAllDay: event.allDay
-    };
-
-    try {
-      await apiClient.put(url, payload);
-    } catch (error) {
-      console.error('拖拽更新失败:', error);
-      apiError.value = `保存失败: ${error.response?.data?.error || '未知错误'}`;
-      changeInfo.revert(); // (出错时撤销)
-    }
+  calendars: [
+    { id: 'primary', name: '我的日程', backgroundColor: '#4f46e5', borderColor: '#4f46e5', color: '#ffffff' },
+    { id: 'admin', name: '管理员指派', backgroundColor: '#db2777', borderColor: '#db2777', color: '#ffffff' }
+  ],
+  template: {
+    allday(event) { return `<span style="color: ${event.color};">[全天] ${event.title}</span>`; },
+    time(event) { return `<span>${event.title}</span>`; }
   }
+};
+
+// --- 数据获取与转换 (不变) ---
+const getCalendarInstance = () => {
+  return calendarRef.value?.getInstance ? calendarRef.value.getInstance() : calendarRef.value;
+};
+
+function updateMonthDisplay() {
+  const cal = getCalendarInstance();
+  if (!cal) return;
+  const date = cal.getDate();
+  currentMonthDisplay.value = `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`;
+}
+
+async function fetchEvents() {
+  const cal = getCalendarInstance();
+  if (!cal) return;
+  apiError.value = null;
+  
+  const startDate = cal.getDateRangeStart().toDate();
+  const endDate = cal.getDateRangeEnd().toDate();
+
+  try {
+    const response = await apiClient.get('/calendar/events', {
+      params: { start: startDate.toISOString(), end: endDate.toISOString() }
+    });
+
+    events.value = response.data.map(event => ({
+      id: event.id,
+      title: event.title,
+      start: event.startAt,
+      end: event.endAt,
+      isAllday: event.isAllDay,
+      category: event.isAllDay ? 'allday' : 'time',
+      calendarId: event.createdByAdmin ? 'admin' : 'primary',
+      backgroundColor: event.createdByAdmin ? '#db2777' : '#4f46e5',
+      borderColor: event.createdByAdmin ? '#db2777' : '#4f46e5',
+      color: '#ffffff',
+      raw: event
+    }));
+  } catch (error) {
+    console.error("获取日历事件失败:", error);
+    apiError.value = "无法加载日历事件，请刷新重试。";
+  }
+}
+
+onMounted(() => {
+  setTimeout(() => {
+    updateMonthDisplay();
+    fetchEvents();
+  }, 100);
 });
 
-// --- 模态框控制 (下一阶段实现) ---
-function handleNewEventClick() {
-  // selectedDate.value = new Date().toISOString().split('T')[0]; // 默认今天
-  // selectedEvent.value = null;
-  // isModalOpen.value = true;
+// --- 交互事件 (不变) ---
+
+function onClickNav(type) {
+  const cal = getCalendarInstance();
+  if (!cal) return;
+  if (type === 'prev') cal.prev();
+  else if (type === 'next') cal.next();
+  else if (type === 'today') cal.today();
+  updateMonthDisplay();
+  fetchEvents(); 
+}
+
+function onSelectDateTime(info) {
+  selectedDateRange.value = { start: info.start.toDate(), end: info.end.toDate(), isAllday: info.isAllday };
+  selectedEvent.value = null;
+  isModalOpen.value = true;
+}
+
+function onClickEvent(info) {
+  selectedEvent.value = info.event; 
+  selectedDateRange.value = null;
+  isModalOpen.value = true;
+}
+
+async function onBeforeUpdateEvent(info) {
+  const { event, changes } = info;
+
+  if (event.raw.createdByAdmin && authStore.role !== 'admin') {
+    alert('权限不足：无法修改由管理员指派的日程。');
+    fetchEvents();
+    return;
+  }
+
+  const url = authStore.role === 'admin' 
+    ? `/admin/calendar/events/${event.id}` 
+    : `/calendar/events/${event.id}`;
+    
+  const payload = {
+    title: changes.title || event.title,
+    startAt: changes.start ? new Date(changes.start).toISOString() : new Date(event.start).toISOString(),
+    endAt: changes.end ? new Date(changes.end).toISOString() : new Date(event.end).toISOString(),
+    isAllDay: 'isAllday' in changes ? changes.isAllday : event.isAllday,
+  };
   
-  // (本阶段的临时提示)
-  alert('[临时] “新建日程”按钮被点击。下一步将打开模态框。');
+  try {
+    await apiClient.put(url, payload);
+    fetchEvents();
+  } catch (error) {
+    console.error('拖拽更新失败:', error);
+    apiError.value = `保存失败: ${error.response?.data?.error || '未知错误'}`;
+    fetchEvents();
+  }
+}
+
+// --- 模态框控制 (不变) ---
+function handleNewEventClick() {
+  const today = new Date();
+  selectedDateRange.value = { start: today, end: today, isAllday: false };
+  selectedEvent.value = null;
+  isModalOpen.value = true;
 }
 
 function closeModal() {
   isModalOpen.value = false;
   selectedEvent.value = null;
-  selectedDate.value = null;
+  selectedDateRange.value = null;
 }
 
-function handleEventSaved() {
-  closeModal();
-  // (刷新日历)
-  calendarRef.value?.getApi().refetchEvents();
+async function handleEventSave(payload) {
+  apiError.value = '';
+  try {
+    const isAdmin = authStore.role === 'admin';
+    
+    if (payload.id) {
+      const url = isAdmin ? `/admin/calendar/events/${payload.id}` : `/calendar/events/${payload.id}`;
+      await apiClient.put(url, payload);
+    } else {
+      const url = isAdmin ? '/admin/calendar/events' : '/calendar/events';
+      await apiClient.post(url, payload);
+    }
+    
+    closeModal();
+    fetchEvents(); 
+    
+  } catch (error) {
+    console.error('保存日程失败:', error);
+    apiError.value = `保存失败: ${error.response?.data?.error || '未知错误'}`;
+  }
+}
+
+async function handleEventDelete(eventId) {
+  apiError.value = '';
+  try {
+    const isAdmin = authStore.role === 'admin';
+    const url = isAdmin ? `/admin/calendar/events/${eventId}` : `/calendar/events/${eventId}`;
+    
+    await apiClient.delete(url);
+    
+    closeModal();
+    fetchEvents(); 
+
+  } catch (error) {
+    console.error('删除日程失败:', error);
+    apiError.value = `删除失败: ${error.response?.data?.error || '未知错误'}`;
+  }
 }
 
 </script>
 
 <style>
-/* FullCalendar 样式调整 (覆盖)
-  我们希望日历的按钮看起来像 Tailwind 按钮 
-*/
-.fc .fc-button {
-  background-color: #4f46e5; /* bg-indigo-600 */
-  border-color: #4f46e5;
-  color: white;
-  padding: 0.5rem 1rem;
-  text-transform: none; /* (移除大写) */
-  font-size: 0.875rem;
-  font-weight: 500;
-  border-radius: 0.375rem; /* rounded-md */
-  transition: background-color 0.2s;
+/* (覆盖 TUI 默认样式) */
+.toastui-calendar-layout {
+  border-radius: 0.5rem; /* rounded-lg */
 }
-.fc .fc-button:hover {
-  background-color: #4338ca; /* bg-indigo-700 */
+.toastui-calendar-weekday-event {
+  border-radius: 4px;
 }
-.fc .fc-button:focus {
-  box-shadow: none;
+
+/* ⬇️ --- 【新增】 修复 Tailwind CSS 冲突 --- ⬇️ */
+
+/* 修复日期数字的行高和对齐方式 */
+.toastui-calendar-weekday-grid-date {
+  line-height: normal !important; /* 覆盖 Tailwind 的 line-height */
+  text-align: center !important;  
+  margin-right: 0 !important;     
+  min-width: 28px;     
+  height: 28px;        
+  display: flex !important;       
+  align-items: center !important; 
+  justify-content: center !important; 
 }
-.fc .fc-button-primary:disabled {
-  background-color: #a5b4fc;
-  border-color: #a5b4fc;
+
+/* 修复 "今天" 的蓝色圆圈 */
+.toastui-calendar-weekday-grid-date-decorator {
+  line-height: normal !important; 
+  font-weight: bold;   
+  width: 28px;         
+  height: 28px;        
 }
+
+/* 确保事件标题不会被 Tailwind 的行高影响 */
+.toastui-calendar-event-title {
+  line-height: 1.4 !important; /* 设置一个合理的行高 */
+}
+/* ⬆️ --- 【新增】 --- ⬆️ */
 </style>

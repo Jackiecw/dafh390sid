@@ -15,13 +15,11 @@ async function main() {
     create: { key: 'DASHBOARD', name: '仪表盘' },
   });
   
-  // ⬇️ --- 【新增】 ---
   const menuCalendar = await prisma.menuItem.upsert({
     where: { key: 'CALENDAR' },
     update: { name: '工作日历' },
     create: { key: 'CALENDAR', name: '工作日历' },
   });
-  // ⬆️ --- 【新增】 ---
 
   const menuSalesData = await prisma.menuItem.upsert({
     where: { key: 'SALES_DATA' },
@@ -73,10 +71,6 @@ async function main() {
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
-  // ⬇️ --- 【已修正】 ---
-  // (旧的 "CALENDAR" 删除块已被移除)
-  // ⬆️ --- 【已修正】 ---
-
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
     console.log('旧的 "ADMIN_PRODUCTS" 菜单项已删除。');
@@ -102,13 +96,15 @@ async function main() {
           { id: menuReports.id }, 
           { id: menuCalendar.id }, // ⬅️ 【新增】
         ],
+        // ⬇️ --- 【修正】 ---
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
           { key: 'ADMIN_PRODUCTS' },
-          { id: menuViewReports.id },
-          { key: 'CALENDAR' } // (确保断开连接)
+          { id: menuViewReports.id }
+          // (已删除 { key: 'CALENDAR' })
         ]
+        // ⬆️ --- 【修正】 ---
       },
     },
     create: {
@@ -123,7 +119,7 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
+          { id: menuCalendar.id },
         ],
       },
     },
@@ -147,12 +143,14 @@ async function main() {
           { id: menuReports.id }, 
           { id: menuCalendar.id }, // ⬅️ 【新增】
         ],
+        // ⬇️ --- 【修正】 ---
         disconnect: [
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
-          { key: 'ADMIN_PRODUCTS' },
-          { key: 'CALENDAR' } // (确保断开连接)
+          { key: 'ADMIN_PRODUCTS' }
+          // (已删除 { key: 'CALENDAR' })
         ]
+        // ⬆️ --- 【修正】 ---
       },
     },
     create: {
@@ -170,7 +168,7 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
+          { id: menuCalendar.id }, 
         ],
       },
     },
