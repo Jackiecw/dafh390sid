@@ -64,13 +64,13 @@ async function main() {
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
-  // ⬇️ 【新增】
-  const menuCalendar = await prisma.menuItem.upsert({
-    where: { key: 'CALENDAR' },
-    update: {},
-    create: { key: 'CALENDAR', name: '工作日历' },
-  });
-  // ⬆️ 【新增】
+  // ⬇️ --- 【删除】 ---
+  // (删除 menuCalendar)
+  try {
+    await prisma.menuItem.delete({ where: { key: 'CALENDAR' } });
+    console.log('旧的 "CALENDAR" 菜单项已删除。');
+  } catch (e) {}
+  // ⬆️ --- 【删除】 ---
 
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
@@ -95,13 +95,16 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
+          // ⬇️ 【删除】
+          // { id: menuCalendar.id }, 
+          // ⬆️ 【删除】
         ],
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
           { key: 'ADMIN_PRODUCTS' },
-          { id: menuViewReports.id }
+          { id: menuViewReports.id },
+          { key: 'CALENDAR' } // (确保断开连接)
         ]
       },
     },
@@ -117,7 +120,9 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
+          // ⬇️ 【删除】
+          // { id: menuCalendar.id }, 
+          // ⬆️ 【删除】
         ],
       },
     },
@@ -139,12 +144,15 @@ async function main() {
           { id: menuOnSaleProducts.id }, 
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
+          // ⬇️ 【删除】
+          // { id: menuCalendar.id }, 
+          // ⬆️ 【删除】
         ],
         disconnect: [
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
-          { key: 'ADMIN_PRODUCTS' }
+          { key: 'ADMIN_PRODUCTS' },
+          { key: 'CALENDAR' } // (确保断开连接)
         ]
       },
     },
@@ -163,7 +171,9 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
+          // ⬇️ 【删除】
+          // { id: menuCalendar.id }, 
+          // ⬆️ 【删除】
         ],
       },
     },

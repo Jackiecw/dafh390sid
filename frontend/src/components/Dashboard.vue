@@ -75,8 +75,6 @@
       <DashboardHome v-if="currentView === 'DASHBOARD'" />
         <SalesDataPage v-if="currentView === 'SALES_DATA'" />
         
-        <CalendarPage v-if="currentView === 'CALENDAR'" /> 
-        
         <WeeklyReportPage v-if="currentView === 'REPORTS'" />
         <CommonLinks v-if="currentView === 'LINKS'" />
         <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
@@ -90,7 +88,6 @@
 </template>
 
 <script setup>
-// (Script 部分保持不变)
 import { ref, computed } from 'vue'; 
 import SalesDataPage from './SalesDataPage.vue';
 import WeeklyReportPage from './WeeklyReportPage.vue'; 
@@ -109,11 +106,15 @@ import {
 import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
 import OperationsCenter from './OperationsCenter.vue'; 
 import DashboardHome from './DashboardHome.vue'; 
-import CalendarPage from './CalendarPage.vue'; 
+// ⬇️ 【删除】
+// import CalendarPage from './CalendarPage.vue'; 
+// ⬆️ 【删除】
 
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
-  { key: 'CALENDAR', name: '工作日历' },
+  // ⬇️ 【删除】
+  // { key: 'CALENDAR', name: '工作日历' },
+  // ⬆️ 【删除】
   { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'REPORTS', name: '周报' },
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 

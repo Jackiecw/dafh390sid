@@ -35,9 +35,9 @@ model User {
   todos          Todo[]
   recurringTasks RecurringTask[]
   
-  // ⬇️ 【新增】 日历功能关联
-  calendarEvents  CalendarEvent[]
-  weeklyFocuses   WeeklyFocus[] // (Admin) 创建的每周重点
+  // ⬇️ --- 【已删除】 ---
+  // (此处已删除 calendarEvents 和 weeklyFocuses 的关联)
+  // ⬆️ --- 【已删除】 ---
 }
 
 // --- 2. 角色模型 (Role) ---
@@ -80,7 +80,7 @@ model SalesData {
   recordDate  DateTime
   salesVolume Int
   revenue     Float
-  notes       String?  @db.Text 
+  notes       String?
   createdAt   DateTime @default(now())
 
   enteredBy   User   @relation(fields: [enteredById], references: [id])
@@ -163,7 +163,7 @@ model OperationModule {
   country   ManagedCountry @relation(fields: [countryCode], references: [code])
   countryCode String
   tasks OperationTask[]
-  owner   User?   @relation("ModuleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owner   User? @relation("ModuleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   ownerId String?
   @@index([countryCode, displayOrder])
 }
@@ -176,7 +176,7 @@ model OperationTask {
   displayOrder Int      @default(0)
   module   OperationModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleId String
-  owner   User?   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  owner   User? @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   ownerId String?
   @@index([moduleId, displayOrder])
 }
@@ -218,44 +218,9 @@ model RecurringTask {
   @@index([authorId, period])
 }
 
-// ⬇️ --- 【新增】 15. 工作日历 (CalendarEvent) 模型 ---
-model CalendarEvent {
-  id        String   @id @default(cuid())
-  title     String   @db.Text
-  startAt   DateTime
-  endAt     DateTime
-  isAllDay  Boolean  @default(false)
-  color     String   @default("blue") // 颜色块
-
-  // 这个事件属于谁的日历？
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId  String
-
-  // 这个事件是否由管理员创建？ (true = 员工只读)
-  createdByAdmin Boolean @default(false)
-  
-  // (可选) 记录是哪个管理员创建的
-  adminCreatorId String?
-
-  @@index([authorId, startAt, endAt])
-}
-
-// ⬇️ --- 【新增】 16. 每周重点 (WeeklyFocus) 模型 ---
-model WeeklyFocus {
-  id            String   @id @default(cuid())
-  
-  // 以每周一的日期为唯一标识
-  weekStartDate DateTime @unique @db.Date 
-  content       String   @db.Text
-
-  // 记录是谁写的
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-// ⬆️ --- 【新增】 ---
+// ⬇️ --- 【已删除】 ---
+// (15. CalendarEvent 和 16. WeeklyFocus 已被删除)
+// ⬆️ --- 【已删除】 ---
 
 
 // --- 枚举 (Enums) ---
