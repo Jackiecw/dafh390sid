@@ -72,19 +72,11 @@
     <main class="flex-1 flex flex-col overflow-hidden">
       
       <div class="flex-1 p-6 md:p-10 overflow-auto">
-      <DashboardHome v-if="currentView === 'DASHBOARD'" />
         
-        <CalendarPage v-if="currentView === 'CALENDAR'" />
-        <SalesDataPage v-if="currentView === 'SALES_DATA'" />
-        
-        <WeeklyReportPage v-if="currentView === 'REPORTS'" />
-        <CommonLinks v-if="currentView === 'LINKS'" />
-        <ProfileManagement v-if="currentView === 'PROFILE_MGMT'" />
-        <UserManagement v-if="currentView === 'ADMIN_USERS'" />
-        <StoreManagement v-if="currentView === 'ADMIN_STORES'" />
-        <OnSaleProductsPage v-if="currentView === 'ON_SALE_PRODUCTS'" />
-        <OperationsCenter v-if="currentView === 'OPERATION_CENTER'" /> 
-      </div>
+        <KeepAlive>
+          <component :is="currentComponent" />
+        </KeepAlive>
+        </div>
     </main>
     </div>
 </template>
@@ -108,15 +100,11 @@ import {
 import OnSaleProductsPage from './OnSaleProductsPage.vue'; 
 import OperationsCenter from './OperationsCenter.vue'; 
 import DashboardHome from './DashboardHome.vue'; 
-// ⬇️ --- 【新增】 ---
 import CalendarPage from './CalendarPage.vue'; 
-// ⬆️ --- 【新增】 ---
 
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
-  // ⬇️ --- 【新增】 ---
   { key: 'CALENDAR', name: '工作日历' },
-  // ⬆️ --- 【新增】 ---
   { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'REPORTS', name: '周报' },
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 
@@ -125,6 +113,21 @@ const allMenuItems = [
   { key: 'ADMIN_STORES', name: '店铺管理' },
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
+
+// ⬇️ 【新增】 组件映射表
+const viewComponents = {
+  'DASHBOARD': DashboardHome,
+  'CALENDAR': CalendarPage,
+  'SALES_DATA': SalesDataPage,
+  'REPORTS': WeeklyReportPage,
+  'ON_SALE_PRODUCTS': OnSaleProductsPage,
+  'OPERATION_CENTER': OperationsCenter,
+  'LINKS': CommonLinks,
+  'ADMIN_STORES': StoreManagement,
+  'ADMIN_USERS': UserManagement,
+  'PROFILE_MGMT': ProfileManagement, // (个人中心)
+};
+// ⬆️ 【新增】
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
@@ -144,6 +147,12 @@ const visibleMenuItems = computed(() => {
     userPermissions.includes(item.key)
   );
 });
+
+// ⬇️ 【新增】 计算属性，用于动态组件
+const currentComponent = computed(() => {
+  return viewComponents[currentView.value] || DashboardHome;
+});
+// ⬆️ 【新增】
 
 const setView = (viewName) => {
   currentView.value = viewName;

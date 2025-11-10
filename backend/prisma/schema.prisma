@@ -242,7 +242,7 @@ model CalendarEvent {
 // ⬇️ --- 【新增】 每周重点 (WeeklyFocus) 模型 ---
 model WeeklyFocus {
   id            String   @id @default(cuid())
-  weekStartDate DateTime @unique // (周一的日期)
+  weekStartDate DateTime @unique @db.Date // ⬅️ 将类型改为 @db.Date 以确保只比较日期
   content       String   @db.Text
   
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)

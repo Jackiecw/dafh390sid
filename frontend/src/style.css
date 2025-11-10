@@ -2,6 +2,67 @@
 
 @import "tailwindcss";
 
-/* (确保这里没有 @import "@fullcalendar/...")
-  (所有 FullCalendar 样式已在 main.js 中正确导入)
-*/
+/* ---------------------------------------------------- */
+/* ⬇️ 【关键修复】TUI Calendar Tailwind CSS 冲突修复 */
+/* ---------------------------------------------------- */
+
+/* 1. 强制日历根容器占据全部高度 */
+.toastui-calendar-container {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 500px !important;
+}
+
+/* 2. 修复内部布局高度被压缩的问题 */
+.toastui-calendar-layout,
+.toastui-calendar-month,
+.toastui-calendar-weekday-grid {
+    height: 100% !important;
+    min-height: 100% !important;
+}
+
+/* 3. 修复内部网格的高度分配 */
+.toastui-calendar-grid {
+    height: 100% !important;
+}
+.toastui-calendar-grid-cell {
+    flex: 1 1 auto !important; 
+}
+
+/* 4. 修复网格元素样式 */
+.toastui-calendar-day-name {
+  line-height: normal !important;
+}
+.toastui-calendar-weekday-grid-date {
+  line-height: normal !important; 
+  text-align: center !important;  
+  margin-right: 0 !important;     
+  min-width: 28px !important;     
+  height: 28px !important;        
+  display: flex !important;       
+  align-items: center !important; 
+  justify-content: center !important; 
+}
+.toastui-calendar-weekday-grid-date-decorator {
+  line-height: normal !important; 
+  font-weight: bold !important;   
+  width: 28px !important;         
+  height: 28px !important;        
+}
+.toastui-calendar-event-title {
+  line-height: 1.4 !important;
+}
+
+/* 5. 确保日历容器内的元素不会被 Tailwind 的 flex-grow: 1 影响 */
+.toastui-calendar-weekday-grid-line,
+.toastui-calendar-time-date {
+  flex: none !important;
+}
+
+/* 6. 视觉美化 */
+.toastui-calendar-layout {
+  border-radius: 0.5rem !important;
+}
+.toastui-calendar-weekday-event {
+  border-radius: 4px !important;
+}

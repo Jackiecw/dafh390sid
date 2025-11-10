@@ -1,5 +1,6 @@
 <template>
-  <div class="space-y-6">
+  <div class="flex flex-col h-full space-y-6">
+
     <div class="flex flex-col md:flex-row justify-between items-center gap-4">
       <div class="flex items-center space-x-4">
         <h2 class="text-3xl font-bold text-stone-900">工作日历</h2>
@@ -29,9 +30,11 @@
       </button>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg" style="height: 75vh;">
+    <div class="bg-white p-6 rounded-lg shadow-lg flex-1 min-h-0">
+      
       <Calendar
         ref="calendarRef"
+        class="h-full" 
         :view="'month'"
         :options="tuiOptions"
         :events="events"
@@ -55,7 +58,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+// 导入 onActivated
+import { ref, computed, onMounted, onActivated } from 'vue'; 
 import { useAuthStore } from '../stores/auth';
 import apiClient from '../api';
 
@@ -74,7 +78,6 @@ const isModalOpen = ref(false);
 const selectedEvent = ref(null); 
 const selectedDateRange = ref(null); 
 
-// --- 核心：Toast UI 配置 (不变) ---
 const tuiOptions = {
   defaultView: 'month',
   useCreationPopup: false, 
@@ -94,7 +97,6 @@ const tuiOptions = {
   }
 };
 
-// --- 数据获取与转换 (不变) ---
 const getCalendarInstance = () => {
   return calendarRef.value?.getInstance ? calendarRef.value.getInstance() : calendarRef.value;
 };
@@ -138,11 +140,30 @@ async function fetchEvents() {
   }
 }
 
+// --- 关键生命周期修复 (不变) ---
+
 onMounted(() => {
+  // 延迟初始化，等待 DOM 渲染稳定
   setTimeout(() => {
     updateMonthDisplay();
     fetchEvents();
+    // 强制 TUI 在首次加载时调整大小
+    const cal = getCalendarInstance();
+    if (cal) {
+        cal.resize();
+    }
   }, 100);
+});
+
+// 当组件被 <KeepAlive> 重新激活时
+onActivated(() => {
+  const cal = getCalendarInstance();
+  if (cal) {
+    setTimeout(() => {
+        cal.render(); // 重新渲染日历
+        cal.resize(); // 重新计算布局
+    }, 50); // 50ms 延迟
+  }
 });
 
 // --- 交互事件 (不变) ---
@@ -171,24 +192,20 @@ function onClickEvent(info) {
 
 async function onBeforeUpdateEvent(info) {
   const { event, changes } = info;
-
   if (event.raw.createdByAdmin && authStore.role !== 'admin') {
     alert('权限不足：无法修改由管理员指派的日程。');
     fetchEvents();
     return;
   }
-
   const url = authStore.role === 'admin' 
     ? `/admin/calendar/events/${event.id}` 
     : `/calendar/events/${event.id}`;
-    
   const payload = {
     title: changes.title || event.title,
     startAt: changes.start ? new Date(changes.start).toISOString() : new Date(event.start).toISOString(),
     endAt: changes.end ? new Date(changes.end).toISOString() : new Date(event.end).toISOString(),
     isAllDay: 'isAllday' in changes ? changes.isAllday : event.isAllday,
   };
-  
   try {
     await apiClient.put(url, payload);
     fetchEvents();
@@ -199,7 +216,6 @@ async function onBeforeUpdateEvent(info) {
   }
 }
 
-// --- 模态框控制 (不变) ---
 function handleNewEventClick() {
   const today = new Date();
   selectedDateRange.value = { start: today, end: today, isAllday: false };
@@ -217,7 +233,6 @@ async function handleEventSave(payload) {
   apiError.value = '';
   try {
     const isAdmin = authStore.role === 'admin';
-    
     if (payload.id) {
       const url = isAdmin ? `/admin/calendar/events/${payload.id}` : `/calendar/events/${payload.id}`;
       await apiClient.put(url, payload);
@@ -225,10 +240,8 @@ async function handleEventSave(payload) {
       const url = isAdmin ? '/admin/calendar/events' : '/calendar/events';
       await apiClient.post(url, payload);
     }
-    
     closeModal();
     fetchEvents(); 
-    
   } catch (error) {
     console.error('保存日程失败:', error);
     apiError.value = `保存失败: ${error.response?.data?.error || '未知错误'}`;
@@ -240,54 +253,16 @@ async function handleEventDelete(eventId) {
   try {
     const isAdmin = authStore.role === 'admin';
     const url = isAdmin ? `/admin/calendar/events/${eventId}` : `/calendar/events/${eventId}`;
-    
     await apiClient.delete(url);
-    
     closeModal();
     fetchEvents(); 
-
   } catch (error) {
     console.error('删除日程失败:', error);
     apiError.value = `删除失败: ${error.response?.data?.error || '未知错误'}`;
   }
 }
-
 </script>
 
 <style>
-/* (覆盖 TUI 默认样式) */
-.toastui-calendar-layout {
-  border-radius: 0.5rem; /* rounded-lg */
-}
-.toastui-calendar-weekday-event {
-  border-radius: 4px;
-}
-
-/* ⬇️ --- 【新增】 修复 Tailwind CSS 冲突 --- ⬇️ */
-
-/* 修复日期数字的行高和对齐方式 */
-.toastui-calendar-weekday-grid-date {
-  line-height: normal !important; /* 覆盖 Tailwind 的 line-height */
-  text-align: center !important;  
-  margin-right: 0 !important;     
-  min-width: 28px;     
-  height: 28px;        
-  display: flex !important;       
-  align-items: center !important; 
-  justify-content: center !important; 
-}
-
-/* 修复 "今天" 的蓝色圆圈 */
-.toastui-calendar-weekday-grid-date-decorator {
-  line-height: normal !important; 
-  font-weight: bold;   
-  width: 28px;         
-  height: 28px;        
-}
-
-/* 确保事件标题不会被 Tailwind 的行高影响 */
-.toastui-calendar-event-title {
-  line-height: 1.4 !important; /* 设置一个合理的行高 */
-}
-/* ⬆️ --- 【新增】 --- ⬆️ */
+/* 样式已转移到 style.css 中 */
 </style>
