@@ -71,6 +71,24 @@ async function main() {
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
+  // ⬇️ --- 【新增】 ---
+  const menuFinanceAdmin = await prisma.menuItem.upsert({
+    where: { key: 'FINANCE_ADMIN' },
+    update: {},
+    create: { key: 'FINANCE_ADMIN', name: '财务管理' },
+  });
+  const menuFinanceEntry = await prisma.menuItem.upsert({
+    where: { key: 'FINANCE_ENTRY' },
+    update: {},
+    create: { key: 'FINANCE_ENTRY', name: '支出录入' },
+  });
+  const menuFinanceView = await prisma.menuItem.upsert({
+    where: { key: 'FINANCE_VIEW' },
+    update: {},
+    create: { key: 'FINANCE_VIEW', name: '支出查询' },
+  });
+  // ⬆️ --- 【新增】 ---
+  
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
     console.log('旧的 "ADMIN_PRODUCTS" 菜单项已删除。');
@@ -95,14 +113,22 @@ async function main() {
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
           { id: menuCalendar.id }, // ⬅️ 【新增】
+          
+          // ⬇️ --- 【新增】 ---
+          { id: menuFinanceAdmin.id },
+          { id: menuFinanceEntry.id },
+          // ⬆️ --- 【新增】 ---
         ],
         // ⬇️ --- 【修正】 ---
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
           { key: 'ADMIN_PRODUCTS' },
-          { id: menuViewReports.id }
-          // (已删除 { key: 'CALENDAR' })
+          { id: menuViewReports.id },
+          
+          // ⬇️ --- 【新增】 (确保运营没有查询权限) ---
+          { id: menuFinanceView.id }
+          // ⬆️ --- 【新增】 ---
         ]
         // ⬆️ --- 【修正】 ---
       },
@@ -120,6 +146,11 @@ async function main() {
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
           { id: menuCalendar.id },
+
+          // ⬇️ --- 【新增】 ---
+          { id: menuFinanceAdmin.id },
+          { id: menuFinanceEntry.id },
+          // ⬆️ --- 【新增】 ---
         ],
       },
     },
@@ -142,6 +173,12 @@ async function main() {
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
           { id: menuCalendar.id }, // ⬅️ 【新增】
+          
+          // ⬇️ --- 【新增】 (Admin 拥有所有权限) ---
+          { id: menuFinanceAdmin.id },
+          { id: menuFinanceEntry.id },
+          { id: menuFinanceView.id },
+          // ⬆️ --- 【新增】 ---
         ],
         // ⬇️ --- 【修正】 ---
         disconnect: [
@@ -169,6 +206,12 @@ async function main() {
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
           { id: menuCalendar.id }, 
+          
+          // ⬇️ --- 【新增】 ---
+          { id: menuFinanceAdmin.id },
+          { id: menuFinanceEntry.id },
+          { id: menuFinanceView.id },
+          // ⬆️ --- 【新增】 ---
         ],
       },
     },

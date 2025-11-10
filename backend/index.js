@@ -17,6 +17,7 @@ const managementRoutes = require('./routes/management');
 const productRoutes = require('./routes/products'); 
 const profileRoutes = require('./routes/profile'); 
 const operationRoutes = require('./routes/operation'); // ⬅️ 【修复】 必须添加这一行
+const financeRoutes = require('./routes/finance'); // ⬅️ 【新增】
 
 // 3. 初始化
 const app = express();
@@ -51,6 +52,7 @@ app.use('/api/admin', productRoutes);
 // ⬇️ 【新增】 挂载新路由
 // (注意: 它同时处理 /api/operation/... 和 /api/admin/operation-...)
 app.use('/api', operationRoutes); // ⬅️ 这一行就是你报错的第 52 行
+app.use('/api', financeRoutes); // ⬅️ 【新增】 (这将同时注册 /api/expenses 和 /api/admin/expenses)
 
 // 6. 启动服务器
 const PORT = 3000;

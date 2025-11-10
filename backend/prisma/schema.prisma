@@ -35,11 +35,12 @@ model User {
   todos          Todo[]
   recurringTasks RecurringTask[]
   
-  // ⬇️ --- 【新增】 日历功能关联 ---
-  calendarEvents      CalendarEvent[] @relation("UserEvents")
+  // ⬇️ --- 【日历功能】 ---
+  calendarEvents        CalendarEvent[] @relation("UserEvents")
   createdCalendarEvents CalendarEvent[] @relation("AdminCreatedEvents")
-  weeklyFocuses       WeeklyFocus[]
-  // ⬆️ --- 【新增】 ---
+  weeklyFocuses         WeeklyFocus[]
+  
+  expenses              Expense[] // ⬅️ 【财务模块新增】
 }
 
 // --- 2. 角色模型 (Role) ---
@@ -72,6 +73,8 @@ model Store {
 
   salesData SalesData[]
   listings  StoreProductListing[]
+
+  expenses  Expense[] // ⬅️ 【财务模块新增】
 }
 
 // --- 5. 销售数据模型 (SalesData) ---
@@ -218,7 +221,7 @@ model RecurringTask {
   @@index([authorId, period])
 }
 
-// ⬇️ --- 【新增】 工作日历 (CalendarEvent) 模型 ---
+// --- 15. 工作日历 (CalendarEvent) 模型 ---
 model CalendarEvent {
   id        String   @id @default(cuid())
   title     String
@@ -235,11 +238,10 @@ model CalendarEvent {
   createdByAdmin Boolean  @default(false)
   adminCreator   User?    @relation("AdminCreatedEvents", fields: [adminCreatorId], references: [id], onDelete: SetNull)
   adminCreatorId String?
-
   @@index([authorId, startAt, endAt])
 }
 
-// ⬇️ --- 【新增】 每周重点 (WeeklyFocus) 模型 ---
+// --- 16. 每周重点 (WeeklyFocus) 模型 ---
 model WeeklyFocus {
   id            String   @id @default(cuid())
   weekStartDate DateTime @unique @db.Date // ⬅️ 将类型改为 @db.Date 以确保只比较日期
@@ -251,7 +253,42 @@ model WeeklyFocus {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-// ⬆️ --- 【新增】 ---
+
+// --- 17. 支出 (Expense) 模型 --- ⬅️ 【财务模块新增】
+model Expense {
+  id                String    @id @default(cuid())
+  expenseDate       DateTime  // "日期"
+  itemDescription   String    // "项目" (例如: Facebook 广告费)
+  amount            Float     // "金额"
+
+  // 详细财务信息
+  paymentMethod     PaymentMethod @default(OTHER) // "付款方式"
+  payer             String    // "付款方" (例如: 公司支付宝, 运营A)
+  payee             String    // "收款方" (例如: Facebook, Google)
+  invoiceStatus     InvoiceStatus @default(NONE)  // "是否含票"
+  
+  // 报销信息 (对应 "是否垫付" 和 "报销日期")
+  isAdvancePayment  Boolean   @default(false)
+  reimbursementDate DateTime? // 垫付报销日期
+  
+  notes             String?   @db.Text // "备注"
+
+  // --- 关键关联 ---
+
+  // 1. 归属店铺 (可选，允许"公司"级支出)
+  store             Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  storeId           String?   
+
+  // 2. 录入人
+  enteredBy         User      @relation(fields: [enteredById], references: [id], onDelete: Cascade)
+  enteredById       String
+
+  createdAt         DateTime  @default(now())
+
+  @@index([expenseDate])
+  @@index([storeId])
+  @@index([enteredById])
+}
 
 
 // --- 枚举 (Enums) ---
@@ -283,4 +320,20 @@ enum TaskPeriod {
   DAILY
   WEEKLY
   MONTHLY
+}
+
+// ⬇️ 【财务模块新增】
+enum PaymentMethod {
+  ALIPAY        // 支付宝
+  WECHAT_PAY    // 微信支付
+  BANK_TRANSFER // 银行转账
+  CREDIT_CARD   // 信用卡
+  CASH          // 现金
+  OTHER         // 其他
+}
+
+enum InvoiceStatus {
+  NONE     // 无票
+  REGULAR  // 普票
+  SPECIAL  // 专票
 }

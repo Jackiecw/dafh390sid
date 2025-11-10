@@ -1,7 +1,7 @@
 <template>
-  <div class="flex flex-col h-full space-y-6">
+  <div class="flex flex-col h-full">
 
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
       <div class="flex items-center space-x-4">
         <h2 class="text-3xl font-bold text-stone-900">工作日历</h2>
         
@@ -44,7 +44,7 @@
       />
     </div>
 
-    <p v-if="apiError" class="text-red-600">{{ apiError }}</p>
+    <p v-if="apiError" class="text-red-600 mt-6">{{ apiError }}</p>
   </div>
 
   <EventModal
@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-// 导入 onActivated
+// ( <script setup> 部分保持不变 )
 import { ref, computed, onMounted, onActivated } from 'vue'; 
 import { useAuthStore } from '../stores/auth';
 import apiClient from '../api';

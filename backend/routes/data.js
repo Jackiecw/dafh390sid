@@ -11,7 +11,7 @@ const router = express.Router();
 
 // --- Zod 验证模式 (用于 sales-data，保持不变) ---
 const salesDataSchema = z.object({
-  recordDate: z.string().datetime(),
+  recordDate: z.string().date("日期格式无效"),
   storeId: z.string().min(1),
   productId: z.string().min(1),
   salesVolume: z.number().int().min(0),

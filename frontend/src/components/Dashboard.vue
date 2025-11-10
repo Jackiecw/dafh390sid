@@ -101,12 +101,14 @@ import OnSaleProductsPage from './OnSaleProductsPage.vue';
 import OperationsCenter from './OperationsCenter.vue'; 
 import DashboardHome from './DashboardHome.vue'; 
 import CalendarPage from './CalendarPage.vue'; 
+import FinancePage from './FinancePage.vue'; // ⬅️ 【1. 新增】 导入财务页面
 
 const allMenuItems = [
   { key: 'DASHBOARD', name: '仪表盘' },
   { key: 'CALENDAR', name: '工作日历' },
   { key: 'SALES_DATA', name: '销售数据' }, 
   { key: 'REPORTS', name: '周报' },
+  { key: 'FINANCE_ADMIN', name: '财务管理' }, // ⬅️ 【2. 新增】 添加菜单项
   { key: 'ON_SALE_PRODUCTS', name: '在售商品' }, 
   { key: 'OPERATION_CENTER', name: '运营中心' },
   { key: 'LINKS', name: '常用链接' },
@@ -114,12 +116,13 @@ const allMenuItems = [
   { key: 'ADMIN_USERS', name: '员工配置与管理' },
 ];
 
-// ⬇️ 【新增】 组件映射表
+// ⬇️ 【修改】 组件映射表
 const viewComponents = {
   'DASHBOARD': DashboardHome,
   'CALENDAR': CalendarPage,
   'SALES_DATA': SalesDataPage,
   'REPORTS': WeeklyReportPage,
+  'FINANCE_ADMIN': FinancePage, // ⬅️ 【3. 新增】 添加组件映射
   'ON_SALE_PRODUCTS': OnSaleProductsPage,
   'OPERATION_CENTER': OperationsCenter,
   'LINKS': CommonLinks,
@@ -127,7 +130,7 @@ const viewComponents = {
   'ADMIN_USERS': UserManagement,
   'PROFILE_MGMT': ProfileManagement, // (个人中心)
 };
-// ⬆️ 【新增】
+// ⬆️ 【修改】
 
 const authStore = useAuthStore();
 const currentView = ref('DASHBOARD'); 
@@ -143,6 +146,9 @@ const userAvatar = computed(() => {
 const visibleMenuItems = computed(() => {
   const userPermissions = authStore.permissions; 
   if (!userPermissions) return []; 
+  
+  // ⬅️ 【4. 修正】 确保菜单项正确排序
+  // (我们从 allMenuItems 过滤，以保证顺序)
   return allMenuItems.filter(item => 
     userPermissions.includes(item.key)
   );
