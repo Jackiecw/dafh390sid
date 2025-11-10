@@ -9,6 +9,8 @@ async function main() {
 
   // --- 1. 创建所有“菜单项” ---
   console.log('正在创建菜单项...');
+  
+  // ⬇️ --- 【修复】 补全所有缺失的菜单项 ---
   const menuDashboard = await prisma.menuItem.upsert({
     where: { key: 'DASHBOARD' },
     update: {},
@@ -64,6 +66,7 @@ async function main() {
     update: { name: '在售商品' },
     create: { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
   });
+  // ⬆️ --- 【修复】 ---
 
   const menuOperationCenter = await prisma.menuItem.upsert({
     where: { key: 'OPERATION_CENTER' },
@@ -71,7 +74,6 @@ async function main() {
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
-  // ⬇️ --- 【新增】 ---
   const menuFinanceAdmin = await prisma.menuItem.upsert({
     where: { key: 'FINANCE_ADMIN' },
     update: {},
@@ -87,7 +89,12 @@ async function main() {
     update: {},
     create: { key: 'FINANCE_VIEW', name: '支出查询' },
   });
-  // ⬆️ --- 【新增】 ---
+
+  const menuFinanceExport = await prisma.menuItem.upsert({
+    where: { key: 'FINANCE_EXPORT' },
+    update: {},
+    create: { key: 'FINANCE_EXPORT', name: '支出批量导出' },
+  });
   
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
@@ -112,25 +119,18 @@ async function main() {
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
-          
-          // ⬇️ --- 【新增】 ---
+          { id: menuCalendar.id },
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
-          // ⬆️ --- 【新增】 ---
         ],
-        // ⬇️ --- 【修正】 ---
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
           { key: 'ADMIN_PRODUCTS' },
-          { id: menuViewReports.id },
-          
-          // ⬇️ --- 【新增】 (确保运营没有查询权限) ---
-          { id: menuFinanceView.id }
-          // ⬆️ --- 【新增】 ---
+          { id: menuViewReports.id }, // ⬅️ 这一行 (第66行) 现在是安全的
+          { id: menuFinanceView.id },
+          { id: menuFinanceExport.id }, 
         ]
-        // ⬆️ --- 【修正】 ---
       },
     },
     create: {
@@ -146,11 +146,8 @@ async function main() {
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
           { id: menuCalendar.id },
-
-          // ⬇️ --- 【新增】 ---
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
-          // ⬆️ --- 【新增】 ---
         ],
       },
     },
@@ -172,22 +169,17 @@ async function main() {
           { id: menuOnSaleProducts.id }, 
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
-          { id: menuCalendar.id }, // ⬅️ 【新增】
-          
-          // ⬇️ --- 【新增】 (Admin 拥有所有权限) ---
+          { id: menuCalendar.id }, 
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
           { id: menuFinanceView.id },
-          // ⬆️ --- 【新增】 ---
+          { id: menuFinanceExport.id },
         ],
-        // ⬇️ --- 【修正】 ---
         disconnect: [
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
           { key: 'ADMIN_PRODUCTS' }
-          // (已删除 { key: 'CALENDAR' })
         ]
-        // ⬆️ --- 【修正】 ---
       },
     },
     create: {
@@ -206,12 +198,10 @@ async function main() {
           { id: menuOperationCenter.id },
           { id: menuReports.id }, 
           { id: menuCalendar.id }, 
-          
-          // ⬇️ --- 【新增】 ---
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
           { id: menuFinanceView.id },
-          // ⬆️ --- 【新增】 ---
+          { id: menuFinanceExport.id },
         ],
       },
     },

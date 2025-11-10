@@ -30,7 +30,20 @@
         >
           支出查询
         </button>
-      </nav>
+
+        <button 
+          v-if="isAdmin || canExport"
+          @click="currentTab = 'batch'"
+          :class="[
+            'py-2 px-4 text-sm font-medium',
+            currentTab === 'batch' 
+              ? 'border-b-2 border-indigo-600 text-indigo-600' 
+              : 'text-stone-500 hover:text-stone-700'
+          ]"
+        >
+          批量操作
+        </button>
+        </nav>
     </div>
 
     <div>
@@ -40,7 +53,10 @@
       <div v-if="currentTab === 'management'">
         <FinanceManagement />
       </div>
-    </div>
+      <div v-if="currentTab === 'batch' && (isAdmin || canExport)">
+        <FinanceBatchOps />
+      </div>
+      </div>
   </div>
 </template>
 
@@ -49,23 +65,27 @@ import { ref, computed } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import FinanceForm from './FinanceForm.vue';
 import FinanceManagement from './FinanceManagement.vue';
+import FinanceBatchOps from './FinanceBatchOps.vue'; // ⬅️ 【新增】
 
 const authStore = useAuthStore();
 
 // 1. 检查用户是否具备“录入”和“查询”的子权限
 const canEntry = computed(() => authStore.permissions.includes('FINANCE_ENTRY'));
 const canView = computed(() => authStore.permissions.includes('FINANCE_VIEW'));
+const isAdmin = computed(() => authStore.role === 'admin');
+const canExport = computed(() => authStore.permissions.includes('FINANCE_EXPORT')); // ⬅️ 【新增】
 
 // 2. 决定默认显示哪个标签页
 const getDefaultTab = () => {
   // 优先级：管理员/财务 默认看查询，运营默认看录入
-  if (canView.value && authStore.role === 'admin') {
+  if (canView.value && (authStore.role === 'admin' || canExport.value)) {
     return 'management';
   }
   if (canEntry.value) {
     return 'entry';
   }
-  return 'management'; // 备用
+  // 备用
+  return canView.value ? 'management' : 'batch'; 
 };
 
 const currentTab = ref(getDefaultTab()); 

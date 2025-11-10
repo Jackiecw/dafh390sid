@@ -134,7 +134,6 @@ router.get('/expenses/options', authMiddleware, (req, res) => {
 
 /**
  * (用户) POST /api/expenses (不变)
- * 录入一条新的支出
  */
 router.post('/expenses', authMiddleware, async (req, res) => {
   // ... (代码不变)
@@ -169,12 +168,11 @@ router.post('/expenses', authMiddleware, async (req, res) => {
   }
 });
 
-// ⬇️ --- 【新增：批量导入 API】 ---
 /**
- * (管理员) POST /api/admin/expenses/import
- * 批量导入支出
+ * (管理员) POST /api/admin/expenses/import (不变)
  */
 router.post('/admin/expenses/import', adminMiddleware, upload.single('expenseFile'), async (req, res) => {
+  // ... (代码不变)
   if (!req.file) {
     return res.status(400).json({ error: '未找到上传的 Excel 文件' });
   }
@@ -320,12 +318,9 @@ router.post('/admin/expenses/import', adminMiddleware, upload.single('expenseFil
     });
   }
 });
-// ⬆️ --- 【新增：批量导入 API】 ---
-
 
 /**
  * (管理员) GET /api/admin/expenses (不变)
- * 查询支出列表 (带筛选)
  */
 router.get('/admin/expenses', adminMiddleware, async (req, res) => {
   // ... (代码不变)
@@ -402,7 +397,6 @@ router.get('/admin/expenses', adminMiddleware, async (req, res) => {
 
 /**
  * (管理员) PUT /api/admin/expenses/:id (不变)
- * 更新一条支出
  */
 router.put('/admin/expenses/:id', adminMiddleware, async (req, res) => {
   // ... (代码不变)
@@ -457,7 +451,6 @@ router.put('/admin/expenses/:id', adminMiddleware, async (req, res) => {
 
 /**
  * (管理员) DELETE /api/admin/expenses/:id (不变)
- * 删除一条支出
  */
 router.delete('/admin/expenses/:id', adminMiddleware, async (req, res) => {
   // ... (代码不变)
@@ -484,6 +477,107 @@ router.delete('/admin/expenses/:id', adminMiddleware, async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
+
+
+// ⬇️ --- 【新增：批量导出 API】 ---
+/**
+ * (管理员) GET /api/admin/expenses/export
+ * 批量导出支出
+ */
+router.get('/admin/expenses/export', adminMiddleware, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: '必须提供 startDate 和 endDate 查询参数' });
+    }
+
+    // 1. 定义查询条件
+    const where = {
+      expenseDate: {
+        gte: new Date(startDate),
+        lte: new Date(new Date(endDate).setDate(new Date(endDate).getDate() + 1)), // 包含结束日期
+      }
+    };
+    
+    // (未来可以添加更多筛选，例如 storeId, payer 等)
+
+    // 2. 从数据库获取数据
+    const expenses = await prisma.expense.findMany({
+      where: where,
+      orderBy: { expenseDate: 'asc' },
+      include: {
+        store: { select: { name: true } },
+        enteredBy: { select: { nickname: true } }
+      }
+    });
+
+    // 3. 准备中文翻译
+    const paymentMethodMap = { 'ALIPAY': '支付宝', 'WECHAT_PAY': '微信支付', 'BANK_TRANSFER': '银行转账', 'CREDIT_CARD': '信用卡', 'CASH': '现金', 'OTHER': '其他' };
+    const invoiceStatusMap = { 'NONE': '无票', 'REGULAR': '普票', 'SPECIAL': '专票' };
+    const formatDate = (date) => date ? new Date(date).toISOString().split('T')[0] : '';
+
+    // 4. 将数据格式化为 Excel 格式 (匹配模板)
+    const dataForExcel = expenses.map(ex => ({
+      '支出日期': formatDate(ex.expenseDate),
+      '项目描述': ex.itemDescription,
+      '金额': ex.amount,
+      '付款方式': paymentMethodMap[ex.paymentMethod] || ex.paymentMethod,
+      '付款方': ex.payer,
+      '收款方': ex.payee,
+      '票据状态': invoiceStatusMap[ex.invoiceStatus] || ex.invoiceStatus,
+      '是否垫付(Y/N)': ex.isAdvancePayment ? 'Y' : 'N',
+      '报销日期': formatDate(ex.reimbursementDate),
+      '归属店铺名称': ex.store ? ex.store.name : '', // (模板要求的是名称)
+      '备注': ex.notes || '',
+      '录入人': ex.enteredBy.nickname, // (额外添加一列)
+    }));
+
+    // 5. 定义表头 (确保顺序)
+    const headers = [
+      '支出日期', '项目描述', '金额', 
+      '付款方式', '付款方', '收款方', 
+      '票据状态', '是否垫付(Y/N)', '报销日期',
+      '归属店铺名称', '备注', '录入人'
+    ];
+    
+    // 6. 创建工作簿和工作表
+    const ws = xlsx.utils.json_to_sheet(dataForExcel, { header: headers });
+
+    // (设置列宽)
+    ws['!cols'] = [
+      { wch: 12 }, // 支出日期
+      { wch: 30 }, // 项目描述
+      { wch: 10 }, // 金额
+      { wch: 12 }, // 付款方式
+      { wch: 15 }, // 付款方
+      { wch: 15 }, // 收款方
+      { wch: 10 }, // 票据状态
+      { wch: 15 }, // 是否垫付
+      { wch: 12 }, // 报销日期
+      { wch: 30 }, // 归属店铺名称
+      { wch: 30 }, // 备注
+      { wch: 15 }  // 录入人
+    ];
+
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, ws, '支出报表');
+
+    // 7. 将工作簿写入 Buffer
+    const buffer = xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    // 8. 设置响应头并发送文件
+    const filename = `支出报表_${startDate}_至_${endDate}.xlsx`;
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+
+  } catch (error) {
+    console.error('导出支出失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+// ⬆️ --- 【新增：批量导出 API】 ---
 
 
 module.exports = router;
