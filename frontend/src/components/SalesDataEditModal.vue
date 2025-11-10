@@ -158,7 +158,9 @@ const selectedPlatform = ref('');
 // --- 级联菜单逻辑 (同 SalesForm) ---
 async function fetchStores() {
   try {
-    const response = await apiClient.get('/admin/stores');
+    // ⬇️ --- 【修复】 ---
+    const response = await apiClient.get('/stores-list');
+    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败:', error);

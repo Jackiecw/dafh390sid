@@ -194,7 +194,9 @@ async function fetchData(showLoading = true) {
 // 2. 获取筛选器选项 (用于下拉菜单)
 async function fetchStoresForFilter() {
   try {
-    const response = await apiClient.get('/admin/stores');
+    // ⬇️ --- 【修复】 ---
+    const response = await apiClient.get('/stores-list');
+    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败(用于筛选):', error);

@@ -126,11 +126,14 @@ const formOtherData = ref({
 const successMessage = ref('');
 const errorMessage = ref('');
 
-// --- 2. 数据获取 (onMounted) (不变) ---
+// --- 2. 数据获取 (onMounted) (修改) ---
 async function fetchStores() {
   isLoadingStores.value = true;
   try {
-    const response = await apiClient.get('/admin/stores');
+    // ⬇️ --- 【修复】 ---
+    // (不再调用 /admin/stores，而是调用我们新建的 /stores-list)
+    const response = await apiClient.get('/stores-list'); 
+    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败:', error);

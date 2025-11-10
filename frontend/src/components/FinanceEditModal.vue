@@ -184,7 +184,9 @@ async function fetchStoresAndOptions() {
   isLoading.value = true;
   try {
     const [storesRes, optionsRes] = await Promise.all([
-      apiClient.get('/admin/stores'),
+      // ⬇️ --- 【修复】 ---
+      apiClient.get('/stores-list'),
+      // ⬆️ --- 【修复】 ---
       apiClient.get('/expenses/options')
     ]);
     allStores.value = storesRes.data;

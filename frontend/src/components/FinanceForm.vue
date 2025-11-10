@@ -166,7 +166,9 @@ const errorMessage = ref('');
 async function fetchStores() {
   isLoadingStores.value = true;
   try {
-    const response = await apiClient.get('/admin/stores'); // (复用)
+    // ⬇️ --- 【修复】 ---
+    const response = await apiClient.get('/stores-list'); // (复用)
+    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败:', error);
