@@ -1,68 +1,48 @@
-/* ./frontend/src/style.css */
-
 @import "tailwindcss";
 
 /* ---------------------------------------------------- */
-/* ⬇️ 【关键修复】TUI Calendar Tailwind CSS 冲突修复 */
+/* FullCalendar x Tailwind 细节调整 */
 /* ---------------------------------------------------- */
 
-/* 1. 强制日历根容器占据全部高度 */
-.toastui-calendar-container {
-    width: 100% !important;
-    height: 100% !important;
-    min-height: 500px !important;
+.calendar-shell .fc {
+  --fc-border-color: #e7e5e4;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #f5f5f4;
+  --fc-today-bg-color: #eef2ff;
+  --fc-event-bg-color: #4f46e5;
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: #ffffff;
+  width: 100%;
+  height: 100%;
+  min-height: 640px;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* 2. 修复内部布局高度被压缩的问题 */
-.toastui-calendar-layout,
-.toastui-calendar-month,
-.toastui-calendar-weekday-grid {
-    height: 100% !important;
-    min-height: 100% !important;
+.calendar-shell .fc-scrollgrid {
+  border-radius: 0.5rem;
 }
 
-/* 3. 修复内部网格的高度分配 */
-.toastui-calendar-grid {
-    height: 100% !important;
-}
-.toastui-calendar-grid-cell {
-    flex: 1 1 auto !important; 
+.calendar-shell .fc-daygrid-day-number {
+  font-weight: 600;
+  color: #44403c;
 }
 
-/* 4. 修复网格元素样式 */
-.toastui-calendar-day-name {
-  line-height: normal !important;
-}
-.toastui-calendar-weekday-grid-date {
-  line-height: normal !important; 
-  text-align: center !important;  
-  margin-right: 0 !important;     
-  min-width: 28px !important;     
-  height: 28px !important;        
-  display: flex !important;       
-  align-items: center !important; 
-  justify-content: center !important; 
-}
-.toastui-calendar-weekday-grid-date-decorator {
-  line-height: normal !important; 
-  font-weight: bold !important;   
-  width: 28px !important;         
-  height: 28px !important;        
-}
-.toastui-calendar-event-title {
-  line-height: 1.4 !important;
+.calendar-shell .fc .fc-col-header-cell-cushion,
+.calendar-shell .fc .fc-daygrid-day-number {
+  padding: 0.5rem;
 }
 
-/* 5. 确保日历容器内的元素不会被 Tailwind 的 flex-grow: 1 影响 */
-.toastui-calendar-weekday-grid-line,
-.toastui-calendar-time-date {
-  flex: none !important;
+.calendar-shell .fc .fc-day-today {
+  background-color: #eef2ff;
 }
 
-/* 6. 视觉美化 */
-.toastui-calendar-layout {
-  border-radius: 0.5rem !important;
+.calendar-shell .fc .fc-h-event,
+.calendar-shell .fc .fc-daygrid-event {
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.4rem;
 }
-.toastui-calendar-weekday-event {
-  border-radius: 4px !important;
+
+.calendar-shell .fc .fc-timegrid-slot-label-cushion {
+  font-size: 0.75rem;
+  color: #78716c;
 }

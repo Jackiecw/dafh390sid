@@ -124,6 +124,22 @@ const getStartOfMonth = () => {
   const now = getTimeZoneDate();
   return new Date(now.getFullYear(), now.getMonth(), 1);
 };
+
+async function getPlanPreviewForWeek(userId, currentWeekStart) {
+  const previousWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const lastReport = await prisma.weeklyReport.findFirst({
+    where: {
+      authorId: userId,
+      weekStartDate: {
+        gte: previousWeekStart,
+        lt: currentWeekStart,
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { planNextWeek: true },
+  });
+  return lastReport?.planNextWeek || null;
+}
 // ---
 
 /**
@@ -223,57 +239,16 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
     // ⬇️ --- 【修改】 ---
     // (逻辑修改：获取或创建本周的 WeeklyFocus)
 // ... (不变)
-    let planNextWeek = '加载中...';
-    try {
-      const currentWeekStart = getStartOfWeek(); // (使用辅助函数)
-      
-      let focus = await prisma.weeklyFocus.findFirst({
-// ... (不变)
-        where: { 
-          weekStartDate: currentWeekStart, // 查找本周一的
-          authorId: userId 
-        },
-      });
+    const currentWeekStart = getStartOfWeek();
+    const [personalPlan, teamFocusRecord] = await Promise.all([
+      getPlanPreviewForWeek(userId, currentWeekStart),
+      prisma.weeklyFocus.findUnique({
+        where: { weekStartDate: currentWeekStart },
+      }),
+    ]);
 
-      if (focus) {
-// ... (不变)
-        planNextWeek = focus.content;
-      } else {
-        // (如果本周的 Focus 还没有，就从上周的 Report 里找)
-// ... (不变)
-        const prevWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-        
-        const lastReport = await prisma.weeklyReport.findFirst({
-// ... (不变)
-          where: {
-            authorId: userId,
-            weekStartDate: {
-              gte: prevWeekStart,
-              lt: currentWeekStart
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-          select: { planNextWeek: true }
-        });
-
-        const content = lastReport?.planNextWeek || '（暂无计划，请填写）';
-        
-        // (创建新的 Focus)
-// ... (不变)
-        const newFocus = await prisma.weeklyFocus.create({
-          data: {
-            weekStartDate: currentWeekStart,
-            content: content,
-            authorId: userId
-          }
-        });
-        planNextWeek = newFocus.content;
-      }
-    } catch (e) {
-// ... (不变)
-      console.error("获取/创建每周重点失败:", e);
-      planNextWeek = '获取计划失败';
-    }
+    const planNextWeek = personalPlan || '�����޼ƻ��������ܱ�����д�����ܼƻ�����';
+    const teamFocusContent = teamFocusRecord?.content || '';
     // ⬆️ --- 【修改】 ---
     
 // ... (不变)
@@ -320,8 +295,8 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
         }
       },
       schedule: {
-// ... (不变)
-        planNextWeek: planNextWeek // ⬅️ 使用我们新逻辑的结果
+        planNextWeek: planNextWeek,
+        teamFocus: teamFocusContent,
       }
     });
 
@@ -648,6 +623,20 @@ router.get('/reports', adminMiddleware, async (req, res) => {
 // ... (不变)
     console.error('获取周报列表失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+router.delete('/reports/:id', adminMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await prisma.weeklyReport.delete({ where: { id } });
+    res.status(204).send();
+  } catch (error) {
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '�ܱ�δ�ҵ�' });
+    }
+    console.error('ɾ���ܱ�ʧ��:', error);
+    res.status(500).json({ error: 'ɾ���ܱ�ʧ��' });
   }
 });
 
@@ -1312,119 +1301,86 @@ router.delete('/calendar/events/:id', authMiddleware, async (req, res) => {
 
 // GET /api/calendar/weekly-focus?weekStartDate=... (获取或创建每周重点)
 router.get('/calendar/weekly-focus', authMiddleware, async (req, res) => {
-// ... (不变)
   try {
-    const { userId } = req.user;
-    const { weekStartDate } = req.query; // 期望 'YYYY-MM-DD' (周一)
-    
+    const { userId, role } = req.user;
+    const { weekStartDate } = req.query;
+
     if (!weekStartDate) {
-// ... (不变)
-      return res.status(400).json({ error: '必须提供 week (周一) 查询参数' });
+      return res.status(400).json({ error: '�����ṩ weekStartDate ��ѯ����' });
     }
-    
+
     const weekStart = new Date(weekStartDate);
-
-    // 1. (使用 findFirst 替代 findUnique)
-// ... (不变)
-    let focus = await prisma.weeklyFocus.findFirst({
-      where: {
-        weekStartDate: weekStart,
-        authorId: userId
-      }
-    });
-    
-    if (focus) {
-// ... (不变)
-      return res.json(focus);
+    if (Number.isNaN(weekStart.getTime())) {
+      return res.status(400).json({ error: 'weekStartDate ��Ч' });
     }
-    
-    // 2. 如果没找到，从上周的报告中创建
-// ... (不变)
-    const prevWeekStart = new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    const lastReport = await prisma.weeklyReport.findFirst({
-// ... (不变)
-      where: {
-        authorId: userId,
-        weekStartDate: {
-          gte: prevWeekStart,
-          lt: weekStart
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      select: { planNextWeek: true }
+
+    const userPlan = await getPlanPreviewForWeek(userId, weekStart);
+
+    let focus = await prisma.weeklyFocus.findUnique({
+      where: { weekStartDate: weekStart },
     });
 
-    const content = lastReport?.planNextWeek || '（暂无计划，请填写）';
-    
-    // 3. 创建新的 (使用 create，因为我们已用 findFirst 检查过)
-// ... (不变)
-    const newFocus = await prisma.weeklyFocus.create({
-      data: {
-        weekStartDate: weekStart,
-        content: content,
-        authorId: userId
-      }
-    });
-
-    res.status(201).json(newFocus);
-// ... (不变)
-
-  } catch (error) {
-    // (处理并发创建时的唯一约束冲突)
-// ... (不变)
-    if (error.code === 'P2002') {
-      // (如果发生冲突，说明刚刚被创建，再次查询)
-// ... (不变)
-      const focus = await prisma.weeklyFocus.findFirst({
-        where: {
-          weekStartDate: new Date(weekStartDate),
-          authorId: req.user.userId
-        }
+    if (!focus && role === 'admin') {
+      focus = await prisma.weeklyFocus.create({
+        data: {
+          weekStartDate: weekStart,
+          content: '',
+          authorId: userId,
+        },
       });
-      return res.json(focus);
     }
-    console.error('获取每周重点失败:', error);
-// ... (不变)
-    res.status(500).json({ error: '服务器内部错误' });
+
+    return res.json({
+      focus,
+      userPlan: userPlan || null,
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      const weekStart = new Date(req.query.weekStartDate);
+      const [focus, userPlan] = await Promise.all([
+        prisma.weeklyFocus.findUnique({ where: { weekStartDate: weekStart } }),
+        getPlanPreviewForWeek(req.user.userId, weekStart),
+      ]);
+      return res.json({ focus, userPlan: userPlan || null });
+    }
+    console.error('��ȡÿ���ص�ʧ��:', error);
+    res.status(500).json({ error: '�������ڲ�����' });
   }
 });
 
 // PUT /api/calendar/weekly-focus/:id (更新每周重点)
 router.put('/calendar/weekly-focus/:id', authMiddleware, async (req, res) => {
-// ... (不变)
   try {
-    const { userId } = req.user;
+    const { userId, role } = req.user;
+    if (role !== 'admin') {
+      return res.status(403).json({ error: '仅管理员可以更新本周聚焦' });
+    }
     const { id } = req.params;
 
     const validation = weeklyFocusUpdateSchema.safeParse(req.body);
-// ... (不变)
     if (!validation.success) {
       return res.status(400).json({ error: '输入无效', details: validation.error.errors });
     }
 
+    const focus = await prisma.weeklyFocus.findUnique({ where: { id } });
+    if (!focus) {
+      return res.status(404).json({ error: '未找到该重点任务' });
+    }
+
     const updatedFocus = await prisma.weeklyFocus.update({
-// ... (不变)
-      where: {
-        id: id,
-        authorId: userId // (安全) 只能改自己的
-      },
+      where: { id },
       data: {
-// ... (不变)
-        content: validation.data.content
-      }
+        content: validation.data.content,
+        authorId: userId,
+      },
     });
     
     res.json(updatedFocus);
-// ... (不变)
-
   } catch (error) {
     if (error.code === 'P2025') {
-// ... (不变)
-      return res.status(404).json({ error: '未找到该重点任务，或无权限修改' });
+      return res.status(404).json({ error: '未找到该重点任务' });
     }
     console.error('更新每周重点失败:', error);
-// ... (不变)
     res.status(500).json({ error: '服务器内部错误' });
   }
 });

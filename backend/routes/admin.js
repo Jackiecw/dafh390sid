@@ -250,6 +250,43 @@ router.post('/users/:id/reset-password', async (req, res) => {
   }
 });
 
+// (DELETE /users/:id)
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUserId = req.user.userId;
+
+    if (id === currentUserId) {
+      return res.status(400).json({ error: '无法删除当前登录账号' });
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, username: true },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ error: '用户未找到' });
+    }
+
+    if (targetUser.username === 'admin') {
+      return res.status(400).json({ error: '无法删除内置超级管理员账号' });
+    }
+
+    await prisma.user.delete({ where: { id } });
+    res.status(204).send();
+  } catch (error) {
+    console.error('删除用户失败:', error);
+    if (error.code === 'P2003' || error.code === 'P2014') {
+      return res.status(400).json({ error: '无法删除该用户：存在关联数据，请先清理相关记录' });
+    }
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: '用户未找到' });
+    }
+    res.status(500).json({ error: '删除用户失败' });
+  }
+});
+
 
 // -----------------------------------------------------------------
 // --- (不变) 角色管理 API (Roles) ---

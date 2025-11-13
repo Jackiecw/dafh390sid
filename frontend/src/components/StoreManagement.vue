@@ -60,6 +60,13 @@
               <button @click="handleAssignProducts(store)" class="text-green-600 hover:text-green-900">
                 分配商品
               </button>
+              <button
+                v-if="isAdmin"
+                @click="handleDelete(store)"
+                class="text-red-600 hover:text-red-900"
+              >
+                删除
+              </button>
             </td>
           </tr>
         </tbody>
@@ -88,11 +95,13 @@
 
 <script setup>
 // ( <script setup> 部分保持不变 )
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import apiClient from '../api';
 import StoreFormModal from './StoreFormModal.vue';
 import StoreProductModal from './StoreProductModal.vue'; 
+import { useAuthStore } from '../stores/auth';
 
+const authStore = useAuthStore();
 const stores = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref('');
@@ -101,6 +110,7 @@ const currentStoreToEditId = ref(null);
 
 const isStoreProductModalOpen = ref(false);
 const currentStoreToAssign = ref(null);
+const isAdmin = computed(() => authStore.role === 'admin');
 
 async function fetchStores() {
   isLoading.value = true;
@@ -159,6 +169,19 @@ function getStatusClass(status) {
     case 'BANNED':
     case 'CLOSED': return 'bg-red-100 text-red-800';
     default: return 'bg-gray-100 text-gray-800';
+  }
+}
+
+async function handleDelete(store) {
+  if (!isAdmin.value) return;
+  if (!confirm(`确定要删除店铺「${store.name}」吗？该操作不可撤销。`)) return;
+  errorMessage.value = '';
+  try {
+    await apiClient.delete(`/admin/stores/${store.id}`);
+    await fetchStores();
+  } catch (error) {
+    console.error('删除店铺失败:', error);
+    errorMessage.value = error.response?.data?.error || '删除店铺失败，请稍后再试。';
   }
 }
 </script>

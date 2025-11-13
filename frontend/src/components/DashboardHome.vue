@@ -143,6 +143,7 @@
     <DashboardSchedule 
       :is-open="isScheduleOpen" 
       :plan-next-week="summaryData.schedule.planNextWeek"
+      :team-focus="summaryData.schedule.teamFocus"
       @close="isScheduleOpen = false"
     />
 
@@ -196,7 +197,7 @@ const isLoading = ref({
 
 const summaryData = ref({
   gmv: { today: 0, thisWeek: 0, thisMonth: 0, currency: '?', cnyEquivalent: { today: 0, thisWeek: 0, thisMonth: 0 }},
-  schedule: { planNextWeek: '加载中...' }
+  schedule: { planNextWeek: '加载中...', teamFocus: '' }
 });
 const ratesData = ref({});
 
@@ -287,7 +288,14 @@ async function fetchDashboardData() {
   
   try {
     const [summaryResponse, ratesResponse] = await Promise.all([summaryPromise, ratesPromise]);
-    summaryData.value = summaryResponse.data;
+    const schedule = summaryResponse.data.schedule || {};
+    summaryData.value = {
+      ...summaryResponse.data,
+      schedule: {
+        planNextWeek: schedule.planNextWeek || '',
+        teamFocus: schedule.teamFocus || '',
+      },
+    };
     ratesData.value = ratesResponse.data;
   } catch (error) {
     console.error("加载仪表盘数据失败:", error);

@@ -85,6 +85,14 @@
                   >
                     重置密码
                   </button>
+                  <button
+                    v-if="isSuperAdmin"
+                    @click="handleDeleteUser(user)"
+                    :disabled="user.username === 'admin' || user.id === currentUserId"
+                    class="ml-4 text-red-600 hover:text-red-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    删除
+                  </button>
                   </td>
               </tr>
             </tbody>
@@ -161,11 +169,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import apiClient from '../api';
 import UserFormModal from './UserFormModal.vue';
 import RoleFormModal from './RoleFormModal.vue'; 
 import CountryManagement from './CountryManagement.vue';
+import { useAuthStore } from '../stores/auth';
 
 // (不变)
 const currentTab = ref('users'); 
@@ -176,6 +185,9 @@ const isModalOpen = ref(false);
 const currentUserToEdit = ref(null);
 const isRoleModalOpen = ref(false);
 const currentRoleToEditId = ref(null);
+const authStore = useAuthStore();
+const isSuperAdmin = computed(() => authStore.role === 'admin');
+const currentUserId = computed(() => authStore.user?.userId);
 
 // (不变)
 onMounted(() => {
@@ -234,6 +246,28 @@ function handleUserUpdated(updatedUser) {
 }
 function handleUserCreated(newUser) {
   users.value.push(newUser);
+}
+
+async function handleDeleteUser(user) {
+  if (!isSuperAdmin.value) return;
+  if (user.username === 'admin') {
+    alert('无法删除内置超级管理员账号');
+    return;
+  }
+  if (user.id === currentUserId.value) {
+    alert('无法删除当前登录账号');
+    return;
+  }
+  if (!confirm(`确定要删除用户「${user.nickname}」(${user.username}) 吗？该操作不可恢复。`)) {
+    return;
+  }
+  try {
+    await apiClient.delete(`/admin/users/${user.id}`);
+    users.value = users.value.filter((u) => u.id !== user.id);
+  } catch (error) {
+    console.error('删除用户失败:', error);
+    alert(error.response?.data?.error || '删除用户失败，请稍后再试');
+  }
 }
 
 

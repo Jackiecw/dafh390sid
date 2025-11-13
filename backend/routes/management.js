@@ -155,6 +155,33 @@ router.put('/stores/:id', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/stores/:id
+router.delete('/stores/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.store.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: '店铺未找到' });
+    }
+
+    await prisma.$transaction([
+      prisma.storeProductListing.deleteMany({ where: { storeId: id } }),
+      prisma.salesData.deleteMany({ where: { storeId: id } }),
+      prisma.expense.updateMany({
+        where: { storeId: id },
+        data: { storeId: null },
+      }),
+      prisma.store.delete({ where: { id } }),
+    ]);
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('删除店铺失败:', error);
+    res.status(500).json({ error: '删除店铺失败' });
+  }
+});
+
 // --- (不变) 国家 (ManagedCountry) CRUD ---
 router.get('/countries', async (req, res) => {
   try {

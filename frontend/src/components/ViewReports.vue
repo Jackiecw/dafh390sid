@@ -24,6 +24,13 @@
               <button @click="openReportModal(report)" class="text-indigo-600 hover:text-indigo-900">
                 查看详情
               </button>
+              <button
+                v-if="isSuperAdmin"
+                @click="handleDeleteReport(report.id)"
+                class="ml-4 text-red-600 hover:text-red-900"
+              >
+                删除
+              </button>
             </td>
           </tr>
         </tbody>
@@ -43,14 +50,17 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import apiClient from '../api';
 import ReportDetailModal from './ReportDetailModal.vue'; // ⬅️ 【新增】
+import { useAuthStore } from '../stores/auth';
 
 // --- (API 和加载逻辑不变) ---
 const reports = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref('');
+const authStore = useAuthStore();
+const isSuperAdmin = computed(() => authStore.role === 'admin');
 
 async function fetchReports() {
   isLoading.value = true;
@@ -86,6 +96,21 @@ function closeReportModal() {
   isModalOpen.value = false;
   // (可选：关闭时清空，防止闪烁)
   // selectedReport.value = null; 
+}
+
+async function handleDeleteReport(reportId) {
+  if (!isSuperAdmin.value) return;
+  if (!confirm('确定要删除这份周报吗？该操作不可恢复。')) {
+    return;
+  }
+  errorMessage.value = '';
+  try {
+    await apiClient.delete(`/reports/${reportId}`);
+    reports.value = reports.value.filter((report) => report.id !== reportId);
+  } catch (error) {
+    console.error('删除周报失败:', error);
+    errorMessage.value = error.response?.data?.error || '删除周报失败，请稍后再试';
+  }
 }
 
 

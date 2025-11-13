@@ -1,7 +1,7 @@
 <template>
   <div class="flex min-h-screen bg-white">
     
-    <div class="hidden lg:block lg:w-1/2 relative">
+    <div class="hidden lg:block lg:w-3/5 relative">
       <img 
         src="../assets/login-bg.png" 
         alt="Login Background" 
@@ -10,7 +10,7 @@
       <div class="absolute inset-0 bg-indigo-900 opacity-30"></div>
     </div>
 
-    <div class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-stone-50">
+    <div class="w-full lg:w-2/5 flex items-center justify-center p-8 bg-stone-50">
       <div class="w-full max-w-md">
         
         <img 
@@ -76,7 +76,7 @@
           <p class="text-center text-sm text-stone-500 !mt-6">
             登录遇到问题? 
             <a href="mailto:wei@cheerlux.com" class="font-medium text-indigo-600 hover:text-indigo-500">
-              联系 IT 部门
+              联系管理员
             </a>
           </p>
         </form>

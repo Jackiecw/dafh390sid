@@ -28,7 +28,7 @@
               <DialogTitle as="h3" class="text-lg font-medium leading-6 text-gray-900">
                 {{ isEditMode ? '编辑日程' : '新建日程' }}
               </DialogTitle>
-              
+
               <div class="mt-4 space-y-4">
                 <div class="input-group">
                   <label for="title">标题 *</label>
@@ -46,37 +46,45 @@
                   </div>
                 </div>
 
-                <div class="flex items-center">
+                <div class="flex items-center gap-2">
                   <input type="checkbox" id="isAllDay" v-model="formData.isAllDay" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                  <label for="isAllDay" class="ml-2 block text-sm text-gray-900">全天</label>
+                  <label for="isAllDay" class="text-sm text-gray-900">全天</label>
+                </div>
+
+                <div class="input-group">
+                  <label for="label">标签 / 颜色</label>
+                  <select id="label" v-model="formData.color" class="form-input">
+                    <option v-for="label in labels" :key="label.value" :value="label.color">
+                      {{ label.name }}
+                    </option>
+                  </select>
                 </div>
 
                 <div v-if="authStore.role === 'admin'" class="input-group">
                   <label for="userId">指派给 *</label>
-                  <p v-if="isLoadingUsers" class="text-sm text-stone-500">正在加载用户列表...</p>
+                  <p v-if="isLoadingUsers" class="text-xs text-stone-500">正在加载用户列表...</p>
                   <select v-else id="userId" v-model="formData.userId" class="form-input">
                     <option v-for="user in userList" :key="user.id" :value="user.id">
                       {{ user.nickname }}
                     </option>
                   </select>
                 </div>
-                
+
                 <p v-if="errorMessage" class="text-red-600 text-sm">{{ errorMessage }}</p>
               </div>
 
               <div class="mt-6 flex justify-between">
-                <div>
-                  <button
-                    v-if="isEditMode"
-                    type="button"
-                    @click="handleDelete"
-                    :disabled="isDeleteDisabled"
-                    class="rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                  >
-                    删除
-                  </button>
-                </div>
-                <div class="flex space-x-4">
+                <button
+                  v-if="isEditMode"
+                  type="button"
+                  @click="handleDelete"
+                  :disabled="isDeleteDisabled"
+                  class="rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                >
+                  删除
+                </button>
+
+                <div class="flex space-x-4 ml-auto">
                   <button
                     type="button"
                     @click="closeModal"
@@ -115,9 +123,7 @@ import { useAuthStore } from '../stores/auth';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
-  // (TUI) eventToEdit 是 TUI 的事件对象 (包含 .raw)
   eventToEdit: { type: Object, default: null },
-  // (TUI) selectedDateRange 是 TUI 的选择对象 (包含 .start, .end)
   selectedDateRange: { type: Object, default: null },
 });
 
@@ -125,7 +131,6 @@ const emit = defineEmits(['close', 'save', 'delete']);
 
 const authStore = useAuthStore();
 const errorMessage = ref('');
-
 const userList = ref([]);
 const isLoadingUsers = ref(false);
 
@@ -135,104 +140,87 @@ const formData = ref({
   isAllDay: false,
   start: new Date(),
   end: new Date(),
-  userId: authStore.user.userId, // (Admin 可修改)
+  userId: authStore.user.userId,
   createdByAdmin: false,
+  color: '#4f46e5',
 });
 
 const isEditMode = computed(() => !!formData.value.id);
+const isDeleteDisabled = computed(() => authStore.role !== 'admin' && formData.value.createdByAdmin);
 
-// (权限) 检查是否允许删除
-const isDeleteDisabled = computed(() => {
-  if (authStore.role === 'admin') return false; // Admin 总能删除
-  return formData.value.createdByAdmin; // 用户不能删除 Admin 指派的
-});
+const labels = [
+  { value: 'default', name: '默认（蓝）', color: '#4f46e5' },
+  { value: 'important', name: '重要（玫红）', color: '#db2777' },
+  { value: 'meeting', name: '会议（青绿）', color: '#059669' },
+  { value: 'reminder', name: '提醒（琥珀）', color: '#d97706' },
+];
 
-// (核心) 监听模态框打开
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    errorMessage.value = '';
-    // (如果是 Admin，加载用户列表)
-    if (authStore.role === 'admin') {
-      fetchUsers();
-    }
+watch(() => props.isOpen, async (newVal) => {
+  if (!newVal) return;
+  errorMessage.value = '';
+  if (authStore.role === 'admin') {
+    await fetchUsers();
+  }
 
-    if (props.eventToEdit) {
-      // --- 编辑模式 ---
-      const event = props.eventToEdit;
-      formData.value = {
-        id: event.id,
-        title: event.title,
-        isAllDay: event.isAllday,
-        start: new Date(event.start),
-        end: new Date(event.end),
-        // (TUI) 原始数据在 .raw 中
-        userId: event.raw.authorId,
-        createdByAdmin: event.raw.createdByAdmin,
-      };
-    } else if (props.selectedDateRange) {
-      // --- 创建模式 ---
-      const selection = props.selectedDateRange;
-      formData.value = {
-        id: null,
-        title: '',
-        isAllDay: selection.isAllday,
-        start: new Date(selection.start),
-        end: new Date(selection.end),
-        userId: authStore.user.userId,
-        createdByAdmin: authStore.role === 'admin', // Admin 创建的默认为是“指派”
-      };
-    }
+  if (props.eventToEdit) {
+    const event = props.eventToEdit;
+    formData.value = {
+      id: event.id,
+      title: event.title,
+      isAllDay: event.isAllday,
+      start: new Date(event.start),
+      end: new Date(event.end),
+      userId: event.raw.authorId,
+      createdByAdmin: event.raw.createdByAdmin,
+      color: event.raw.color || '#4f46e5',
+    };
+  } else if (props.selectedDateRange) {
+    const range = props.selectedDateRange;
+    formData.value = {
+      id: null,
+      title: '',
+      isAllDay: range.isAllday,
+      start: new Date(range.start),
+      end: new Date(range.end),
+      userId: authStore.user.userId,
+      createdByAdmin: authStore.role === 'admin',
+      color: '#4f46e5',
+    };
   }
 });
 
-// (辅助) 获取用户列表
 async function fetchUsers() {
   isLoadingUsers.value = true;
   try {
-    const response = await apiClient.get('/admin/users');
-    userList.value = response.data;
+    const res = await apiClient.get('/admin/users');
+    userList.value = res.data || [];
   } catch (error) {
     console.error('获取用户列表失败:', error);
-    errorMessage.value = '无法加载用户列表。';
+    errorMessage.value = '无法加载用户列表';
   } finally {
     isLoadingUsers.value = false;
   }
 }
 
-// (辅助) 转换日期为 input[datetime-local] 需要的格式
 function toLocalISOString(date) {
-  const tzoffset = (new Date()).getTimezoneOffset() * 60000;
-  const localISOTime = (new Date(date - tzoffset)).toISOString().slice(0, 16);
-  return localISOTime;
+  const tzOffset = new Date().getTimezoneOffset() * 60000;
+  return new Date(date - tzOffset).toISOString().slice(0, 16);
 }
-// (辅助) 转换日期为 input[date] 需要的格式
+
 function toDateString(date) {
   return date.toISOString().split('T')[0];
 }
 
-// (计算属性) V-Model 绑定
 const formStart = computed({
-  get: () => {
-    return formData.value.isAllDay 
-      ? toDateString(formData.value.start)
-      : toLocalISOString(formData.value.start);
-  },
-  set: (val) => {
-    formData.value.start = new Date(val);
-  }
-});
-const formEnd = computed({
-  get: () => {
-    return formData.value.isAllDay 
-      ? toDateString(formData.value.end)
-      : toLocalISOString(formData.value.end);
-  },
-  set: (val) => {
-    formData.value.end = new Date(val);
-  }
+  get: () => formData.value.isAllDay ? toDateString(formData.value.start) : toLocalISOString(formData.value.start),
+  set: (val) => { formData.value.start = new Date(val); }
 });
 
-// --- 按钮操作 ---
+const formEnd = computed({
+  get: () => formData.value.isAllDay ? toDateString(formData.value.end) : toLocalISOString(formData.value.end),
+  set: (val) => { formData.value.end = new Date(val); }
+});
+
 function closeModal() {
   emit('close');
 }
@@ -242,8 +230,7 @@ function handleSave() {
     errorMessage.value = '标题不能为空';
     return;
   }
-  
-  // (将本地时间转换为 ISO 字符串)
+
   const payload = {
     id: formData.value.id,
     title: formData.value.title,
@@ -251,10 +238,9 @@ function handleSave() {
     endAt: formData.value.end.toISOString(),
     isAllDay: formData.value.isAllDay,
     userId: formData.value.userId,
-    // (TUI 的颜色)
-    color: formData.value.userId === authStore.user.userId ? '#4f46e5' : '#db2777', 
+    color: formData.value.color || '#4f46e5',
   };
-  
+
   emit('save', payload);
 }
 
@@ -262,21 +248,21 @@ function handleDelete() {
   if (!confirm('确定要删除这个日程吗？')) return;
   emit('delete', formData.value.id);
 }
-
 </script>
 
 <style scoped>
-/* (复用样式) */
 .input-group {
   display: flex;
   flex-direction: column;
 }
+
 .input-group label {
   margin-bottom: 0.5rem;
   color: #333;
   font-weight: bold;
-  font-size: 0.875rem; /* 14px */
+  font-size: 0.875rem;
 }
+
 .input-group input,
 .input-group select {
   padding: 0.75rem;
