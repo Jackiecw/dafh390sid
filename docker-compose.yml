@@ -1,38 +1,53 @@
-# docker-compose.yml
+# ./docker-compose.yml
 
-# 定义我们使用的 Docker Compose 文件版本
 version: '3.8'
 
-# 'services' 是我们要运行的所有“容器”的列表
 services:
-
-  # 这是我们的第一个服务：数据库
+  # 1. 数据库服务 (使用 .env 变量)
   db:
-    image: postgres:15-alpine     # 使用官方的 postgres 15 版本镜像
-    container_name: internal_db   # 给这个容器起个固定的名字
-    restart: always               # 关键：让它在电脑重启后自动运行
-
-    # 环境变量：设置数据库的用户名、密码和库名
+    image: postgres:15-alpine
+    container_name: internal_db
+    restart: always
     environment:
-      POSTGRES_USER: admin        # (您可以改成您想要的用户名)
-      POSTGRES_PASSWORD: admin  # (!!请改成一个您自己的强密码!!)
-      POSTGRES_DB: internal_app   # (您网站的数据库名称)
-
-    # 端口映射：
-    # 格式 "宿主机端口:容器端口"
-    # 意思是：把电脑(宿主机)的 5432 端口 映射到 容器的 5432 端口
-    # 这样，您电脑上的其他程序才能访问到这个数据库
-    ports:
-      - "5432:5432"
-
-    # 数据卷 (Volume)：
-    # 这是最关键的一步，用于“数据持久化”
-    # 把它理解为：把容器内的数据库文件，存放到您电脑的真实硬盘上
-    # 这样，就算容器被删除，您的“销售数据”和“周报”也永远不会丢失
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db-data:/var/lib/postgresql/data
+    # 数据库端口 5432 不需要对外部暴露，保持内部访问最安全
 
-# 这是“数据卷”的全局定义
+  # 2. 后端服务 (Node.js)
+  backend:
+    build: ./backend  # 告诉 Docker 去 ./backend 目录找 Dockerfile
+    container_name: internal_backend
+    restart: always
+    environment:
+      # (关键) 将 .env 变量注入后端容器
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+      JWT_SECRET: ${JWT_SECRET}
+      EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
+    ports:
+      # ⬇️ 关键修改
+      # 你的 3000 和 3001 都被占用了，我们使用 3002
+      # 将服务器的 3002 端口 映射到 容器内部的 3000 端口
+      - "3002:3000"
+    volumes:
+      # (关键) 持久化用户上传的文件
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - db # 确保在后端启动前，数据库已启动
+
+  # 3. 前端服务 (Vue + Nginx)
+  frontend:
+    build: ./frontend # 告诉 Docker 去 ./frontend 目录找 Dockerfile
+    container_name: internal_frontend
+    restart: always
+    ports:
+      # 你的网站将通过服务器的 5000 端口访问
+      - "5000:80" # 将服务器的 5000 端口 映射到 Nginx 容器的 80 端口
+    depends_on:
+      - backend # 确保在前端启动前，后端已启动
+
 volumes:
   db-data:
     driver: local
