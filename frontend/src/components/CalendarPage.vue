@@ -425,7 +425,7 @@ async function handleEventDelete(eventId) {
     await apiClient.delete(url);
     closeModal();
     fetchEvents();
-  } catch (error)
+  } catch (error) {
     console.error('删除日程失败:', error);
     apiError.value = `删除失败: ${error.response?.data?.error || error.message || '未知错误'}`;
   }
