@@ -233,7 +233,7 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
       }),
     ]);
 
-    const planNextWeek = personalPlan || '暂无计划内容，请在周报中填写“下周计划”';
+    const planNextWeek = personalPlan || '暂无计划内容，请在周报中填写“下周计划”。';
     const teamFocusContent = teamFocusRecord?.content || '';
     // ⬆️ --- 【修改】 ---
     let currency = 'CNY'; 
