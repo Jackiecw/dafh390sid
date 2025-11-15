@@ -113,7 +113,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -164,7 +164,7 @@ watch([adminFilterMode, selectedUserId], ([mode, userId]) => {
   fetchEvents();
 });
 
-const calendarOptions = computed(() => ({
+const calendarOptions = ref({
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
   locales: [zhCnLocale],
   locale: 'zh-cn',
@@ -190,7 +190,19 @@ const calendarOptions = computed(() => ({
   eventDrop: onEventMutate,
   eventResize: onEventMutate,
   datesSet: onDatesSet,
-}));
+});
+
+watch(events, (newEvents) => {
+  const cal = getCalendarApi();
+  if (cal) {
+    cal.batchRendering(() => {
+      cal.removeAllEventSources();
+      cal.addEventSource(newEvents);
+    });
+  } else {
+    calendarOptions.value.events = newEvents;
+  }
+}, { immediate: true });
 
 const resizeHandler = ref(null);
 
