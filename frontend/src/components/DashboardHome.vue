@@ -229,11 +229,16 @@ const countryFilterOptions = computed(() => {
 });
 
 const storeFilterOptions = computed(() => {
-  if (authStore.role === 'admin') return allStores.value;
-  const storeIds = authStore.storeIds || [];
-  return allStores.value.filter((store) => storeIds.includes(store.id));
+  if (!selectedCountryCode.value) {
+    return []; // 如果没有选国家，列表为空
+  }
+  
+  // 核心修复：根据 allStores 列表，筛选出 store.countryCode 
+  // 等于 selectedCountryCode.value (当前选中的国家按钮) 的店铺
+  return allStores.value.filter(
+    (store) => store.countryCode === selectedCountryCode.value
+  );
 });
-
 const selectedStoreName = computed(() => {
   const store = storeFilterOptions.value.find((s) => s.id === selectedStoreId.value);
   return store ? store.name : '选择店铺...';
@@ -302,9 +307,15 @@ async function fetchFilterOptions() {
     allCountries.value = response.data.countries;
     allStores.value = response.data.stores;
 
+    // 步骤 1: 设置国家
     if (countryFilterOptions.value.length > 0) {
       selectedCountryCode.value = countryFilterOptions.value[0].code;
     }
+    
+    // 步骤 2: (核心修复) 等待 Vue 响应，让 storeFilterOptions (已修复) 重新计算
+    await nextTick(); 
+
+    // 步骤 3: 现在 storeFilterOptions 已经更新了，可以安全地设置店铺
     if (storeFilterOptions.value.length > 0) {
       selectedStoreId.value = storeFilterOptions.value[0].id;
     }
