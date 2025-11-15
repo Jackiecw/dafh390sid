@@ -1,68 +1,78 @@
 <template>
-  <div class="space-y-6">
-    <div class="flex justify-between items-center">
-      <h2 class="text-3xl font-bold text-stone-900">常用链接</h2>
-      <button 
-        v-if="isAdmin"
-        @click="handleCreate"
-        class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition"
-      >
-        <PlusIcon class="h-5 w-5 inline-block -mt-1 mr-1" />
-        新建链接
-      </button>
-    </div>
+  <div class="space-y-8">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-6 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Quick Access</p>
+          <h2 class="text-3xl font-semibold">常用链接</h2>
+          <p class="text-sm text-white/80">收藏常用的后台、文档与协作工具，快速跳转。</p>
+        </div>
+        <button
+          v-if="isAdmin"
+          @click="handleCreate"
+          class="rounded-2xl bg-white/90 px-5 py-3 text-sm font-semibold text-[#3B82F6] shadow-lg shadow-blue-500/30 transition hover:bg-white"
+        >
+          <PlusIcon class="h-5 w-5 inline-block -mt-1 mr-1" />
+          新建链接
+        </button>
+      </div>
+    </section>
 
-    <p v-if="isLoading" class="text-stone-500">正在加载链接列表...</p>
-    <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
+    <p v-if="isLoading" class="text-sm text-[#6B7280]">正在加载链接列表...</p>
+    <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
 
-    <div v-if="!isLoading && links.length === 0 && !errorMessage" class="p-6 bg-white rounded-lg shadow text-center text-stone-500">
+    <div
+      v-if="!isLoading && links.length === 0 && !errorMessage"
+      class="rounded-3xl border border-[#E5E7EB] bg-white p-6 text-center text-[#6B7280]"
+    >
       <p>
         目前还没有常用链接。
-        <span v-if="isAdmin">点击右上角按钮添加一个。</span>
+        <span v-if="isAdmin">点击右上角按钮添加一个吧。</span>
       </p>
     </div>
 
-    <div v-if="!isLoading && links.length > 0" 
-         class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-      
-      <div v-for="link in links" :key="link.id" class="relative group">
-        
-        <a :href="link.url" target="_blank" rel="noopener noreferrer"
-           class="block bg-white p-4 rounded-lg shadow-lg hover:shadow-xl transition-shadow h-full flex flex-col justify-between min-h-[100px]">
-          
-          <p class="font-semibold text-lg text-indigo-700 group-hover:text-indigo-800 break-words">
+    <div
+      v-if="!isLoading && links.length > 0"
+      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6"
+    >
+      <div
+        v-for="link in links"
+        :key="link.id"
+        class="group relative rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+      >
+        <a :href="link.url" target="_blank" rel="noopener noreferrer" class="flex h-full flex-col justify-between">
+          <p class="text-lg font-semibold text-[#1F2937] break-words">
             {{ link.title }}
           </p>
-          
-          <p class="text-sm text-stone-500 mt-1 break-words">
+          <p class="mt-2 text-sm text-[#6B7280] break-words">
             {{ link.description || '点击跳转' }}
           </p>
         </a>
-        
-        <div v-if="isAdmin" 
-             class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col space-y-1">
-          <button @click="handleEdit(link)" title="编辑"
-                  class="bg-white p-1.5 rounded-full shadow hover:bg-stone-100 text-stone-600 hover:text-indigo-600">
+
+        <div
+          v-if="isAdmin"
+          class="absolute top-2 right-2 flex gap-1 opacity-0 transition group-hover:opacity-100"
+        >
+          <button
+            @click="handleEdit(link)"
+            title="编辑"
+            class="rounded-full bg-white p-1.5 text-[#64748B] shadow hover:text-[#3B82F6]"
+          >
             <PencilIcon class="h-4 w-4" />
           </button>
-          <button @click="handleDelete(link)" title="删除"
-                  class="bg-white p-1.5 rounded-full shadow hover:bg-stone-100 text-stone-600 hover:text-red-600">
+          <button
+            @click="handleDelete(link)"
+            title="删除"
+            class="rounded-full bg-white p-1.5 text-[#64748B] shadow hover:text-red-600"
+          >
             <TrashIcon class="h-4 w-4" />
           </button>
         </div>
       </div>
-
     </div>
   </div>
-  
-  <LinkModal
-    :is-open="isModalOpen"
-    :link-to-edit="currentLinkToEdit"
-    @close="closeModal"
-    @link-created="handleLinkChange"
-    @link-updated="handleLinkChange"
-  />
 </template>
+
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';

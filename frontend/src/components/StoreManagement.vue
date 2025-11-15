@@ -1,89 +1,79 @@
 <template>
-  <div class="space-y-6">
-    <div class="flex justify-between items-center">
-      <h2 class="text-3xl font-bold text-stone-900">店铺管理</h2>
-      <button 
-        @click="openModal" 
-        class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition"
-      >
-        + 新建店铺
-      </button>
-    </div>
+  <div class="space-y-8">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-6 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Store Network</p>
+          <h2 class="text-3xl font-semibold">店铺管理</h2>
+          <p class="text-sm text-white/80">维护各渠道店铺，快速分配商品与监控状态。</p>
+        </div>
+        <button
+          @click="openModal"
+          class="rounded-2xl bg-white/90 px-5 py-3 text-sm font-semibold text-[#3B82F6] shadow-lg shadow-blue-500/30 transition hover:bg-white"
+        >
+          + 新建店铺
+        </button>
+      </div>
+    </section>
 
-    <p v-if="isLoading" class="text-stone-500">正在加载店铺列表...</p>
-    <p v-if="errorMessage" class="text-red-600 mb-4">{{ errorMessage }}</p>
+    <p v-if="isLoading" class="text-sm text-[#6B7280]">正在加载店铺列表...</p>
+    <p v-if="errorMessage" class="text-sm text-red-600 mb-4">{{ errorMessage }}</p>
 
-    <div v-if="!isLoading && stores.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
-      <table class="min-w-full divide-y divide-stone-200">
-        <thead class="bg-stone-50">
+    <section v-if="!isLoading && stores.length > 0" class="rounded-3xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden">
+      <table class="min-w-full divide-y divide-[#E5E7EB]">
+        <thead class="bg-[#F9FAFB]">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">店铺名称</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">平台</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">国家 (Code)</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">状态</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">在售商品 (SKU)</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">注册日期</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">店铺名称</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">平台</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">国家 (Code)</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">状态</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">在售商品 (SKU)</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">注册日期</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">操作</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-stone-200">
-          <tr v-for="store in stores" :key="store.id">
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ store.name }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ store.platform }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
-              {{ store.country ? store.country.name : 'N/A' }} 
-              ({{ store.countryCode }})
+        <tbody class="bg-white divide-y divide-[#E5E7EB]">
+          <tr v-for="store in stores" :key="store.id" class="hover:bg-[#F9FAFB]">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[#1F2937]">{{ store.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-[#6B7280]">{{ store.platform }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-[#6B7280]">
+              {{ store.country ? store.country.name : 'N/A' }} ({{ store.countryCode }})
             </td>
-            
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
               <span :class="['px-2 py-1 rounded-full text-xs font-semibold', getStatusClass(store.status)]">
                 {{ store.status }}
               </span>
             </td>
-
-            <td class="px-6 py-4 text-sm text-stone-500" style="min-width: 200px;">
+            <td class="px-6 py-4 text-sm text-[#6B7280]">
               <div class="flex flex-wrap gap-1">
-                <span v-if="!store.products || store.products.length === 0" class="px-2 py-0.5 text-xs text-gray-400">
-                  未分配
-                </span>
-                <span v-else v-for="product in store.products" :key="product.sku"
-                      class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                <span v-if="!store.products || store.products.length === 0" class="px-2 py-0.5 text-xs text-[#94A3B8]">未分配</span>
+                <span v-else v-for="product in store.products" :key="product.sku" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#DBEAFE] text-[#1D4ED8]">
                   {{ product.sku }}
                 </span>
               </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDate(store.registeredAt) }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
-              <button @click="handleEdit(store)" class="text-indigo-600 hover:text-indigo-900">
-                编辑
-              </button>
-              <button @click="handleAssignProducts(store)" class="text-green-600 hover:text-green-900">
-                分配商品
-              </button>
-              <button
-                v-if="isAdmin"
-                @click="handleDelete(store)"
-                class="text-red-600 hover:text-red-900"
-              >
-                删除
-              </button>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-[#6B7280]">{{ formatDate(store.registeredAt) }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+              <button @click="handleEdit(store)" class="text-[#3B82F6] hover:text-[#2563EB]">编辑</button>
+              <button @click="handleAssignProducts(store)" class="text-[#10B981] hover:text-[#059669]">分配商品</button>
+              <button v-if="isAdmin" @click="handleDelete(store)" class="text-red-500 hover:text-red-700">删除</button>
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
+    </section>
 
-    <div v-if="!isLoading && stores.length === 0 && !errorMessage" class="p-6 bg-white rounded-lg shadow text-center text-stone-500">
-      <p>您还没有创建任何店铺。点击右上角按钮开始创建。</p>
+    <div v-if="!isLoading && stores.length === 0 && !errorMessage" class="rounded-3xl border border-[#E5E7EB] bg-white p-6 text-center text-[#6B7280]">
+      <p>您还没有创建任何店铺。点击右上角按钮开始创建吧。</p>
     </div>
   </div>
 
   <StoreFormModal
     :is-open="isModalOpen"
-    :store-to-edit-id="currentStoreToEditId" 
+    :store-to-edit-id="currentStoreToEditId"
     @close="closeModal"
     @store-created="handleStoreCreated"
-    @store-updated="handleStoreUpdated" 
+    @store-updated="handleStoreUpdated"
   />
 
   <StoreProductModal
@@ -92,6 +82,7 @@
     @close="closeStoreProductModal"
   />
 </template>
+
 
 <script setup>
 // ( <script setup> 部分保持不变 )

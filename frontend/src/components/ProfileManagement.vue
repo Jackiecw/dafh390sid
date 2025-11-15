@@ -1,9 +1,22 @@
 <template>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    
-    <div class="md:col-span-1 space-y-6">
-      <div class="bg-white p-6 rounded-lg shadow-lg">
-        <h3 class="text-xl font-bold text-stone-900 mb-6">个人资料</h3>
+  <div class="space-y-8">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-6 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Profile Center</p>
+          <h2 class="text-3xl font-semibold">个人中心</h2>
+          <p class="text-sm text-white/80">更新个人资料、上传头像并及时修改密码。</p>
+        </div>
+        <div class="rounded-2xl border border-white/30 bg-white/10 px-4 py-3 text-right backdrop-blur">
+          <p class="text-xs text-white/70">当前用户</p>
+          <p class="text-xl font-semibold">{{ authStore.nickname }}</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <section class="space-y-6 rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm md:col-span-1">
+        <h3 class="text-xl font-semibold text-[#1F2937]">个人资料</h3>
         
         <form @submit.prevent="handleProfileUpdate" class="space-y-4">
           
@@ -18,8 +31,8 @@
                      file:mr-4 file:py-2 file:px-4
                      file:rounded-full file:border-0
                      file:text-sm file:font-semibold
-                     file:bg-indigo-50 file:text-indigo-700
-                     hover:file:bg-indigo-100"
+                     file:bg-[#EEF2FF] file:text-[#1D4ED8]
+                     hover:file:bg-[#E0EAFF]"
             />
           </div>
 
@@ -35,12 +48,10 @@
           <p v-if="profileError" class="text-red-600 text-sm">{{ profileError }}</p>
           <p v-if="profileSuccess" class="text-green-600 text-sm">{{ profileSuccess }}</p>
         </form>
-      </div>
-    </div>
+      </section>
 
-    <div class="md:col-span-2 space-y-6">
-      <div class="bg-white p-6 rounded-lg shadow-lg">
-        <h3 class="text-xl font-bold text-stone-900 mb-6">修改密码</h3>
+      <section class="space-y-6 rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm md:col-span-2">
+        <h3 class="text-xl font-semibold text-[#1F2937]">修改密码</h3>
         
         <form @submit.prevent="handleChangePassword" class="space-y-4">
           <div class="space-y-2">
@@ -65,7 +76,7 @@
           <p v-if="passwordError" class="text-red-600 text-sm">{{ passwordError }}</p>
           <p v-if="passwordSuccess" class="text-green-600 text-sm">{{ passwordSuccess }}</p>
         </form>
-      </div>
+      </section>
     </div>
     
   </div>
@@ -196,43 +207,54 @@ async function handleChangePassword() {
 .form-label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #333;
-  font-weight: bold;
-  font-size: 0.875rem; /* 14px */
+  color: #1F2937;
+  font-weight: 600;
+  font-size: 0.875rem;
 }
 .form-input {
   display: block;
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.75rem;
+  font-size: 0.95rem;
+  color: #1F2937;
+  background-color: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.form-input:focus {
+  border-color: #3B82F6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 .form-submit-button {
   display: inline-flex;
   justify-content: center;
-  border-radius: 0.375rem; /* rounded-lg */
+  border-radius: 9999px;
   border: 1px solid transparent;
-  background-color: #4f46e5; /* bg-indigo-600 */
-  padding: 0.5rem 1.5rem;
-  font-size: 0.875rem; /* text-sm */
-  font-weight: 500; /* font-medium */
+  background-color: #3B82F6;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   color: white;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
-  transition: background-color 0.15s ease;
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.25);
+  transition: background-color 0.15s ease, transform 0.15s ease;
 }
 .form-submit-button:hover {
-  background-color: #4338ca; /* hover:bg-indigo-700 */
+  background-color: #2563EB;
+  transform: translateY(-1px);
 }
 .form-submit-button:disabled {
-  background-color: #a5b4fc; /* bg-indigo-300 */
+  background-color: #93C5FD;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .avatar-img {
-  width: 100px; /* 150px */
-  height: 100px; /* 150px */
-  border-radius: 9999px; /* rounded-full */
-  object-fit: cover; /* 确保图片不变形 */
-  border: 4px solid #e5e7eb; /* border-gray-200 */
+  width: 100px;
+  height: 100px;
+  border-radius: 9999px;
+  object-fit: cover;
+  border: 4px solid #E5E7EB;
 }
 </style>

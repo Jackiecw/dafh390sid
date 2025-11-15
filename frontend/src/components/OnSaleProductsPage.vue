@@ -1,160 +1,166 @@
 <template>
-  <div class="space-y-6">
-    <div class="flex justify-between items-center">
-      <h2 class="text-3xl font-bold text-stone-900">在售商品</h2>
-      <button 
-        @click="openCreateModal" 
-        class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition"
-      >
-        + 新建商品
-      </button>
-    </div>
+  <div class="space-y-8">
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#94A3B8]">Product Ops</p>
+          <h2 class="text-3xl font-semibold text-[#1F2937]">在售商品</h2>
+          <p class="text-sm text-[#6B7280]">集中管理全渠道 SKU，随时查看配置与价格。</p>
+        </div>
+        <div class="flex gap-3">
+          <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3 text-right">
+            <p class="text-xs text-[#94A3B8]">商品总数</p>
+            <p class="text-xl font-semibold text-[#1F2937]">{{ products.length }}</p>
+          </div>
+          <button
+            @click="openCreateModal"
+            class="rounded-2xl bg-[#3B82F6] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:bg-[#2563EB]"
+          >
+            + 新建商品
+          </button>
+        </div>
+      </div>
+    </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-      <div class="lg:col-span-1 space-y-4">
-        <p v-if="isLoading" class="text-stone-500">正在加载商品列表...</p>
-        <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
-
-        <div class="grid grid-cols-2 lg:grid-cols-1 gap-4 max-h-[80vh] overflow-y-auto pr-2">
-          <div 
-            v-for="product in products" 
+    <div class="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+      <aside class="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+        <div class="flex items-center justify-between pb-4">
+          <h3 class="text-lg font-semibold text-[#1F2937]">SKU 列表</h3>
+          <span class="text-xs text-[#94A3B8]">{{ selectedProduct ? '已选择' : '未选择' }}</span>
+        </div>
+        <p v-if="isLoading" class="text-sm text-[#6B7280]">正在加载商品列表...</p>
+        <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
+        <div class="grid grid-cols-2 gap-3 overflow-y-auto pr-1 lg:grid-cols-1 max-h-[70vh]">
+          <button
+            v-for="product in products"
             :key="product.id"
             @click="selectProduct(product)"
             :class="[
-              'p-4 bg-white rounded-lg shadow cursor-pointer transition-all',
-              selectedProduct?.id === product.id 
-                ? 'ring-2 ring-indigo-500' 
-                : 'hover:shadow-md hover:bg-stone-50'
+              'rounded-2xl border p-3 text-left transition hover:bg-[#F3F4F6]',
+              selectedProduct?.id === product.id
+                ? 'border-[#3B82F6] bg-[#EEF2FF] shadow-lg shadow-blue-500/20'
+                : 'border-[#E5E7EB] bg-white shadow-sm'
             ]"
           >
-            <div class="flex items-center space-x-4">
-              <img :src="getProductImageUrl(product.imageUrl)" alt="product" class="h-16 w-16 object-cover rounded shadow-sm">
+            <div class="flex items-center gap-3">
+              <img :src="getProductImageUrl(product.imageUrl)" alt="product" class="h-16 w-16 rounded-xl object-cover shadow" />
               <div>
-                <p class="font-bold text-stone-900">{{ product.sku }}</p>
-                <p class="text-sm text-stone-600">{{ product.name }}</p>
+                <p class="text-sm font-semibold text-[#1F2937]">{{ product.sku }}</p>
+                <p class="text-xs text-[#6B7280] line-clamp-1">{{ product.name }}</p>
               </div>
             </div>
-          </div>
+          </button>
         </div>
-      </div>
+      </aside>
 
-      <div class="lg:col-span-2">
-        <div class="bg-white p-6 rounded-lg shadow-lg min-h-[400px]">
-          
-          <div v-if="!selectedProduct" class="flex items-center justify-center h-full text-stone-500">
-            <p>← 请从左侧选择一个商品以查看详情</p>
+      <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm min-h-[420px]">
+        <div v-if="!selectedProduct" class="flex h-full items-center justify-center text-[#6B7280]">
+          <p>请从左侧选择一个商品以查看详情</p>
+        </div>
+        <div v-else class="space-y-6">
+          <div class="flex flex-col gap-4 border-b border-[#E5E7EB] pb-5 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-4">
+              <img :src="getProductImageUrl(selectedProduct.imageUrl)" alt="product" class="h-24 w-24 rounded-2xl object-cover shadow" />
+              <div>
+                <p class="text-xs uppercase tracking-[0.35em] text-[#94A3B8]">SKU</p>
+                <h3 class="text-2xl font-semibold text-[#1F2937]">{{ selectedProduct.sku }}</h3>
+                <p class="text-lg text-[#6B7280]">{{ selectedProduct.name }}</p>
+              </div>
+            </div>
+            <button
+              @click="openEditModal(selectedProduct)"
+              class="rounded-full border border-[#E5E7EB] px-4 py-2 text-sm font-semibold text-[#1F2937] transition hover:bg-[#F3F4F6]"
+            >
+              编辑商品
+            </button>
           </div>
 
-          <div v-else>
-            <div class="pb-5 border-b border-stone-200">
-              <div class="flex justify-between items-start">
-                <div class="flex items-center space-x-4">
-                  <img :src="getProductImageUrl(selectedProduct.imageUrl)" alt="product" class="h-24 w-24 object-cover rounded shadow-sm">
-                  <div>
-                    <h3 class="text-2xl font-bold text-stone-900">{{ selectedProduct.sku }}</h3>
-                    <p class="text-lg text-stone-600">{{ selectedProduct.name }}</p>
-                  </div>
-                </div>
-                <button 
-                  @click="openEditModal(selectedProduct)" 
-                  class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                >
-                  编辑商品
-                </button>
-              </div>
-              
-              <div class="mt-4 grid grid-cols-1 md:grid-cols-5 gap-4 text-sm">
-                <div>
-                  <label class="block text-stone-500">成本</label>
-                  <p class="font-semibold">{{ selectedProduct.cost ? `¥ ${selectedProduct.cost.toFixed(2)}` : 'N/A' }}</p>
-                </div>
-                <div>
-                  <label class="block text-stone-500">重量</label>
-                  <p class="font-semibold">{{ selectedProduct.weightKg ? `${selectedProduct.weightKg} kg` : 'N/A' }}</p>
-                </div>
-                <div>
-                  <label class="block text-stone-500">体积</label>
-                  <p class="font-semibold">{{ selectedProduct.volumeM3 ? `${selectedProduct.volumeM3} m³` : 'N/A' }}</p>
-                </div>
-                <div>
-                  <label class="block text-stone-500">尺寸</label>
-                  <p class="font-semibold">{{ selectedProduct.dimensionsMm ? `${selectedProduct.dimensionsMm} mm` : 'N/A' }}</p>
-                </div>
-                <div>
-                  <label class="block text-stone-500">分类</label>
-                  <p class="font-semibold">{{ selectedProduct.category }}</p>
-                </div>
-              </div>
-              </div>
+          <dl class="grid grid-cols-2 gap-4 text-sm lg:grid-cols-5">
+            <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3">
+              <dt class="text-xs text-[#94A3B8]">成本</dt>
+              <dd class="mt-1 font-semibold text-[#1F2937]">{{ selectedProduct.cost ? `¥ ${selectedProduct.cost.toFixed(2)}` : 'N/A' }}</dd>
+            </div>
+            <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3">
+              <dt class="text-xs text-[#94A3B8]">重量</dt>
+              <dd class="mt-1 font-semibold text-[#1F2937]">{{ selectedProduct.weightKg ? `${selectedProduct.weightKg} kg` : 'N/A' }}</dd>
+            </div>
+            <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3">
+              <dt class="text-xs text-[#94A3B8]">体积</dt>
+              <dd class="mt-1 font-semibold text-[#1F2937]">{{ selectedProduct.volumeM3 ? `${selectedProduct.volumeM3} m³` : 'N/A' }}</dd>
+            </div>
+            <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3">
+              <dt class="text-xs text-[#94A3B8]">尺寸</dt>
+              <dd class="mt-1 font-semibold text-[#1F2937]">{{ selectedProduct.dimensionsMm ? `${selectedProduct.dimensionsMm} mm` : 'N/A' }}</dd>
+            </div>
+            <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3">
+              <dt class="text-xs text-[#94A3B8]">分类</dt>
+              <dd class="mt-1 font-semibold text-[#1F2937]">{{ selectedProduct.category }}</dd>
+            </div>
+          </dl>
 
-            <div class="mt-6">
-              <h4 class="text-lg font-bold text-stone-900 mb-4">店铺售价 (价格同步)</h4>
-              <p v-if="filteredListings.length === 0" class="text-sm text-stone-500">
-                该商品未在您负责运营的国家 [{{ authStore.operatedCountries.join(', ') }}] 的店铺中上架。
-              </p>
-              
-              <div class="space-y-3 max-h-[50vh] overflow-y-auto pr-2">
-                <div 
-                  v-for="listing in filteredListings" 
-                  :key="listing.id"
-                  class="flex items-center justify-between p-3 bg-stone-50 rounded-lg"
-                >
+          <div>
+            <div class="flex items-center justify-between">
+              <h4 class="text-lg font-semibold text-[#1F2937]">店铺售价 (价格同步)</h4>
+              <span class="text-xs text-[#94A3B8]">仅显示有权限的店铺</span>
+            </div>
+            <p v-if="filteredListings.length === 0" class="mt-2 text-sm text-[#6B7280]">
+              该商品未在您负责运营的国家 [{{ authStore.operatedCountries.join(', ') }}] 的店铺中上架。
+            </p>
+
+            <div class="mt-4 space-y-3 overflow-y-auto pr-1 max-h-[50vh]">
+              <div
+                v-for="listing in filteredListings"
+                :key="listing.id"
+                class="rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4"
+              >
+                <div class="flex items-center justify-between">
                   <div>
-                    <span class="text-xs font-semibold text-stone-500">[{{ listing.store.country.code }}]</span>
-                    <span class="ml-2 font-medium text-stone-800">{{ listing.store.name }}</span>
+                    <span class="text-xs font-semibold text-[#94A3B8]">[{{ listing.store.country.code }}]</span>
+                    <span class="ml-2 text-sm font-medium text-[#1F2937]">{{ listing.store.name }}</span>
                   </div>
-                  
                   <div class="w-48">
-                    <div v-if="editingListingId !== listing.id" class="flex items-center justify-end">
-                      <span class="text-lg font-bold text-stone-800 mr-4">
+                    <div v-if="editingListingId !== listing.id" class="flex items-center justify-end gap-3">
+                      <span class="text-lg font-bold text-[#1F2937]">
                         {{ listing.currentPrice.toFixed(2) }}
                       </span>
-                      <button 
+                      <button
                         v-if="canManagePrice(listing.store.countryCode)"
                         @click="startEditPrice(listing)"
-                        class="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                        class="text-sm font-semibold text-[#3B82F6] hover:text-[#2563EB]"
                       >
                         编辑
                       </button>
-                      <span v-else class="text-xs text-gray-400">无权限</span>
+                      <span v-else class="text-xs text-[#94A3B8]">无权限</span>
                     </div>
-                    
-                    <div v-else class="flex items-center space-x-2">
-                      <input 
-                        type="number" 
-                        step="0.01" 
-                        v-model="editPrice" 
+
+                    <div v-else class="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        v-model="editPrice"
                         class="form-input w-full"
                         ref="editPriceInput"
                       />
-                      <button @click="savePrice(listing.id)" :disabled="isSavingPrice" class="text-green-600 hover:text-green-900 text-sm font-medium">
+                      <button @click="savePrice(listing.id)" :disabled="isSavingPrice" class="text-sm font-semibold text-[#10B981]">
                         保存
                       </button>
-                      <button @click="cancelEditPrice" class="text-red-600 hover:text-red-900 text-sm font-medium">
+                      <button @click="cancelEditPrice" class="text-sm font-semibold text-red-500">
                         取消
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
-              <p v-if="priceSyncError" class="text-red-600 text-sm mt-2">{{ priceSyncError }}</p>
             </div>
-            
+
+            <p v-if="priceSyncError" class="mt-2 text-sm text-red-600">{{ priceSyncError }}</p>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   </div>
-  
-  <ProductFormModal
-    :is-open="isModalOpen"
-    :product-to-edit-id="productToEditId" 
-    @close="closeModal"
-    @product-created="handleProductChange"
-    @product-updated="handleProductChange" 
-  />
 </template>
+
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';

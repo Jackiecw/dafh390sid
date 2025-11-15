@@ -21,7 +21,7 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ report.author.nickname }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ formatDateTime(report.createdAt) }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-              <button @click="openReportModal(report)" class="text-indigo-600 hover:text-indigo-900">
+              <button @click="openReportModal(report)" class="text-[#3B82F6] hover:text-[#1D4ED8]">
                 查看详情
               </button>
               <button

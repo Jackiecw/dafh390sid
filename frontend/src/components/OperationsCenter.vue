@@ -1,65 +1,75 @@
 <template>
-  <div class="space-y-6">
-    <h2 class="text-3xl font-bold text-stone-900">运营中心</h2>
+  <div class="space-y-8">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-6 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Ops Control</p>
+          <h2 class="text-3xl font-semibold">运营中心</h2>
+          <p class="text-sm text-white/80">按国家维度查看责任人矩阵和执行 SOP。</p>
+        </div>
+        <div class="rounded-2xl border border-white/30 bg-white/10 px-4 py-3 text-right backdrop-blur">
+          <p class="text-xs text-white/70">可见国家</p>
+          <p class="text-xl font-semibold">{{ countries.length }}</p>
+        </div>
+      </div>
+    </section>
 
-    <div class="border-b border-stone-300">
-      <nav class="flex space-x-4">
-        <p v-if="isLoadingCountries" class="py-2 px-4 text-sm font-medium text-stone-500">
-          正在加载国家...
-        </p>
-        <button 
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <div class="flex flex-wrap items-center gap-2">
+        <p v-if="isLoadingCountries" class="px-4 py-2 text-sm text-[#6B7280]">正在加载国家...</p>
+        <button
           v-for="country in countries"
           :key="country.code"
           @click="currentCountryCode = country.code"
           :class="[
-            'py-2 px-4 text-sm font-medium',
+            'rounded-full px-4 py-2 text-sm font-semibold transition',
             currentCountryCode === country.code
-              ? 'border-b-2 border-indigo-600 text-indigo-600' 
-              : 'text-stone-500 hover:text-stone-700'
+              ? 'bg-[#3B82F6] text-white shadow'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
           ]"
         >
           {{ country.name }}
         </button>
-        </nav>
-    </div>
+      </div>
+    </section>
 
-    <div class="border-b border-stone-200">
-      <nav class="flex space-x-4">
-        <button 
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <nav class="flex gap-3">
+        <button
           @click="currentSubTab = 'matrix'"
           :class="[
-            'py-2 px-1 text-sm font-medium',
+            'rounded-full px-4 py-2 text-sm font-semibold',
             currentSubTab === 'matrix'
-              ? 'border-b-2 border-indigo-600 text-indigo-600' 
-              : 'text-stone-500 hover:text-stone-700'
+              ? 'bg-[#3B82F6] text-white shadow'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
           ]"
         >
           责任人矩阵
         </button>
-        <button 
+        <button
           @click="currentSubTab = 'sop'"
           disabled
-          class="py-2 px-1 text-sm font-medium text-stone-400 cursor-not-allowed"
+          class="rounded-full px-4 py-2 text-sm font-semibold text-[#94A3B8] bg-[#F9FAFB] cursor-not-allowed"
         >
           SOP 文档 (未来)
         </button>
       </nav>
-    </div>
+    </section>
 
-    <div>
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
       <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
 
       <div v-if="currentSubTab === 'matrix' && currentCountryCode">
         <ResponsibilityTable :country-code="currentCountryCode" />
       </div>
 
-      <div v-if="currentSubTab === 'sop'" class="p-6 bg-white rounded-lg shadow text-center text-stone-500">
-        <p>SOP 文档功能正在规划中...</p>
+      <div v-if="currentSubTab === 'sop'" class="rounded-2xl bg-[#F9FAFB] p-6 text-center text-sm text-[#6B7280]">
+        <p>SOP 文档功能正在规划中，敬请期待。</p>
       </div>
-    </div>
-
+    </section>
   </div>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue';

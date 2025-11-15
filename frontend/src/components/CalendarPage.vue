@@ -1,59 +1,78 @@
 <template>
-  <div class="flex flex-col h-full">
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
-      <div class="flex items-center space-x-4">
-        <h2 class="text-3xl font-bold text-stone-900">工作日历</h2>
-        <div class="flex items-center space-x-2">
-          <button @click="onClickNav('prev')" class="p-2 rounded-lg hover:bg-stone-200 transition">
-            <ChevronLeftIcon class="h-5 w-5 text-stone-600" />
-          </button>
-          <button @click="onClickNav('next')" class="p-2 rounded-lg hover:bg-stone-200 transition">
-            <ChevronRightIcon class="h-5 w-5 text-stone-600" />
-          </button>
-          <button @click="onClickNav('today')" class="text-sm font-medium text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition">
-            今日
-          </button>
-        </div>
-        <h3 class="text-xl font-semibold text-stone-700">{{ currentMonthDisplay }}</h3>
-      </div>
-
-      <div class="flex items-center gap-2 w-full md:w-auto">
-      <div class="inline-flex rounded-md shadow-sm" role="group">
-          <button :class="['px-3 py-1.5 text-sm border', currentView === 'month' ? 'bg-indigo-600 text-white' : 'bg-white']" @click="setView('month')">月</button>
-          <button :class="['px-3 py-1.5 text-sm border -ml-px', currentView === 'week' ? 'bg-indigo-600 text-white' : 'bg-white']" @click="setView('week')">周</button>
-          <button :class="['px-3 py-1.5 text-sm border -ml-px', currentView === 'day' ? 'bg-indigo-600 text-white' : 'bg-white']" @click="setView('day')">日</button>
-        </div>
-
-        <div v-if="isAdmin" class="flex items-center gap-2">
-          <select v-model="adminFilterMode" class="border rounded px-2 py-1 text-sm">
-            <option value="ME">仅自己</option>
-            <option value="ALL_ASSIGNED">全部指派</option>
-            <option value="USER">指定成员</option>
-          </select>
-          <select v-if="adminFilterMode === 'USER'" v-model="selectedUserId" class="border rounded px-2 py-1 text-sm min-w-40">
-            <option value="" disabled>选择成员</option>
-            <option v-for="u in userList" :key="u.id" :value="u.id">{{ u.nickname }}</option>
-          </select>
-        </div>
-
-        <button @click="handleNewEventClick" class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow hover:bg-indigo-700 transition w-full md:w-auto">
-          <PlusIcon class="h-5 w-5 inline-block -mt-1 mr-1" />
-          新建日程
-        </button>
-      </div>
-    </div>
-
-    <div class="bg-white p-4 rounded-lg shadow mb-4">
-      <div class="flex items-center justify-between mb-4">
+  <div class="space-y-6">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-6 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h4 class="text-base font-semibold text-stone-700">本周聚焦</h4>
-          <p class="text-xs text-stone-500">左侧为管理员同步的团队重点，右侧为你在上周周报中填写的“下周计划”</p>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">Operation Rhythm</p>
+          <h2 class="mt-2 text-3xl font-semibold">工作日历</h2>
+          <p class="text-sm text-white/80">集中安排会议、项目节点与团队计划。</p>
+          <p class="mt-4 text-lg font-semibold text-white">{{ currentMonthDisplay }}</p>
+        </div>
+        <div class="flex w-full flex-col gap-3 lg:w-auto">
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <button @click="onClickNav('prev')" class="rounded-full border border-white/20 bg-white/10 p-2 transition hover:bg-white/20">
+              <ChevronLeftIcon class="h-5 w-5 text-white" />
+            </button>
+            <button @click="onClickNav('next')" class="rounded-full border border-white/20 bg-white/10 p-2 transition hover:bg-white/20">
+              <ChevronRightIcon class="h-5 w-5 text-white" />
+            </button>
+            <button @click="onClickNav('today')" class="rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#3B82F6] shadow-sm hover:bg-[#E0F2FE]">
+              回到今日
+            </button>
+          </div>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+            <div class="inline-flex rounded-full border border-white/30 bg-white/10 p-1 text-sm font-semibold">
+              <button
+                v-for="view in ['month', 'week', 'day']"
+                :key="view"
+                @click="setView(view)"
+                :class="[
+                  'px-3 py-1 rounded-full transition',
+                  currentView === view ? 'bg-white text-[#3B82F6]' : 'text-white/80'
+                ]"
+              >
+                {{ view === 'month' ? '月' : view === 'week' ? '周' : '日' }}
+              </button>
+            </div>
+            <div v-if="isAdmin" class="flex flex-1 items-center gap-2">
+              <select v-model="adminFilterMode" class="flex-1 rounded-2xl border border-white/40 bg-white/90 px-3 py-2 text-sm text-[#1F2937] placeholder:text-[#6B7280] focus:border-white focus:outline-none appearance-none">
+                <option value="ME">仅自己</option>
+                <option value="ALL_ASSIGNED">全部指派</option>
+                <option value="USER">指定成员</option>
+              </select>
+              <select
+                v-if="adminFilterMode === 'USER'"
+                v-model="selectedUserId"
+                class="flex-1 rounded-2xl border border-white/40 bg-white/90 px-3 py-2 text-sm text-[#1F2937] placeholder:text-[#6B7280] focus:border-white focus:outline-none appearance-none"
+              >
+                <option value="" disabled>选择成员</option>
+                <option v-for="u in userList" :key="u.id" :value="u.id">{{ u.nickname }}</option>
+              </select>
+            </div>
+            <button
+              @click="handleNewEventClick"
+              class="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2 text-sm font-semibold text-[#3B82F6] shadow-lg shadow-blue-500/30 transition hover:bg-[#E0F2FE]"
+            >
+              <PlusIcon class="mr-1 h-5 w-5" />
+              新建日程
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#94A3B8]">Weekly Focus</p>
+          <h4 class="text-xl font-semibold text-[#1F2937]">本周聚焦</h4>
+          <p class="text-xs text-[#6B7280]">左侧为管理员同步的团队重点，右侧展示你在周报中填写的“下周计划”。</p>
         </div>
         <div class="flex items-center gap-2">
-          <p v-if="!isAdmin" class="text-xs text-stone-400">由管理员统一管理</p>
+          <p v-if="!isAdmin" class="text-xs text-[#94A3B8]">由管理员统一管理</p>
           <button
             v-if="isAdmin"
-            class="text-sm px-3 py-1 rounded border border-stone-300 hover:bg-stone-50 disabled:opacity-60"
+            class="rounded-full border border-[#E5E7EB] px-4 py-1.5 text-sm font-medium text-[#1F2937] transition hover:bg-[#F3F4F6] disabled:opacity-60"
             :disabled="isSavingFocus"
             @click="saveWeeklyFocus"
           >
@@ -62,43 +81,43 @@
         </div>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-2">
-        <div>
-          <label class="text-sm font-medium text-stone-600 flex items-center justify-between mb-2">
+      <div class="mt-4 grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+          <label class="flex items-center justify-between text-sm font-semibold text-[#1F2937]">
             <span>团队重点</span>
-            <span v-if="!weeklyFocusEntry" class="text-xs text-stone-400">尚未发布</span>
+            <span v-if="!weeklyFocusEntry" class="text-xs text-[#94A3B8]">尚未发布</span>
           </label>
           <textarea
             v-model="teamFocusContent"
             rows="4"
-            class="w-full border rounded p-2 text-sm"
+            class="w-full rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-3 text-sm text-[#374151] shadow-inner"
             :readonly="!isAdmin"
-            :class="{'bg-stone-50 text-stone-500 cursor-not-allowed': !isAdmin}"
+            :class="{'bg-[#F3F4F6] text-[#94A3B8] cursor-not-allowed': !isAdmin}"
             placeholder="记录本周团队最重要的聚焦事项..."
           ></textarea>
-          <p class="text-xs text-red-500 mt-1" v-if="weeklyFocusError">{{ weeklyFocusError }}</p>
+          <p class="text-xs text-red-500" v-if="weeklyFocusError">{{ weeklyFocusError }}</p>
         </div>
 
-        <div>
-          <label class="text-sm font-medium text-stone-600 mb-2 block">我的周报计划</label>
-          <div class="w-full border rounded p-3 text-sm text-stone-700 min-h-[120px] bg-stone-50 whitespace-pre-wrap">
+        <div class="space-y-2">
+          <label class="text-sm font-semibold text-[#1F2937]">我的周报计划</label>
+          <div class="min-h-[140px] rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-3 text-sm text-[#374151] shadow-inner whitespace-pre-wrap">
             {{ userPlanPreview || '暂无内容，请在上周周报中填写“下周计划”。' }}
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="bg-white p-6 rounded-lg shadow-lg flex-1 min-h-0 calendar-shell">
+    <section class="calendar-shell rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm flex-1 min-h-0">
       <FullCalendar
         ref="calendarRef"
         class="h-full"
         :options="calendarOptions"
       />
-    </div>
+    </section>
 
-    <div class="mt-4">
-      <p v-if="isLoadingEvents" class="text-stone-500 text-sm">正在拉取日程...</p>
-      <p v-if="apiError" class="text-red-600 text-sm">{{ apiError }}</p>
+    <div class="text-sm">
+      <p v-if="isLoadingEvents" class="text-[#6B7280]">正在拉取日程...</p>
+      <p v-if="apiError" class="text-red-600">{{ apiError }}</p>
     </div>
   </div>
 
@@ -106,9 +125,9 @@
     :is-open="isModalOpen"
     :event-to-edit="selectedEvent"
     :selected-date-range="selectedDateRange"
-    @close="closeModal"
     @save="handleEventSave"
     @delete="handleEventDelete"
+    @close="closeModal"
   />
 </template>
 

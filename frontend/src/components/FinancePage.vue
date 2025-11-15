@@ -1,62 +1,77 @@
 <template>
-  <div class="space-y-6">
-    <h2 class="text-3xl font-bold text-stone-900">财务管理</h2>
+  <div class="space-y-8">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-6 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Finance Control</p>
+          <h2 class="text-3xl font-semibold">财务管理</h2>
+          <p class="text-sm text-white/80">统一录入与查询支出，支持批量导出与下载。</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="rounded-2xl border border-white/30 bg-white/10 px-4 py-3 backdrop-blur">
+            <p class="text-white/70">可录入</p>
+            <p class="text-xl font-semibold">{{ canEntry ? '是' : '否' }}</p>
+          </div>
+          <div class="rounded-2xl border border-white/30 bg-white/10 px-4 py-3 backdrop-blur">
+            <p class="text-white/70">可导出</p>
+            <p class="text-xl font-semibold">{{ isAdmin || canExport ? '是' : '否' }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <div class="border-b border-stone-300">
-      <nav class="flex space-x-4">
-        
-        <button 
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
+      <nav class="flex flex-wrap gap-3">
+        <button
           v-if="canEntry"
           @click="currentTab = 'entry'"
           :class="[
-            'py-2 px-4 text-sm font-medium',
-            currentTab === 'entry' 
-              ? 'border-b-2 border-indigo-600 text-indigo-600' 
-              : 'text-stone-500 hover:text-stone-700'
+            'rounded-full px-5 py-2 text-sm font-semibold transition',
+            currentTab === 'entry'
+              ? 'bg-[#3B82F6] text-white shadow'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
           ]"
         >
           支出录入
         </button>
-
-        <button 
+        <button
           v-if="canView"
           @click="currentTab = 'management'"
           :class="[
-            'py-2 px-4 text-sm font-medium',
-            currentTab === 'management' 
-              ? 'border-b-2 border-indigo-600 text-indigo-600' 
-              : 'text-stone-500 hover:text-stone-700'
+            'rounded-full px-5 py-2 text-sm font-semibold transition',
+            currentTab === 'management'
+              ? 'bg-[#3B82F6] text-white shadow'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
           ]"
         >
           支出查询
         </button>
-
-        <button 
+        <button
           v-if="isAdmin || canExport"
           @click="currentTab = 'batch'"
           :class="[
-            'py-2 px-4 text-sm font-medium',
-            currentTab === 'batch' 
-              ? 'border-b-2 border-indigo-600 text-indigo-600' 
-              : 'text-stone-500 hover:text-stone-700'
+            'rounded-full px-5 py-2 text-sm font-semibold transition',
+            currentTab === 'batch'
+              ? 'bg-[#3B82F6] text-white shadow'
+              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
           ]"
         >
           批量操作
         </button>
-        </nav>
-    </div>
+      </nav>
+    </section>
 
-    <div>
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
       <div v-if="currentTab === 'entry'">
         <FinanceForm />
       </div>
-      <div v-if="currentTab === 'management'">
+      <div v-else-if="currentTab === 'management'">
         <FinanceManagement />
       </div>
-      <div v-if="currentTab === 'batch' && (isAdmin || canExport)">
+      <div v-else-if="currentTab === 'batch' && (isAdmin || canExport)">
         <FinanceBatchOps />
       </div>
-      </div>
+    </section>
   </div>
 </template>
 

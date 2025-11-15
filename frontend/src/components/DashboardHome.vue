@@ -1,152 +1,169 @@
 <template>
-  <div>
-    <div class="mb-6">
-      <h2 class="text-3xl font-bold text-stone-900">
-        {{ greeting }}，{{ authStore.nickname }}！
-      </h2>
-      <p class="text-stone-500">{{ todayDate }}</p>
-      <p class="text-sm text-indigo-600 mt-2 h-5">{{ hitokoto }}</p>
-    </div>
+  <div class="space-y-8">
+    <section class="rounded-3xl bg-gradient-to-r from-[#3B82F6] to-[#60A5FA] p-8 text-white shadow-xl shadow-blue-900/20">
+      <div class="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Daily Brief</p>
+          <h2 class="mt-2 text-3xl font-semibold">
+            {{ greeting }}，{{ authStore.nickname }}。
+          </h2>
+          <p class="text-white/80">{{ todayDate }}</p>
+          <p class="mt-4 text-sm text-white/70 line-clamp-2">
+            {{ hitokoto || '今天也要加油。' }}
+          </p>
+        </div>
+        <div class="grid w-full gap-4 text-sm sm:grid-cols-2 lg:w-auto">
+          <div
+            v-for="metric in highlightMetrics"
+            :key="metric.label"
+            class="rounded-2xl border border-white/30 bg-white/10 p-4 backdrop-blur"
+          >
+            <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">{{ metric.label }}</p>
+            <p class="mt-3 text-2xl font-semibold text-white">{{ metric.value }}</p>
+            <p class="text-sm text-white/80">{{ metric.sub }}</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <div class="lg:col-span-2 space-y-6">
-        
-        <div class="bg-white p-6 rounded-lg shadow-lg">
-          <div class="flex flex-col md:flex-row md:items-center justify-between mb-4">
-            <h3 class="text-xl font-bold text-stone-900 mb-2 md:mb-0">销售数据 (GMV)</h3>
-            
-            <div class="flex items-center space-x-2">
-              <div class="flex items-center p-1 bg-stone-100 rounded-lg">
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div class="space-y-6">
+        <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
+          <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-[#6B7280]">GMV Overview</p>
+              <h3 class="mt-1 text-2xl font-semibold text-[#1F2937]">销售数据 (GMV)</h3>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex items-center rounded-full border border-[#E5E7EB] bg-[#F3F4F6] p-1">
                 <button
                   v-for="country in countryFilterOptions"
                   :key="country.code"
                   @click="selectCountry(country.code)"
                   :class="[
-                    'px-3 py-1 text-sm font-medium rounded-md transition-all',
+                    'px-3 py-1 text-sm font-semibold rounded-full transition-all',
                     selectedCountryCode === country.code
-                      ? 'bg-white text-indigo-600 shadow'
-                      : 'text-stone-500 hover:text-stone-700'
+                      ? 'bg-white text-[#3B82F6] shadow'
+                      : 'text-[#6B7280] hover:text-[#1F2937]'
                   ]"
                 >
                   {{ country.code }}
                 </button>
               </div>
-              
+
               <Listbox v-model="selectedStoreId" as="div" class="relative w-48">
-                <ListboxButton class="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 border border-stone-200">
+                <ListboxButton class="relative w-full cursor-default rounded-2xl border border-[#E5E7EB] bg-white py-2 pl-3 pr-10 text-left text-sm text-[#1F2937] shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6]">
                   <span class="block truncate">{{ selectedStoreName }}</span>
                   <span class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                    <ChevronUpDownIcon class="h-5 w-5 text-gray-400" aria-hidden="true" />
+                    <ChevronUpDownIcon class="h-5 w-5 text-[#94A3B8]" aria-hidden="true" />
                   </span>
                 </ListboxButton>
                 <transition leave-active-class="transition ease-in duration-100" leave-from-class="opacity-100" leave-to-class="opacity-0">
-                  <ListboxOptions class="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm z-10">
+                  <ListboxOptions class="absolute mt-1 max-h-60 w-full overflow-auto rounded-2xl border border-[#E5E7EB] bg-white py-1 text-base shadow-lg ring-1 ring-black/5 focus:outline-none sm:text-sm z-10">
                     <ListboxOption
                       v-for="store in storeFilterOptions"
                       :key="store.id"
                       :value="store.id"
                       v-slot="{ active, selected }"
                     >
-                      <li :class="[active ? 'bg-indigo-100 text-indigo-900' : 'text-gray-900', 'relative cursor-default select-none py-2 px-4']">
+                      <li :class="[active ? 'bg-[#DBEAFE] text-[#1D4ED8]' : 'text-[#1F2937]', 'relative cursor-default select-none py-2 px-4']">
                         <span :class="[selected ? 'font-medium' : 'font-normal', 'block truncate']">{{ store.name }}</span>
                       </li>
                     </ListboxOption>
                   </ListboxOptions>
                 </transition>
               </Listbox>
-
             </div>
           </div>
-          
-          <div v-if="isLoading.summary" class="text-center text-stone-500 py-10">
+
+          <div v-if="isLoading.summary" class="py-10 text-center text-[#6B7280]">
             加载 GMV 数据中...
           </div>
-          <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-stone-50 p-4 rounded-lg">
-              <label class="text-sm font-medium text-stone-500">今日 GMV</label>
-              <p class="text-2xl font-bold text-stone-900">
+          <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div class="rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+              <label class="text-sm font-medium text-[#6B7280]">今日 GMV</label>
+              <p class="mt-2 text-2xl font-bold text-[#1F2937]">
                 {{ formatCurrency(summaryData.gmv.today, summaryData.gmv.currency) }}
               </p>
-              <p class="text-sm text-gray-400">
-                ≈ ¥ {{ formatCurrency(summaryData.gmv.cnyEquivalent.today, 'CNY') }}
+              <p class="text-sm text-[#6B7280]">
+                ≈¥ {{ formatCurrency(summaryData.gmv.cnyEquivalent.today, 'CNY') }}
               </p>
             </div>
-            <div class="bg-stone-50 p-4 rounded-lg">
-              <label class="text-sm font-medium text-stone-500">本周 GMV</label>
-              <p class="text-2xl font-bold text-stone-900">
+            <div class="rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+              <label class="text-sm font-medium text-[#6B7280]">本周 GMV</label>
+              <p class="mt-2 text-2xl font-bold text-[#1F2937]">
                 {{ formatCurrency(summaryData.gmv.thisWeek, summaryData.gmv.currency) }}
               </p>
-              <p class="text-sm text-gray-400">
-                ≈ ¥ {{ formatCurrency(summaryData.gmv.cnyEquivalent.thisWeek, 'CNY') }}
+              <p class="text-sm text-[#6B7280]">
+                ≈¥ {{ formatCurrency(summaryData.gmv.cnyEquivalent.thisWeek, 'CNY') }}
               </p>
             </div>
-            <div class="bg-stone-50 p-4 rounded-lg">
-              <label class="text-sm font-medium text-stone-500">本月 GMV</label>
-              <p class="text-2xl font-bold text-stone-900">
+            <div class="rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
+              <label class="text-sm font-medium text-[#6B7280]">本月 GMV</label>
+              <p class="mt-2 text-2xl font-bold text-[#1F2937]">
                 {{ formatCurrency(summaryData.gmv.thisMonth, summaryData.gmv.currency) }}
               </p>
-              <p class="text-sm text-gray-400">
-                ≈ ¥ {{ formatCurrency(summaryData.gmv.cnyEquivalent.thisMonth, 'CNY') }}
+              <p class="text-sm text-[#6B7280]">
+                ≈¥ {{ formatCurrency(summaryData.gmv.cnyEquivalent.thisMonth, 'CNY') }}
               </p>
             </div>
           </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          <DashboardTodo class="md:col-span-1" />
-          
-          <div class="md:col-span-1 bg-white p-6 rounded-lg shadow-lg">
-            <button @click="isScheduleOpen = true" class="dashboard-widget-title text-left w-full hover:text-indigo-600">
-              日程 ↗
-            </button>
-            <div class="mt-2 space-y-1">
-              <p class="text-sm font-medium text-stone-600">本周重点:</p>
-              <p class="text-sm text-stone-500 line-clamp-4">
-                {{ summaryData.schedule.planNextWeek || '暂无' }}
-              </p>
-            </div>
-          </div>
-          
-          <DashboardRecurringTask class="md:col-span-1" />
+        </section>
 
-        </div>
-        </div>
-      
-      <div class="lg:col-span-1 space-y-6">
-        <div class="bg-white p-6 rounded-lg shadow-lg">
-          <h4 class="font-bold text-stone-900 mb-4">今日汇率 (CNY)</h4>
-          <div v-if="isLoading.rates" class="text-stone-500">
+        <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <DashboardTodo class="lg:col-span-1" />
+
+          <article class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
+            <button @click="isScheduleOpen = true" class="text-left text-lg font-semibold text-[#1F2937] transition hover:text-[#3B82F6]">
+              日程总览
+            </button>
+            <p class="mt-3 text-sm font-medium text-[#1F2937]">本周重点</p>
+            <p class="mt-1 text-sm text-[#6B7280] line-clamp-5">
+              {{ summaryData.schedule.planNextWeek || '暂无计划，建议在周报中补充。' }}
+            </p>
+          </article>
+
+          <DashboardRecurringTask class="lg:col-span-1" />
+        </section>
+      </div>
+
+      <div class="space-y-6">
+        <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
+          <h4 class="mb-4 text-lg font-semibold text-[#1F2937]">今日汇率 (CNY)</h4>
+          <div v-if="isLoading.rates" class="text-[#6B7280]">
             加载汇率中...
           </div>
-          <div v-else class="space-y-3">
-            <div class="flex justify-between items-center">
-              <span class="font-medium text-stone-600">1 CNY =</span>
-              <span class="text-lg font-bold text-green-600">
+          <div v-else class="space-y-4">
+            <div class="flex items-center justify-between rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2">
+              <span class="text-sm font-medium text-[#1F2937]">1 CNY =</span>
+              <span class="text-lg font-semibold text-[#10B981]">
                 {{ ratesData.CNY_USD?.toFixed(4) || 'N/A' }} USD
               </span>
             </div>
-            <div class="border-t border-stone-100"></div>
-            <div v-for="code in userCountryCodesForRates" :key="code" class="flex justify-between items-center text-sm">
-              <span class="font-medium text-stone-600">1 CNY =</span>
-              <span class="font-bold text-stone-800">
-                {{ ratesData[`CNY_${code}`]?.toFixed(2) || 'N/A' }} {{ code }}
-              </span>
+            <div class="space-y-2 text-sm">
+              <div
+                v-for="code in userCountryCodesForRates"
+                :key="code"
+                class="flex items-center justify-between rounded-2xl border border-[#E5E7EB] px-3 py-2"
+              >
+                <span class="font-medium text-[#1F2937]">1 CNY =</span>
+                <span class="font-semibold text-[#1F2937]">
+                  {{ ratesData[`CNY_${code}`]?.toFixed(2) || 'N/A' }} {{ code }}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
-
     </div>
 
-    <DashboardSchedule 
-      :is-open="isScheduleOpen" 
+    <DashboardSchedule
+      :is-open="isScheduleOpen"
       :plan-next-week="summaryData.schedule.planNextWeek"
       :team-focus="summaryData.schedule.teamFocus"
       @close="isScheduleOpen = false"
     />
-
   </div>
 </template>
 
@@ -154,11 +171,11 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import apiClient from '../api';
-import { 
-  Listbox, 
-  ListboxButton, 
-  ListboxOptions, 
-  ListboxOption 
+import {
+  Listbox,
+  ListboxButton,
+  ListboxOptions,
+  ListboxOption,
 } from '@headlessui/vue';
 import { ChevronUpDownIcon } from '@heroicons/vue/20/solid';
 
@@ -168,7 +185,6 @@ import DashboardRecurringTask from './DashboardRecurringTask.vue';
 
 const authStore = useAuthStore();
 
-// --- 1. 顶栏逻辑 (不变) ---
 const greeting = computed(() => {
   const hour = new Date().getHours();
   if (hour < 6) return '凌晨好';
@@ -177,18 +193,17 @@ const greeting = computed(() => {
   return '晚上好';
 });
 
-const todayDate = computed(() => {
-  return new Date().toLocaleDateString('zh-CN', {
+const todayDate = computed(() =>
+  new Date().toLocaleDateString('zh-CN', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-  });
-});
+  })
+);
 
 const hitokoto = ref('...');
 
-// --- 2. 状态定义 ---
 const isLoading = ref({
   summary: true,
   rates: true,
@@ -196,59 +211,87 @@ const isLoading = ref({
 });
 
 const summaryData = ref({
-  gmv: { today: 0, thisWeek: 0, thisMonth: 0, currency: '?', cnyEquivalent: { today: 0, thisWeek: 0, thisMonth: 0 }},
-  schedule: { planNextWeek: '加载中...', teamFocus: '' }
+  gmv: { today: 0, thisWeek: 0, thisMonth: 0, currency: '¥', cnyEquivalent: { today: 0, thisWeek: 0, thisMonth: 0 } },
+  schedule: { planNextWeek: '加载中...', teamFocus: '' },
 });
 const ratesData = ref({});
-
 const allCountries = ref([]);
 const allStores = ref([]);
 const selectedCountryCode = ref(null);
 const selectedStoreId = ref(null);
-
 const isScheduleOpen = ref(false);
 
-// --- 3. 筛选器逻辑 (不变) ---
-
 const countryFilterOptions = computed(() => {
-  let countries = allCountries.value.map(c => ({ code: c.code, name: c.name }));
-  if (authStore.role === 'admin') {
-    return [{ code: 'ALL', name: '所有国家' }, ...countries];
-  }
-  return countries;
+  const countries = allCountries.value.map((c) => ({ code: c.code, name: c.name }));
+  if (authStore.role === 'admin') return countries;
+  const operatedCountries = authStore.operatedCountries || [];
+  return countries.filter((c) => operatedCountries.includes(c.code));
 });
 
 const storeFilterOptions = computed(() => {
-  let stores = allStores.value;
-  if (selectedCountryCode.value && selectedCountryCode.value !== 'ALL') {
-    stores = stores.filter(s => s.countryCode === selectedCountryCode.value);
-  }
-  return [{ id: 'ALL', name: `所有${selectedCountryCode.value || ''}店铺` }, ...stores];
+  if (authStore.role === 'admin') return allStores.value;
+  const storeIds = authStore.storeIds || [];
+  return allStores.value.filter((store) => storeIds.includes(store.id));
 });
 
 const selectedStoreName = computed(() => {
-  const store = storeFilterOptions.value.find(s => s.id === selectedStoreId.value);
+  const store = storeFilterOptions.value.find((s) => s.id === selectedStoreId.value);
   return store ? store.name : '选择店铺...';
+});
+
+const highlightMetrics = computed(() => {
+  if (isLoading.value.summary) {
+    return [
+      { label: '今日 GMV', value: '加载中', sub: '数据抓取中' },
+      { label: '本周 GMV', value: '加载中', sub: '数据抓取中' },
+      { label: '本月 GMV', value: '加载中', sub: '数据抓取中' },
+      { label: '团队计划', value: '同步中', sub: '请稍候' },
+    ];
+  }
+  const { gmv, schedule } = summaryData.value;
+  const cny = gmv.cnyEquivalent || {};
+  return [
+    {
+      label: '今日 GMV',
+      value: formatCurrency(gmv.today, gmv.currency),
+      sub: `≈¥ ${formatCurrency(cny.today, 'CNY')}`,
+    },
+    {
+      label: '本周 GMV',
+      value: formatCurrency(gmv.thisWeek, gmv.currency),
+      sub: `≈¥ ${formatCurrency(cny.thisWeek, 'CNY')}`,
+    },
+    {
+      label: '本月 GMV',
+      value: formatCurrency(gmv.thisMonth, gmv.currency),
+      sub: `≈¥ ${formatCurrency(cny.thisMonth, 'CNY')}`,
+    },
+    {
+      label: '团队计划',
+      value: schedule.planNextWeek ? '已同步' : '待填写',
+      sub: schedule.planNextWeek || '周报 > 下周计划',
+    },
+  ];
 });
 
 const userCountryCodesForRates = computed(() => {
   if (authStore.role === 'admin') {
-    return ['IDR', 'VND', 'THB', 'MYR', 'PHP', 'SGD']; 
+    return ['IDR', 'VND', 'THB', 'MYR', 'PHP', 'SGD'];
   }
-  return authStore.operatedCountries.map(code => {
-    const currencyMap = { ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD' };
-    return currencyMap[code];
-  }).filter(Boolean);
+  return authStore.operatedCountries
+    .map((code) => {
+      const currencyMap = { ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD' };
+      return currencyMap[code];
+    })
+    .filter(Boolean);
 });
-
-// --- 4. 数据加载 (不变) ---
 
 async function fetchHitokoto() {
   try {
     const response = await fetch('https://v1.hitokoto.cn/?c=i&encode=text');
     hitokoto.value = await response.text();
-  } catch (e) {
-    hitokoto.value = '今天也要加油！';
+  } catch (error) {
+    hitokoto.value = '今天也要加油。';
   }
 }
 
@@ -258,7 +301,7 @@ async function fetchFilterOptions() {
     const response = await apiClient.get('/dashboard/filter-options');
     allCountries.value = response.data.countries;
     allStores.value = response.data.stores;
-    
+
     if (countryFilterOptions.value.length > 0) {
       selectedCountryCode.value = countryFilterOptions.value[0].code;
     }
@@ -266,7 +309,7 @@ async function fetchFilterOptions() {
       selectedStoreId.value = storeFilterOptions.value[0].id;
     }
   } catch (error) {
-    console.error("加载筛选器失败:", error);
+    console.error('加载筛选器失败:', error);
   } finally {
     isLoading.value.filters = false;
   }
@@ -282,10 +325,10 @@ async function fetchDashboardData() {
     countryCode: selectedCountryCode.value,
     storeId: selectedStoreId.value,
   };
-  
+
   const summaryPromise = apiClient.get('/dashboard/summary', { params });
   const ratesPromise = apiClient.get('/rates');
-  
+
   try {
     const [summaryResponse, ratesResponse] = await Promise.all([summaryPromise, ratesPromise]);
     const schedule = summaryResponse.data.schedule || {};
@@ -298,7 +341,7 @@ async function fetchDashboardData() {
     };
     ratesData.value = ratesResponse.data;
   } catch (error) {
-    console.error("加载仪表盘数据失败:", error);
+    console.error('加载仪表盘数据失败:', error);
   } finally {
     isLoading.value.summary = false;
     isLoading.value.rates = false;
@@ -313,13 +356,15 @@ onMounted(async () => {
 
 function selectCountry(code) {
   selectedCountryCode.value = code;
-  selectedStoreId.value = storeFilterOptions.value[0].id; // 重置店铺
+  const firstStore = storeFilterOptions.value[0];
+  selectedStoreId.value = firstStore ? firstStore.id : null;
 }
 
 watch(selectedCountryCode, (newVal, oldVal) => {
   if (newVal === oldVal) return;
-  if (!storeFilterOptions.value.find(s => s.id === selectedStoreId.value)) {
-    selectedStoreId.value = storeFilterOptions.value[0].id;
+  if (!storeFilterOptions.value.find((s) => s.id === selectedStoreId.value)) {
+    const firstStore = storeFilterOptions.value[0];
+    selectedStoreId.value = firstStore ? firstStore.id : null;
   }
   fetchDashboardData();
 });
@@ -335,20 +380,26 @@ function formatCurrency(value, currency) {
   }
   return (value || 0).toFixed(0);
 }
-
 </script>
 
 <style lang="postcss">
-/* ⬇️ 【修复】 重新添加此行 */
 @import "tailwindcss" reference;
 
 .dashboard-widget {
   @apply bg-white p-6 rounded-lg shadow-lg h-full flex flex-col;
 }
 .dashboard-widget-title {
-  @apply font-bold text-stone-900;
+  font-weight: 700;
+  color: #1F2937;
 }
 .form-input {
-  @apply block w-full p-2 border border-stone-300 rounded-md shadow-sm text-sm;
+  display: block;
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  font-size: 0.875rem;
+  color: #1F2937;
 }
 </style>
