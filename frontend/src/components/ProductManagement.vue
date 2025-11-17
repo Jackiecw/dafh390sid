@@ -19,10 +19,10 @@
         <thead class="bg-stone-50">
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">图片</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">SKU</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">商品名称</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">内部型号 (SKU)</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">对外型号</th> <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">商品名称</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">分类</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">成本 (¥)</th> <th class="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">操作</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-stone-200">
@@ -31,9 +31,9 @@
               <img :src="getImageUrl(product.imageUrl)" alt="product" class="h-12 w-12 object-cover rounded">
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-stone-900">{{ product.sku }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ product.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ product.publicName || 'N/A' }}</td> <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ product.name }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ product.category }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-stone-500">{{ product.cost ? product.cost.toFixed(2) : 'N/A' }}</td> <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-4">
               <button @click="handleEdit(product)" class="text-indigo-600 hover:text-indigo-900">
                 编辑
               </button>

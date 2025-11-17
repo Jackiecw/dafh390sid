@@ -214,6 +214,7 @@ import DashboardHome from './DashboardHome.vue';
 import CalendarPage from './CalendarPage.vue';
 import FinancePage from './FinancePage.vue';
 import LogisticsPage from './LogisticsPage.vue';
+import ProductManagement from './ProductManagement.vue';
 
 const menuGroups = [
   {
@@ -234,7 +235,8 @@ const menuGroups = [
     defaultOpen: true,
     items: [
       { key: 'SALES_DATA', name: '销售数据' },
-      { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
+      { key: 'ON_SALE_PRODUCTS', name: '店铺在售' },
+      { key: 'PRODUCT_CATALOG', name: '产品目录' },
       { key: 'OPERATION_CENTER', name: '运营中心' },
       { key: 'FINANCE_ADMIN', name: '财务管理' },
       { key: 'LOGISTICS_MGMT', name: '生产与物流' },
@@ -272,6 +274,7 @@ const viewComponents = {
   ADMIN_USERS: UserManagement,
   PROFILE_MGMT: ProfileManagement,
   LOGISTICS_MGMT: LogisticsPage,
+  PRODUCT_CATALOG: ProductManagement,
 };
 
 const authStore = useAuthStore();

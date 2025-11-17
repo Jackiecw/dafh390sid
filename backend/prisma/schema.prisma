@@ -12,6 +12,7 @@ datasource db {
 }
 
 // --- 1. 用户模型 (User) ---
+// (保持不变)
 model User {
   id           String   @id @default(cuid())
   username     String   @unique
@@ -35,18 +36,17 @@ model User {
   todos          Todo[]
   recurringTasks RecurringTask[]
   
-  // --- 【日历功能】 ---
   calendarEvents        CalendarEvent[] @relation("UserEvents")
   createdCalendarEvents CalendarEvent[] @relation("AdminCreatedEvents")
   weeklyFocuses         WeeklyFocus[]
   
   expenses              Expense[]
   
-  // ⬇️ --- 【物流模块新增 - 已修正】 ---
   createdLogisticsEvents LogisticsEvent[] @relation("LogisticsEventCreator")
 }
 
 // --- 2. 角色模型 (Role) ---
+// (保持不变)
 model Role {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -56,6 +56,7 @@ model Role {
 }
 
 // --- 3. 菜单项模型 (MenuItem) ---
+// (保持不变)
 model MenuItem {
   id    String @id @default(cuid())
   key   String @unique
@@ -64,6 +65,7 @@ model MenuItem {
 }
 
 // --- 4. 店铺模型 (Store) ---
+// (保持不变)
 model Store {
   id              String    @id @default(cuid())
   name            String    @unique
@@ -75,12 +77,13 @@ model Store {
   countryCode     String
 
   salesData SalesData[]
-  listings  StoreProductListing[]
+  listings  StoreProductListing[] // (关联到 "店铺在售商品")
 
   expenses  Expense[]
 }
 
 // --- 5. 销售数据模型 (SalesData) ---
+// (保持不变 - 它的结构已完美支持您的聚合需求)
 model SalesData {
   id          String   @id @default(cuid())
   recordDate  DateTime
@@ -100,6 +103,7 @@ model SalesData {
 }
 
 // --- 6. 周报模型 (WeeklyReport) ---
+// (保持不变)
 model WeeklyReport {
   id                  String   @id @default(cuid())
   weekStartDate       DateTime
@@ -114,6 +118,7 @@ model WeeklyReport {
 
 
 // --- 7. 国家管理模型 (ManagedCountry) ---
+// (保持不变)
 model ManagedCountry {
   id            String    @id @default(cuid())
   code          String    @unique
@@ -125,49 +130,86 @@ model ManagedCountry {
   
   operationModules OperationModule[]
   
-  // ⬇️ --- 【物流模块新增 - 已修正】 ---
   logisticsBatches LogisticsBatch[] @relation("CountryBatches")
 }
 
-// --- 8. 商品模型 (Product) ---
+// --- 8. 商品模型 (Product) - (我有的产品) ---
+// ⬇️ === 【重大修改】 === ⬇️
 model Product {
   id           String  @id @default(cuid())
-  sku          String  @unique
-  name         String
+  sku          String  @unique // 内部型号
+  name         String         // 内部名称
   description  String? @db.Text
-  imageUrl     String?
-  
-  category     ProductCategory 
+  imageUrl     String?        // 内部主图
+  category     ProductCategory // (已有)
 
-  cost         Float?
-  weightKg     Float?
-  volumeM3     Float?
-  dimensionsMm String?
-  listings     StoreProductListing[]
+  // --- 物理规格 ---
+  cost         Float?         // (已有)
+  weightKg     Float?         // 重量 (kg) (已有)
+  lengthMm     Int?           // 长 (mm) [新增]
+  widthMm      Int?           // 宽 (mm) [新增]
+  heightMm     Int?           // 高 (mm) [新增]
+  // (字段 "volumeM3" 和 "dimensionsMm" 已被移除或替换)
   
-  salesData SalesData[]
+  // --- 详细参数 (新增) ---
+  publicName   String?        // 对外型号
+  resolution   String?        // 分辨率 (例如 "1920x1080")
+  brightnessAnsi Int?         // 亮度 (ANSI)
+  brightnessUniformity Int?   // 亮度均匀性 (%)
+  lightSourceBrightness Int?  // 光源亮度 (LM)
+  noiseDb      Int?           // 工作噪声 (dB)
+  contrastRatio String?       // 对比度 (例如 "1000:1")
+  throwRatio   String?        // 投射比 (例如 "1.2:1")
+  projectionSize String?      // 建议投影尺寸 (例如 "40-120")
+  projectionDistance String?  // 建议投影距离 (例如 "1.5-3.5m")
   
-  // ⬇️ --- 【物流模块新增 - 已修正】 ---
+  // --- 硬件与系统 (新增) ---
+  chipset      String?        // 芯片
+  ramRom       String?        // 内存硬盘 (例如 "1+8")
+  os           OS_Type?       // 操作系统
+  focusMethod  Focus_Method?  // 对焦方式
+  keystone     Keystone_Method? // 梯形校正
+  
+  // --- 功能特性 (新增) ---
+  hasGimbal    Boolean @default(false) // 是否带云台
+  wifiVersion  String? // (例如 "5", "6")
+  bluetoothVersion String? // (例如 "5.0")
+  autoObstacle Boolean @default(false) // 自动避障
+  autoScreenFit Boolean @default(false) // 自动入幕
+
+  // --- 关联 ---
+  listings     StoreProductListing[] // 关联“店铺在售商品”
+  salesData    SalesData[]           // 关联“销售数据”
   logisticsBatches LogisticsBatch[] @relation("ProductBatches")
 }
+// ⬆️ === 【重大修改】 === ⬆️
+
 
 // --- 9. 店铺商品上架 (StoreProductListing) 模型 ---
+// ⬇️ === 【重大修改】 === ⬇️
 model StoreProductListing {
   id        String  @id @default(cuid())
   
   store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade) 
-  storeId   String
+  storeId   String  // 关联的店铺
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade) 
-  productId String
+  productId String  // 关联的“我有的产品”
 
-  currentPrice  Float   @default(0) 
-  platformUrl   String?
-  lastSyncedAt  DateTime? @updatedAt 
+  // --- 店铺清单特定字段 ---
+  storeTitle    String?  // 店铺标题 (例如 "Proyektor Mini...") [新增]
+  storeImageUrl String?  // 店铺主图 (URL) [新增]
+  
+  currentPrice  Float   @default(0) // 售价 (当地货币) (已有)
+  platformUrl   String?             // 商品链接 (已有)
+  lastSyncedAt  DateTime? @updatedAt // (已有)
   
   @@unique([storeId, productId])
 }
+// ⬆️ === 【重大修改】 === ⬆️
+
 
 // --- 10. SOP/责任人 (OperationModule) 模型 ---
+// (保持不变)
 model OperationModule {
   id           String   @id @default(cuid())
   name         String
@@ -181,6 +223,7 @@ model OperationModule {
 }
 
 // --- 11. SOP/责任人 (OperationTask) 模型 ---
+// (保持不变)
 model OperationTask {
   id           String   @id @default(cuid())
   name         String
@@ -194,6 +237,7 @@ model OperationTask {
 }
 
 // --- 12. 常用链接 (CommonLink) 模型 ---
+// (保持不变)
 model CommonLink {
   id           String   @id @default(cuid())
   title        String
@@ -204,6 +248,7 @@ model CommonLink {
 }
 
 // --- 13. 待办事项 (Todo) 模型 ---
+// (保持不变)
 model Todo {
   id          String   @id @default(cuid())
   content     String   @db.Text
@@ -217,12 +262,13 @@ model Todo {
 }
 
 // --- 14. 周期任务 (RecurringTask) 模型 ---
+// (保持不变)
 model RecurringTask {
   id          String     @id @default(cuid())
   content     String     @db.Text
   period      TaskPeriod // DAILY, WEEKLY, MONTHLY
   
-  lastCompletedAt DateTime? // 用于重置
+  lastCompletedAt DateTime?
   
   author    User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId  String
@@ -231,6 +277,7 @@ model RecurringTask {
 }
 
 // --- 15. 工作日历 (CalendarEvent) 模型 ---
+// (保持不变)
 model CalendarEvent {
   id        String   @id @default(cuid())
   title     String
@@ -239,22 +286,20 @@ model CalendarEvent {
   isAllDay  Boolean  @default(false)
   color     String   @default("blue")
 
-  // “属于谁” (员工)
   author    User     @relation("UserEvents", fields: [authorId], references: [id], onDelete: Cascade)
   authorId  String
 
-  // “由谁创建” (管理员)
   createdByAdmin Boolean  @default(false)
   adminCreator   User?    @relation("AdminCreatedEvents", fields: [adminCreatorId], references: [id], onDelete: SetNull)
   adminCreatorId String?
-
   @@index([authorId, startAt, endAt])
 }
 
 // --- 16. 每周重点 (WeeklyFocus) 模型 ---
+// (保持不变)
 model WeeklyFocus {
   id            String   @id @default(cuid())
-  weekStartDate DateTime @unique @db.Date // ⬅️ 将类型改为 @db.Date 以确保只比较日期
+  weekStartDate DateTime @unique @db.Date
   content       String   @db.Text
   
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -265,30 +310,25 @@ model WeeklyFocus {
 }
 
 // --- 17. 支出 (Expense) 模型 ---
+// (保持不变)
 model Expense {
   id                String    @id @default(cuid())
-  expenseDate       DateTime  // "日期"
-  itemDescription   String    // "项目" (例如: Facebook 广告费)
-  amount            Float     // "金额"
+  expenseDate       DateTime
+  itemDescription   String
+  amount            Float
 
-  // 详细财务信息
-  paymentMethod     PaymentMethod @default(OTHER) // "付款方式"
-  payer             String    // "付款方" (例如: 公司支付宝, 运营A)
-  payee             String    // "收款方" (例如: Facebook, Google)
-  invoiceStatus     InvoiceStatus @default(NONE)  // "是否含票"
+  paymentMethod     PaymentMethod @default(OTHER)
+  payer             String
+  payee             String
+  invoiceStatus     InvoiceStatus @default(NONE)
   
-  // 报销信息 (对应 "是否垫付" 和 "报销日期")
   isAdvancePayment  Boolean   @default(false)
-  reimbursementDate DateTime? // 垫付报销日期
+  reimbursementDate DateTime?
   
-  notes             String?   @db.Text // "备注"
+  notes             String?   @db.Text
 
-  // --- 关键关联 ---
-
-  // 1. 归属店铺 (可选，允许"公司"级支出)
   store             Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
   storeId           String?
-  // 2. 录入人
   enteredBy         User      @relation(fields: [enteredById], references: [id], onDelete: Cascade)
   enteredById       String
 
@@ -300,52 +340,39 @@ model Expense {
 }
 
 
-// ------------------------------------
-// --- 【新增】物流与生产 (第 18、19) ---
-// ------------------------------------
-
 // --- 18. 物流批次 (LogisticsBatch) 模型 ---
-// (对应你 Excel 表格中的一行)
+// (保持不变)
 model LogisticsBatch {
   id            String    @id @default(cuid())
-  batchNumber   String    @unique // 批次 (e.g., "ID0001")
-  orderDate     DateTime  @db.Date // 订单日期
+  batchNumber   String    @unique
+  orderDate     DateTime  @db.Date
   
-  // 关联产品 (来自你的 "SKU编号")
   product       Product   @relation("ProductBatches", fields: [productId], references: [id])
   productId     String
-  productSpec   String?   // 产品规格
+  productSpec   String?
   
-  // 销售地 (来自你的 "销售地")
   country       ManagedCountry @relation("CountryBatches", fields: [countryCode], references: [code])
   countryCode   String
   
-  // 数量与价格
-  quantity      Int       // 数量
-  unitPrice     Float     // 单价
-  totalPrice    Float     // 总价
+  quantity      Int
+  unitPrice     Float
+  totalPrice    Float
   
-  // 生产信息
-  productionTimeDays Int?  // 生产耗时 (天)
-  estimatedFactoryDate DateTime? @db.Date // 预计出库日期
+  productionTimeDays Int?
+  estimatedFactoryDate DateTime? @db.Date
   
-  // 物流信息
-  logisticsProvider String? // 物流服务商
-  freightForwarder  String? // 货代
-  cartonCount       Int?    // 箱数
-  totalCbm        Float?    // 总 CBM
-  totalKg         Float?    // 总 KG
+  logisticsProvider String?
+  freightForwarder  String?
+  cartonCount       Int?
+  totalCbm        Float?
+  totalKg         Float?
   
-  // 最终入仓
-  estimatedWarehouseDate DateTime? @db.Date // 预计入仓日期
+  estimatedWarehouseDate DateTime? @db.Date
   
-  notes         String?   @db.Text // 备注
+  notes         String?   @db.Text
   createdAt     DateTime  @default(now())
   
-  // 核心: 关联的物流事件 (用于追踪链路)
   events        LogisticsEvent[]
-  
-  // 核心: 当前状态 (冗余存储，方便查询和看板)
   currentStatus   LogisticsStatus @default(FACTORY)
   
   @@index([countryCode])
@@ -354,19 +381,17 @@ model LogisticsBatch {
 }
 
 // --- 19. 物流事件 (LogisticsEvent) 模型 ---
-// (用于实现你的 "可视化链路")
+// (保持不变)
 model LogisticsEvent {
   id          String   @id @default(cuid())
   
-  // 关联到哪个批次
   batch       LogisticsBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
   batchId     String
   
-  status      LogisticsStatus // 状态 (例如: 已装柜, 运输中...)
-  eventDate   DateTime // 事件发生日期
-  notes       String?  @db.Text // 备注 (例如: 柜号, 提单号, 船名)
+  status      LogisticsStatus
+  eventDate   DateTime
+  notes       String?  @db.Text
   
-  // 由谁创建的
   createdBy   User     @relation("LogisticsEventCreator", fields: [createdById], references: [id])
   createdById String
   createdAt   DateTime @default(now())
@@ -377,6 +402,7 @@ model LogisticsEvent {
 
 // --- 枚举 (Enums) ---
 
+// (已有，保持不变)
 enum Platform {
   SHOPEE
   TIKTOK_SHOP
@@ -384,29 +410,24 @@ enum Platform {
   WEBSITE
   OTHER
 }
-
 enum StoreStatus {
   ACTIVE   
   INACTIVE 
   BANNED   
   CLOSED   
 }
-
 enum ProductCategory {
   PROJECTOR
   SCREEN
   STAND
   ACCESSORY
-  
   OTHER
 }
-
 enum TaskPeriod {
   DAILY
   WEEKLY
   MONTHLY
 }
-
 enum PaymentMethod {
   ALIPAY
   WECHAT_PAY
@@ -415,21 +436,43 @@ enum PaymentMethod {
   CASH
   OTHER
 }
-
 enum InvoiceStatus {
   NONE
   REGULAR
   SPECIAL
 }
-
-// ⬇️ --- 【物流模块新增】 ---
 enum LogisticsStatus {
-  FACTORY           // 生产中 (工厂)
-  WAREHOUSE_READY   // 待出库 (已在物流仓库)
-  CONTAINER_LOADED  // 已装柜
-  EXPORT_CUSTOMS    // 出口清关
-  SHIPPING          // 国际运输 (海运/空运)
-  IMPORT_CUSTOMS    // 进口清关
-  LOCAL_DELIVERY    // 本地派送
-  COMPLETED         // 已入仓
-} 
+  FACTORY
+  WAREHOUSE_READY
+  CONTAINER_LOADED
+  EXPORT_CUSTOMS
+  SHIPPING
+  IMPORT_CUSTOMS
+  LOCAL_DELIVERY
+  COMPLETED
+}
+
+// ⬇️ === 【新增枚举】 === ⬇️
+enum OS_Type {
+  LINUX
+  ANDROID_9
+  ANDROID_10
+  ANDROID_11
+  ANDROID_12
+  ANDROID_13
+  GOOGLE_TV
+  WHALE_OS
+  OTHER
+}
+
+enum Focus_Method {
+  AUTO
+  MANUAL
+}
+
+enum Keystone_Method {
+  AUTO
+  VERTICAL // (代表仅上下梯形)
+  NONE
+}
+// ⬆️ === 【新增枚举】 === ⬆️

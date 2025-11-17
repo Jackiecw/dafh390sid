@@ -3,12 +3,12 @@ const express = require('express');
 const prisma = require('../prismaClient');
 const adminMiddleware = require('../adminMiddleware');
 const { z } = require('zod');
-const { Platform, StoreStatus } = require('@prisma/client'); // ⬅️ 移除了 Country
+const { Platform, StoreStatus } = require('@prisma/client');
 
 const router = express.Router();
 router.use(adminMiddleware); // (关键) 只有 Admin 可以访问这些接口
 
-// --- Zod 验证模式 (用于创建/更新) ---
+// --- Zod 验证模式 (不变) ---
 
 const storeSchema = z.object({
   name: z.string().min(1, "店铺名称不能为空"),
@@ -29,7 +29,7 @@ const countrySchema = z.object({
 
 // --- 辅助接口 (用于填充下拉菜单) ---
 
-// (GET /api/admin/management-options)
+// (GET /api/admin/management-options) (不变)
 router.get('/management-options', (req, res) => {
   res.json({
     platforms: Object.values(Platform),
@@ -39,53 +39,36 @@ router.get('/management-options', (req, res) => {
 
 // --- 店铺 (Store) CRUD ---
 
-// (GET /api/admin/stores)
-// ⬇️ 【已修复】
+// (GET /api/admin/stores) (简单修改)
+// ⬇️ 【修改】: 我们不再需要 include 'listings' 或 'products'。
+//           主列表页只需要店铺的基本信息。
 router.get('/stores', async (req, res) => {
   try {
-    // 
-    // 【已删除】这里是原先导致崩溃的错误查询，已被移除
-    // 
-    
-    // (这是正确的查询逻辑)
-    const storesWithListings = await prisma.store.findMany({
+    const stores = await prisma.store.findMany({
        orderBy: { name: 'asc' },
        include: {
-         country: true,
-         listings: { // ⬅️ 读取我们新的 Listing 模型
-           select: {
-             product: { // ⬅️ 选择 Listing 关联的 Product
-               select: { sku: true }
-             }
-           }
-         }
+         country: true, // (保持) 仍然需要国家名称
+         // (移除 'listings' and 'products' 的 include)
        }
     });
     
-    // (将 listings 转换回旧的 `products` 格式，以最小化前端改动)
-    const formattedStores = storesWithListings.map(store => {
-      const { listings, ...rest } = store;
-      return {
-        ...rest,
-        products: listings.map(l => l.product) // ⬅️ 转换
-      };
-    });
-    
-    res.json(formattedStores); // ⬅️ 返回修正后的数据
+    // (不再需要格式化)
+    res.json(stores); 
     
   } catch (error) {
     console.error('获取店铺列表失败:', error);
     res.status(500).json({ error: '获取店铺列表失败' });
   }
 });
-// ⬆️ 【已修复】
+// ⬆️ 【修改】
 
 // (POST /api/admin/stores) (不变)
 router.post('/stores', async (req, res) => {
   try {
     const { registeredAt, ...rest } = req.body;
     
-    const validation = storeSchema.safeParse(rest);
+    // ⬇️ 【修改】 Zod schema 现在是 storeSchema (它不包含 productIds)
+    const validation = storeSchema.safeParse(rest); 
     
     if (!validation.success) {
       return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
@@ -101,23 +84,19 @@ router.post('/stores', async (req, res) => {
   } catch (error) {
      if (error.code === 'P2002') return res.status(400).json({ error: '此店铺名称 (name) 已被占用' });
      if (error.code === 'P2003') return res.status(400).json({ error: '选择的国家 (Country Code) 无效' });
+    console.error('创建店铺失败:', error);
     res.status(500).json({ error: '创建店铺失败' });
   }
 });
 
-// (GET /api/admin/stores/:id) (不变)
+// (GET /api/admin/stores/:id) (简单修改)
+// (这个接口现在只用于 "编辑店铺" 弹窗，不再需要返回 'listings')
 router.get('/stores/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const store = await prisma.store.findUnique({
       where: { id: id },
-      include: { 
-        listings: { 
-          select: { 
-            productId: true 
-          } 
-        } 
-      } 
+      // ⬇️ 【修改】 移除 include
     });
     if (!store) {
       return res.status(404).json({ error: '店铺未找到' });
@@ -134,6 +113,7 @@ router.put('/stores/:id', async (req, res) => {
     const { id } = req.params;
     
     const { registeredAt, ...rest } = req.body;
+    // ⬇️ 【修改】 Zod schema 现在是 storeSchema (它不包含 productIds)
     const validation = storeSchema.safeParse(rest);
     if (!validation.success) {
       return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
@@ -151,11 +131,12 @@ router.put('/stores/:id', async (req, res) => {
     if (error.code === 'P2002') return res.status(400).json({ error: '此店铺名称 (name) 已被占用' });
     if (error.code === 'P2003') return res.status(400).json({ error: '选择的国家 (Country Code) 无效' });
     if (error.code === 'P2025') return res.status(404).json({ error: '店铺未找到' });
+    console.error('更新店铺失败:', error);
     res.status(500).json({ error: '更新店铺失败' });
   }
 });
 
-// DELETE /api/admin/stores/:id
+// DELETE /api/admin/stores/:id (不变)
 router.delete('/stores/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -165,13 +146,18 @@ router.delete('/stores/:id', async (req, res) => {
       return res.status(404).json({ error: '店铺未找到' });
     }
 
+    // (Prisma 的 onDelete: Cascade 会自动删除所有关联的 StoreProductListing)
+    // (我们仍然需要手动处理 SalesData 和 Expense)
     await prisma.$transaction([
-      prisma.storeProductListing.deleteMany({ where: { storeId: id } }),
+      // 1. (自动) StoreProductListing 被级联删除
+      // 2. (手动) 删除关联的销售数据
       prisma.salesData.deleteMany({ where: { storeId: id } }),
+      // 3. (手动) 将支出的关联设为 null
       prisma.expense.updateMany({
         where: { storeId: id },
         data: { storeId: null },
       }),
+      // 4. (手动) 删除店铺
       prisma.store.delete({ where: { id } }),
     ]);
 
@@ -210,6 +196,7 @@ router.post('/countries', async (req, res) => {
     res.status(201).json(newCountry);
   } catch (error) {
      if (error.code === 'P2002') return res.status(400).json({ error: '此国家代码 (Code) 已被占用' });
+    console.error('创建国家失败:', error);
     res.status(500).json({ error: '创建国家失败' });
   }
 });
@@ -233,65 +220,15 @@ router.put('/countries/:id', async (req, res) => {
   } catch (error) {
     if (error.code === 'P2002') return res.status(400).json({ error: '此国家代码 (Code) 已被占用' });
     if (error.code === 'P2025') return res.status(404).json({ error: '国家未找到' });
+    console.error('更新国家失败:', error);
     res.status(500).json({ error: '更新国家失败' });
   }
 });
 
 
-// --- (不变) 店铺-商品 关联 ---
-router.put('/stores/:id/products', async (req, res) => {
-  try {
-    const { id: storeId } = req.params;
-    const { productIds } = req.body; // 期望: { productIds: ["id1", "id2"] }
-
-    if (!Array.isArray(productIds)) {
-      return res.status(400).json({ error: 'productIds 必须是一个数组' });
-    }
-
-    // 1. 获取当前该店铺所有的上架 (Listings)
-    const currentListings = await prisma.storeProductListing.findMany({
-      where: { storeId: storeId },
-      select: { productId: true }
-    });
-    const currentProductIds = currentListings.map(l => l.productId);
-    
-    // 2. 找出需要删除的 (在当前列表，但不在新列表)
-    const productIdsToDelete = currentProductIds.filter(
-      pid => !productIds.includes(pid)
-    );
-    
-    // 3. 找出需要新增的 (在新列表，但不在当前列表)
-    const productIdsToCreate = productIds.filter(
-      pid => !currentProductIds.includes(pid)
-    );
-    
-    // 4. (核心) 在一个事务中执行删除和创建
-    await prisma.$transaction([
-      // (A) 删除
-      prisma.storeProductListing.deleteMany({
-        where: {
-          storeId: storeId,
-          productId: { in: productIdsToDelete }
-        }
-      }),
-      // (B) 创建
-      prisma.storeProductListing.createMany({
-        data: productIdsToCreate.map(pid => ({
-          storeId: storeId,
-          productId: pid,
-          currentPrice: 0 // (重要) 默认售价为 0
-        })),
-        skipDuplicates: true // (安全)
-      })
-    ]);
-
-    res.json({ message: '商品分配更新成功' });
-
-  } catch (error) {
-    console.error('更新商品关联失败:', error);
-    if (error.code === 'P2025') return res.status(404).json({ error: '店铺未找到' });
-    res.status(500).json({ error: '更新商品关联失败' });
-  }
-});
+// --- (已删除) 店铺-商品 关联 ---
+// ⬇️ 【修改】 
+// (原 PUT /api/admin/stores/:id/products 接口已删除)
+// ⬆️ 【修改】
 
 module.exports = router;

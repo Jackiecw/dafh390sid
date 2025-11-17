@@ -9,6 +9,16 @@ const axios = require('axios');
 
 const router = express.Router();
 
+const { 
+  getRates, 
+  countryCurrencyMap, 
+  currencySymbols,
+  getStartOfToday,
+  getStartOfWeek,
+  getStartOfMonth,
+  getPlanPreviewForWeek
+} = require('./datahelpers');
+
 // --- Zod 验证模式 (用于 sales-data) ---
 const salesDataSchema = z.object({
   recordDate: z.string().date("日期格式无效"), // ⬅️ 【已修复】
@@ -81,107 +91,7 @@ const recurringTaskSchema = z.object({
   period: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
 });
 
-// ... (
-// ... (该文件 [data.js] 的其余所有代码保持不变) ...
-// ...
-// --- 汇率缓存 (不变) ---
-let ratesCache = {
-  data: null,
-  lastFetched: 0,
-};
-const CACHE_DURATION = 1000 * 60 * 60; // 1 小时
-const currencySymbols = {
-  CNY: '¥', USD: '$', IDR: 'Rp', VND: '₫', THB: '฿', MYR: 'RM', PHP: '₱', SGD: 'S$'
-};
-const countryCurrencyMap = {
-  ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD',
-};
 
-// --- 日期辅助函数 (东八区 - 不变) ---
-const getTimeZoneDate = () => {
-  return new Date();
-};
-const getStartOfToday = () => {
-  const now = getTimeZoneDate();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-};
-const getStartOfWeek = () => {
-  const now = getStartOfToday();
-  const day = now.getDay(); 
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1); // 调整为周一
-  return new Date(now.setDate(diff));
-};
-const getStartOfMonth = () => {
-  const now = getTimeZoneDate();
-  return new Date(now.getFullYear(), now.getMonth(), 1);
-};
-
-async function getPlanPreviewForWeek(userId, currentWeekStart) {
-  const previousWeekStart = new Date(currentWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const lastReport = await prisma.weeklyReport.findFirst({
-    where: {
-      authorId: userId,
-      weekStartDate: {
-        gte: previousWeekStart,
-        lt: currentWeekStart,
-      },
-    },
-    orderBy: { createdAt: 'desc' },
-    select: { planNextWeek: true },
-  });
-  return lastReport?.planNextWeek || null;
-}
-// ---
-
-/**
- * 【辅助函数】获取并缓存汇率 (不变)
- */
-async function getRates() {
-  const now = Date.now();
-  if (ratesCache.data && (now - ratesCache.lastFetched < CACHE_DURATION)) {
-    return ratesCache.data;
-  }
-  try {
-    const apiKey = process.env.EXCHANGE_RATE_API_KEY;
-    if (!apiKey) {
-      throw new Error('未配置汇率 API 密钥');
-    }
-    const response = await axios.get(`https://v6.exchangerate-api.com/v6/${apiKey}/latest/CNY`);
-    
-    if (response.data && response.data.result === 'success') {
-      const rates = response.data.conversion_rates;
-      ratesCache.data = {
-        CNY_USD: rates.USD,
-        CNY_IDR: rates.IDR,
-        CNY_VND: rates.VND,
-        CNY_THB: rates.THB,
-        CNY_MYR: rates.MYR,
-        CNY_PHP: rates.PHP,
-        CNY_SGD: rates.SGD,
-      };
-      ratesCache.lastFetched = now;
-      console.log('汇率缓存已更新');
-      return ratesCache.data;
-    } else {
-      throw new Error('汇率 API 响应失败');
-    }
-  } catch (error) {
-    console.error('获取汇率失败:', error.message);
-    return {}; 
-  }
-}
-
-/**
- * 【GET /api/rates】 (不变)
- */
-router.get('/rates', authMiddleware, async (req, res) => {
-  try {
-    const rates = await getRates(); 
-    res.json(rates);
-  } catch (error) {
-     res.status(500).json({ error: '获取汇率失败' });
-  }
-});
 
 
 /**

@@ -19,6 +19,8 @@ const profileRoutes = require('./routes/profile');
 const operationRoutes = require('./routes/operation');
 const financeRoutes = require('./routes/finance');
 const logisticsRoutes = require('./routes/logistics');
+const storeListingsRoutes = require('./routes/storeListings');
+
 // 3. 初始化
 const app = express();
 
@@ -48,6 +50,7 @@ app.use('/api', profileRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', managementRoutes);
 app.use('/api/admin', productRoutes); 
+app.use('/api/admin', storeListingsRoutes);
 
 
 app.use('/api', operationRoutes);

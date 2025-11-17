@@ -5,8 +5,7 @@
         <div>
           <p class="text-xs font-semibold uppercase tracking-[0.35em] text-white/80">Store Network</p>
           <h2 class="text-3xl font-semibold">店铺管理</h2>
-          <p class="text-sm text-white/80">维护各渠道店铺，快速分配商品与监控状态。</p>
-        </div>
+          <p class="text-sm text-white/80">维护各渠道店铺的基础信息与状态。</p> </div>
         <button
           @click="openModal"
           class="rounded-2xl bg-white/90 px-5 py-3 text-sm font-semibold text-[#3B82F6] shadow-lg shadow-blue-500/30 transition hover:bg-white"
@@ -27,7 +26,6 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">平台</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">国家 (Code)</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">状态</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">在售商品 (SKU)</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">注册日期</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-[#94A3B8] uppercase tracking-wider">操作</th>
           </tr>
@@ -37,25 +35,16 @@
             <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-[#1F2937]">{{ store.name }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#6B7280]">{{ store.platform }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#6B7280]">
-              {{ store.country ? store.country.name : 'N/A' }} ({{ store.countryCode }})
+              {{ store.country.name }} ({{ store.countryCode }})
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
               <span :class="['px-2 py-1 rounded-full text-xs font-semibold', getStatusClass(store.status)]">
                 {{ store.status }}
               </span>
             </td>
-            <td class="px-6 py-4 text-sm text-[#6B7280]">
-              <div class="flex flex-wrap gap-1">
-                <span v-if="!store.products || store.products.length === 0" class="px-2 py-0.5 text-xs text-[#94A3B8]">未分配</span>
-                <span v-else v-for="product in store.products" :key="product.sku" class="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#DBEAFE] text-[#1D4ED8]">
-                  {{ product.sku }}
-                </span>
-              </div>
-            </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-[#6B7280]">{{ formatDate(store.registeredAt) }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
               <button @click="handleEdit(store)" class="text-[#3B82F6] hover:text-[#2563EB]">编辑</button>
-              <button @click="handleAssignProducts(store)" class="text-[#10B981] hover:text-[#059669]">分配商品</button>
               <button v-if="isAdmin" @click="handleDelete(store)" class="text-red-500 hover:text-red-700">删除</button>
             </td>
           </tr>
@@ -76,20 +65,14 @@
     @store-updated="handleStoreUpdated"
   />
 
-  <StoreProductModal
-    :is-open="isStoreProductModalOpen"
-    :store="currentStoreToAssign"
-    @close="closeStoreProductModal"
-  />
-</template>
+  </template>
 
 
 <script setup>
-// ( <script setup> 部分保持不变 )
+// ⬇️ 【已删除】StoreProductModal 导入
 import { computed, ref, onMounted } from 'vue';
 import apiClient from '../api';
 import StoreFormModal from './StoreFormModal.vue';
-import StoreProductModal from './StoreProductModal.vue'; 
 import { useAuthStore } from '../stores/auth';
 
 const authStore = useAuthStore();
@@ -99,16 +82,16 @@ const errorMessage = ref('');
 const isModalOpen = ref(false);
 const currentStoreToEditId = ref(null);
 
-const isStoreProductModalOpen = ref(false);
-const currentStoreToAssign = ref(null);
+// ⬇️ 【已删除】isStoreProductModalOpen 和 currentStoreToAssign
 const isAdmin = computed(() => authStore.role === 'admin');
 
 async function fetchStores() {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    const response = await apiClient.get('/admin/stores');
-    stores.value = response.data; // (数据将自动包含 products)
+    // (这个接口在 P2 已更新, 不再返回 products)
+    const response = await apiClient.get('/admin/stores'); 
+    stores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败:', error);
     errorMessage.value = '获取店铺列表失败，请稍后重试。';
@@ -127,7 +110,7 @@ function closeModal() {
 }
 
 function handleStoreCreated(newStore) {
-  fetchStores();
+  fetchStores(); // (重新加载列表)
 }
 
 function handleEdit(store) {
@@ -136,18 +119,10 @@ function handleEdit(store) {
 }
 
 function handleStoreUpdated() {
-  fetchStores();
+  fetchStores(); // (重新加载列表)
 }
 
-function handleAssignProducts(store) {
-  currentStoreToAssign.value = store;
-  isStoreProductModalOpen.value = true;
-}
-function closeStoreProductModal() {
-  isStoreProductModalOpen.value = false;
-  currentStoreToAssign.value = null;
-  fetchStores(); // (可选) 分配后刷新列表
-}
+// ⬇️ 【已删除】handleAssignProducts 和 closeStoreProductModal
 
 function formatDate(dateString) {
   if (!dateString) return 'N/A';

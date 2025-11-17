@@ -6,7 +6,8 @@ const { z } = require('zod');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { ProductCategory } = require('@prisma/client');
+// ⬇️ 【新增】 导入新的枚举
+const { ProductCategory, OS_Type, Focus_Method, Keystone_Method } = require('@prisma/client');
 
 const router = express.Router();
 
@@ -37,17 +38,50 @@ const upload = multer({
   limits: { fileSize: 1024 * 1024 * 5 } // 限制 5MB
 });
 
-// --- 2. Zod 验证模式 (修改) ---
+// --- 2. Zod 验证模式 (重大修改) ---
+// (用于 "我有的产品" / Product)
 const productSchema = z.object({
   sku: z.string().min(1, "SKU 不能为空"),
   name: z.string().min(1, "商品名称不能为空"),
   description: z.string().optional().nullable(),
   category: z.nativeEnum(ProductCategory),
+  
+  // ⬇️ --- 【新增所有规格字段】 ---
+  publicName: z.string().optional().nullable(),
+  
+  // 物理规格 (使用 coerce 转换 "100" 为 100)
   cost: z.preprocess(val => parseFloat(val) || null, z.number().optional().nullable()),
   weightKg: z.preprocess(val => parseFloat(val) || null, z.number().optional().nullable()),
-  volumeM3: z.preprocess(val => parseFloat(val) || null, z.number().optional().nullable()),
-  dimensionsMm: z.string().optional().nullable(), // ⬅️ 【新增】
+  lengthMm: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+  widthMm: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+  heightMm: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+
+  // 详细参数
+  resolution: z.string().optional().nullable(),
+  brightnessAnsi: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+  brightnessUniformity: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+  lightSourceBrightness: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+  noiseDb: z.preprocess(val => parseInt(val) || null, z.number().int().optional().nullable()),
+  contrastRatio: z.string().optional().nullable(),
+  throwRatio: z.string().optional().nullable(),
+  projectionSize: z.string().optional().nullable(),
+  projectionDistance: z.string().optional().nullable(),
+  
+  // 硬件与系统
+  chipset: z.string().optional().nullable(),
+  ramRom: z.string().optional().nullable(),
+  os: z.nativeEnum(OS_Type).optional().nullable(),
+  focusMethod: z.nativeEnum(Focus_Method).optional().nullable(),
+  keystone: z.nativeEnum(Keystone_Method).optional().nullable(),
+  
+  // 功能特性 (使用 preprocess 将 "true" 字符串转为 boolean)
+  hasGimbal: z.preprocess(val => val === 'true' || val === true, z.boolean().optional().default(false)),
+  wifiVersion: z.string().optional().nullable(),
+  bluetoothVersion: z.string().optional().nullable(),
+  autoObstacle: z.preprocess(val => val === 'true' || val === true, z.boolean().optional().default(false)),
+  autoScreenFit: z.preprocess(val => val === 'true' || val === true, z.boolean().optional().default(false)),
 });
+// ⬆️ --- 【新增所有规格字段】 ---
 
 // (不变) 价格同步 Zod
 const priceSyncSchema = z.object({
@@ -59,6 +93,7 @@ const priceSyncSchema = z.object({
 router.use(adminMiddleware);
 
 // GET /api/admin/products (不变)
+// (这个接口用于获取 "我有的产品" 列表)
 router.get('/products', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
@@ -70,16 +105,20 @@ router.get('/products', async (req, res) => {
   }
 });
 
-// GET /api/admin/product-options (不变)
+// GET /api/admin/product-options (重大修改)
+// (为 "我有的产品" 表单提供所有下拉框选项)
 router.get('/product-options', (req, res) => {
   res.json({
     categories: Object.values(ProductCategory),
+    osTypes: Object.values(OS_Type), // ⬅️ 【新增】
+    focusMethods: Object.values(Focus_Method), // ⬅️ 【新增】
+    keystoneMethods: Object.values(Keystone_Method), // ⬅️ 【新增】
   });
 });
 
-// POST /api/admin/products (不变)
-// (此路由逻辑不需要修改，因为它使用 ...validation.data 自动包含了新字段)
-router.post('/products', upload.single('productImage'), async (req, res) => {
+// POST /api/admin/products (重大修改)
+// (用于创建 "我有的产品")
+router.post('/products', upload.single('imageUrl'), async (req, res) => {
   try {
     // 1. 验证文本数据
     const validation = productSchema.safeParse(req.body);
@@ -89,18 +128,19 @@ router.post('/products', upload.single('productImage'), async (req, res) => {
     }
     
     // 2. 检查 SKU 是否唯一
-    const { sku, ...data } = validation.data;
+    const { sku } = validation.data;
     const existing = await prisma.product.findUnique({ where: { sku } });
     if (existing) {
       if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: '此 SKU 已被占用' });
     }
 
-    // 3. 准备数据库 payload
-    const payload = { ...data, sku: sku, }; // ⬅️ 'data' 中已包含新字段
+    // 3. 准备数据库 payload (Zod 已处理所有字段)
+    const payload = { ...validation.data }; 
     
     // 4. (关键) 处理图片路径
     if (req.file) {
+      // (注意：这里的 'imageUrl' 是 "我有的产品" 的内部主图)
       payload.imageUrl = `/uploads/products/${req.file.filename}`;
     }
 
@@ -111,13 +151,16 @@ router.post('/products', upload.single('productImage'), async (req, res) => {
   } catch (error) {
     console.error('创建商品失败:', error);
     if (req.file) fs.unlinkSync(req.file.path); // 出错时删除文件
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: '此 SKU 已被占用' });
+    }
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
 
-// PUT /api/admin/products/:id (不变)
-// (此路由逻辑也不需要修改)
-router.put('/products/:id', upload.single('productImage'), async (req, res) => {
+// PUT /api/admin/products/:id (重大修改)
+// (用于更新 "我有的产品")
+router.put('/products/:id', upload.single('imageUrl'), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -129,22 +172,20 @@ router.put('/products/:id', upload.single('productImage'), async (req, res) => {
     }
 
     // 2. 检查 SKU (如果 SKU 被修改了)
-    const { sku, ...data } = validation.data;
+    const { sku } = validation.data;
     const existing = await prisma.product.findUnique({ where: { sku } });
     if (existing && existing.id !== id) {
       if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: '此 SKU 已被其他商品占用' });
     }
 
-    // 3. 准备 payload
-    const payload = { ...data, sku: sku }; // ⬅️ 'data' 中已包含新字段
+    // 3. 准备 payload (Zod 已处理所有字段)
+    const payload = { ...validation.data };
 
     // 4. (关键) 处理图片更新
     if (req.file) {
-      // 上传了新图片，准备替换
       payload.imageUrl = `/uploads/products/${req.file.filename}`;
       
-      // (可选但推荐) 删除旧图片
       const oldProduct = await prisma.product.findUnique({ where: { id }, select: { imageUrl: true } });
       if (oldProduct && oldProduct.imageUrl) {
         const oldPath = path.join(__dirname, '..', oldProduct.imageUrl);
@@ -167,16 +208,19 @@ router.put('/products/:id', upload.single('productImage'), async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: '商品未找到' });
     }
+    if (error.code === 'P2002') {
+      return res.status(400).json({ error: '此 SKU 已被占用' });
+    }
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
 
 // DELETE /api/admin/products/:id (不变)
+// (删除 "我有的产品")
 router.delete('/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // 删除前先删除图片
     const product = await prisma.product.findUnique({ where: { id }, select: { imageUrl: true } });
     if (product && product.imageUrl) {
       const oldPath = path.join(__dirname, '..', product.imageUrl);
@@ -185,6 +229,7 @@ router.delete('/products/:id', async (req, res) => {
       }
     }
     
+    // (Prisma 的 onDelete: Cascade 会自动删除所有关联的 StoreProductListing)
     await prisma.product.delete({ where: { id } });
     res.status(204).send(); // 204 No Content
 
@@ -193,29 +238,29 @@ router.delete('/products/:id', async (req, res) => {
       return res.status(404).json({ error: '商品未找到' });
     }
     if (error.code === 'P2003') { 
-      return res.status(400).json({ error: '删除失败：该商品已有销售数据关联，无法删除' });
+      // (例如：如果还有 SalesData 关联着)
+      return res.status(400).json({ error: '删除失败：该商品仍有关联的销售数据或物流批次，无法删除' });
     }
+    console.error('删除商品失败:', error);
     res.status(500).json({ error: '删除商品失败' });
   }
 });
 
 
 // ----------------------------------------------------
-// --- (不变) "在售商品" 模块 API ---
+// --- (不变) "在售商品" 模块 API (由 data.js 和其他文件处理) ---
+// (我们保留这些，因为它们仍然被 SalesForm 和 OnSaleProductsPage 使用)
 // ----------------------------------------------------
 
 /**
- * GET /api/admin/products-list (获取商品卡片 + 售价详情)
+ * GET /api/admin/products-list (不变)
+ * (这个接口名现在有点歧义，但 OnSaleProductsPage 依赖它)
+ * (它获取 "我有的产品" 列表，并附带 "店铺清单" 信息)
  */
 router.get('/products-list', async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       orderBy: { sku: 'asc' },
-      // ⬇️ 【修改】
-      // 默认的 findMany (不带 select) 会返回所有字段
-      // (包括我们新增的 weightKg, volumeM3, dimensionsMm)
-      // 所以这里的 include 逻辑保持不变
-      // ⬆️ 【修改】
       include: {
         listings: { 
           include: {
@@ -230,17 +275,19 @@ router.get('/products-list', async (req, res) => {
     });
     res.json(products);
   } catch (error) {
-    console.error("获取在售商品列表失败:", error);
+    console.error("获取在售商品列表(products-list)失败:", error);
     res.status(500).json({ error: '获取在售商品列表失败' });
   }
 });
 
 /**
- * PUT /api/admin/listings/:id (价格同步)
+ * PUT /api/admin/listings/:id (价格同步) (不变)
+ * (这个接口现在归属 StoreProductListing，但路由保持不变)
  */
 router.put('/listings/:id', async (req, res) => {
   try {
     const { id: listingId } = req.params;
+    // (注意：req.user 来自 adminMiddleware)
     const { role, supervisedCountries } = req.user; 
 
     // 1. 验证输入
