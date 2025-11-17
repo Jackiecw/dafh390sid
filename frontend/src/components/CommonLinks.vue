@@ -70,6 +70,14 @@
         </div>
       </div>
     </div>
+
+    <LinkModal
+      :is-open="isModalOpen"
+      :link-to-edit="currentLinkToEdit"
+      @close="closeModal"
+      @link-created="handleLinkChange"
+      @link-updated="handleLinkChange"
+    />
   </div>
 </template>
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="kanban-board">
+  <div class="kanban-board" :class="{ 'kanban-board--empty': batches.length === 0 }">
     <div
       v-for="column in columns"
       :key="column.status"
@@ -8,12 +8,21 @@
       @dragleave.prevent="onDragLeave(column.status)"
       @drop.prevent="onDrop(column.status)"
       :class="{ 'drag-over': dragOverStatus === column.status }"
+      :style="{ '--accent': column.accent }"
     >
       <div class="column-header">
-        <span class="column-title">{{ column.label }}</span>
-        <span class="column-count">{{ column.batches.length }}</span>
+        <div>
+          <p class="column-title">{{ column.label }}</p>
+          <p class="column-subtitle">{{ column.subtitle }}</p>
+        </div>
+        <div class="column-metrics">
+          <span class="column-count">{{ column.batches.length }}</span>
+          <span v-if="column.totalAmount" class="column-amount">
+            ¥{{ column.totalAmount }}
+          </span>
+        </div>
       </div>
-      
+
       <div class="column-body">
         <LogisticsKanbanCard
           v-for="batch in column.batches"
@@ -23,9 +32,10 @@
           @click="onCardClick"
           @dragstart="onDragStart(batch)"
         />
-        
+
         <div v-if="column.batches.length === 0" class="column-empty">
-          无批次
+          <p>无批次</p>
+          <p class="muted">等待新的进度...</p>
         </div>
       </div>
     </div>
@@ -53,21 +63,20 @@ const props = defineProps({
 
 const emit = defineEmits(['update-status-request']);
 
-// (与 Stepper 和 Schema 保持一致)
-const STATUS_MAP = [
-  { key: 'FACTORY', label: '生产中' },
-  { key: 'WAREHOUSE_READY', label: '待出库' },
-  { key: 'CONTAINER_LOADED', label: '已装柜' },
-  { key: 'EXPORT_CUSTOMS', label: '出口清关' },
-  { key: 'SHIPPING', label: '国际运输' },
-  { key: 'IMPORT_CUSTOMS', label: '进口清关' },
-  { key: 'LOCAL_DELIVERY', label: '本地派送' },
-  { key: 'COMPLETED', label: '已入仓' },
+// (与 Stepper / Schema 保持一致)
+const STATUS_META = [
+  { key: 'FACTORY', label: '生产中', subtitle: '排产与备料', accent: '#A5B4FC' },
+  { key: 'WAREHOUSE_READY', label: '待出库', subtitle: '成品待发', accent: '#67E8F9' },
+  { key: 'CONTAINER_LOADED', label: '已装柜', subtitle: '等待出口', accent: '#34D399' },
+  { key: 'EXPORT_CUSTOMS', label: '出口清关', subtitle: '报关与查验', accent: '#FBBF24' },
+  { key: 'SHIPPING', label: '国际运输', subtitle: '海运 / 空运', accent: '#F472B6' },
+  { key: 'IMPORT_CUSTOMS', label: '进口清关', subtitle: '海外报关', accent: '#FB7185' },
+  { key: 'LOCAL_DELIVERY', label: '本地派送', subtitle: '海外末端', accent: '#38BDF8' },
+  { key: 'COMPLETED', label: '已入仓', subtitle: '入仓完成', accent: '#A7F3D0' },
 ];
 
-// (核心) 将传入的 batches 数组按状态分组
+// (核心) 将传入的 batches 数组按状态分组，顺便统计金额
 const columns = computed(() => {
-  // (创建一个 map, key 是状态, value 是批次数组)
   const batchesByStatus = props.batches.reduce((acc, batch) => {
     const status = batch.currentStatus;
     if (!acc[status]) {
@@ -77,11 +86,20 @@ const columns = computed(() => {
     return acc;
   }, {});
 
-  // (按 STATUS_MAP 的顺序)
-  return STATUS_MAP.map((statusInfo) => ({
-    ...statusInfo,
-    batches: batchesByStatus[statusInfo.key] || [],
-  }));
+  return STATUS_META.map((statusInfo) => {
+    const batchesInColumn = batchesByStatus[statusInfo.key] || [];
+    const totalAmount = batchesInColumn.reduce((sum, batch) => {
+      return sum + (Number(batch.totalPrice) || 0);
+    }, 0);
+
+    return {
+      ...statusInfo,
+      batches: batchesInColumn,
+      totalAmount: totalAmount
+        ? totalAmount.toLocaleString('zh-CN', { maximumFractionDigits: 0 })
+        : null,
+    };
+  });
 });
 
 // --- 拖拽逻辑 ---
@@ -106,15 +124,14 @@ function onDragLeave(statusKey) {
 
 function onDrop(targetStatus) {
   if (!props.isAdmin) return;
-  
+
   const batchId = draggingBatchId.value;
-  const batch = props.batches.find(b => b.id === batchId);
-  
+  const batch = props.batches.find((b) => b.id === batchId);
+
   dragOverStatus.value = null;
   draggingBatchId.value = null;
 
   if (batch && batch.currentStatus !== targetStatus) {
-    // (核心) 不直接修改, 而是发出事件, 通知父组件打开弹窗
     emit('update-status-request', { batch, targetStatus });
   }
 }
@@ -128,54 +145,91 @@ function onCardClick(batch) {
 
 <style scoped>
 .kanban-board {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  gap: 1rem;
   overflow-x: auto;
-  padding: 0.5rem;
-  background-color: #f9fafb; /* gray-50 */
-  border-radius: 0.5rem;
-  min-height: 600px;
+  padding: 1rem;
+  background-color: #f9fafb;
+  border-radius: 1rem;
+  min-height: 540px;
+}
+.kanban-board--empty {
+  justify-content: center;
 }
 .kanban-column {
-  width: 280px;
+  width: 300px;
   min-width: 280px;
-  margin-right: 0.75rem;
-  border-radius: 0.5rem; /* rounded-lg */
-  background-color: #f3f4f6; /* gray-100 */
-  transition: background-color 0.2s ease;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #fff, #f8fafc);
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 10px 25px -20px rgba(15, 23, 42, 0.4);
+}
+.kanban-column::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 6px;
+  border-radius: 1rem 0 0 1rem;
+  background: var(--accent, #d1d5db);
 }
 .kanban-column.drag-over {
-  background-color: #eef2ff; /* blue-100 */
-  border: 1px dashed #3b82f6;
+  border-color: #2563eb;
+  box-shadow: 0 15px 35px -15px rgba(37, 99, 235, 0.5);
 }
 .column-header {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.9));
+  backdrop-filter: blur(6px);
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 2px solid #e5e7eb; /* gray-200 */
+  gap: 0.5rem;
+  padding: 1rem;
+  border-bottom: 1px solid #eef2ff;
+  border-top-right-radius: 1rem;
 }
 .column-title {
-  font-size: 0.875rem; /* text-sm */
-  font-weight: 600; /* font-semibold */
-  color: #1f2937; /* gray-800 */
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.column-subtitle {
+  font-size: 0.75rem;
+  color: #64748b;
+}
+.column-metrics {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
 }
 .column-count {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #6b7280; /* gray-500 */
-  background-color: #e5e7eb;
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2563eb;
+  background-color: rgba(37, 99, 235, 0.12);
+  padding: 0.15rem 0.75rem;
+  border-radius: 999px;
+}
+.column-amount {
+  font-size: 0.75rem;
+  color: #475569;
 }
 .column-body {
-  padding: 0.75rem;
-  height: calc(100% - 50px);
+  padding: 1rem;
+  height: calc(100% - 70px);
   overflow-y: auto;
 }
 .column-empty {
   padding: 2rem 0;
   text-align: center;
   font-size: 0.875rem;
-  color: #9ca3af; /* gray-400 */
+  color: #9ca3af;
+}
+.column-empty .muted {
+  font-size: 0.75rem;
 }
 </style>
