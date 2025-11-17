@@ -213,6 +213,7 @@ import OperationsCenter from './OperationsCenter.vue';
 import DashboardHome from './DashboardHome.vue';
 import CalendarPage from './CalendarPage.vue';
 import FinancePage from './FinancePage.vue';
+import LogisticsPage from './LogisticsPage.vue';
 
 const menuGroups = [
   {
@@ -236,6 +237,7 @@ const menuGroups = [
       { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
       { key: 'OPERATION_CENTER', name: '运营中心' },
       { key: 'FINANCE_ADMIN', name: '财务管理' },
+      { key: 'LOGISTICS_MGMT', name: '生产与物流' },
     ],
   },
   {
@@ -269,6 +271,7 @@ const viewComponents = {
   ADMIN_STORES: StoreManagement,
   ADMIN_USERS: UserManagement,
   PROFILE_MGMT: ProfileManagement,
+  LOGISTICS_MGMT: LogisticsPage,
 };
 
 const authStore = useAuthStore();

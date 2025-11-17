@@ -35,12 +35,15 @@ model User {
   todos          Todo[]
   recurringTasks RecurringTask[]
   
-  // ⬇️ --- 【日历功能】 ---
+  // --- 【日历功能】 ---
   calendarEvents        CalendarEvent[] @relation("UserEvents")
   createdCalendarEvents CalendarEvent[] @relation("AdminCreatedEvents")
   weeklyFocuses         WeeklyFocus[]
   
-  expenses              Expense[] // ⬅️ 【财务模块新增】
+  expenses              Expense[]
+  
+  // ⬇️ --- 【物流模块新增 - 已修正】 ---
+  createdLogisticsEvents LogisticsEvent[] @relation("LogisticsEventCreator")
 }
 
 // --- 2. 角色模型 (Role) ---
@@ -74,7 +77,7 @@ model Store {
   salesData SalesData[]
   listings  StoreProductListing[]
 
-  expenses  Expense[] // ⬅️ 【财务模块新增】
+  expenses  Expense[]
 }
 
 // --- 5. 销售数据模型 (SalesData) ---
@@ -121,6 +124,9 @@ model ManagedCountry {
   stores        Store[]
   
   operationModules OperationModule[]
+  
+  // ⬇️ --- 【物流模块新增 - 已修正】 ---
+  logisticsBatches LogisticsBatch[] @relation("CountryBatches")
 }
 
 // --- 8. 商品模型 (Product) ---
@@ -140,6 +146,9 @@ model Product {
   listings     StoreProductListing[]
   
   salesData SalesData[]
+  
+  // ⬇️ --- 【物流模块新增 - 已修正】 ---
+  logisticsBatches LogisticsBatch[] @relation("ProductBatches")
 }
 
 // --- 9. 店铺商品上架 (StoreProductListing) 模型 ---
@@ -238,6 +247,7 @@ model CalendarEvent {
   createdByAdmin Boolean  @default(false)
   adminCreator   User?    @relation("AdminCreatedEvents", fields: [adminCreatorId], references: [id], onDelete: SetNull)
   adminCreatorId String?
+
   @@index([authorId, startAt, endAt])
 }
 
@@ -254,7 +264,7 @@ model WeeklyFocus {
   updatedAt DateTime @updatedAt
 }
 
-// --- 17. 支出 (Expense) 模型 --- ⬅️ 【财务模块新增】
+// --- 17. 支出 (Expense) 模型 ---
 model Expense {
   id                String    @id @default(cuid())
   expenseDate       DateTime  // "日期"
@@ -277,8 +287,7 @@ model Expense {
 
   // 1. 归属店铺 (可选，允许"公司"级支出)
   store             Store?    @relation(fields: [storeId], references: [id], onDelete: SetNull)
-  storeId           String?   
-
+  storeId           String?
   // 2. 录入人
   enteredBy         User      @relation(fields: [enteredById], references: [id], onDelete: Cascade)
   enteredById       String
@@ -288,6 +297,81 @@ model Expense {
   @@index([expenseDate])
   @@index([storeId])
   @@index([enteredById])
+}
+
+
+// ------------------------------------
+// --- 【新增】物流与生产 (第 18、19) ---
+// ------------------------------------
+
+// --- 18. 物流批次 (LogisticsBatch) 模型 ---
+// (对应你 Excel 表格中的一行)
+model LogisticsBatch {
+  id            String    @id @default(cuid())
+  batchNumber   String    @unique // 批次 (e.g., "ID0001")
+  orderDate     DateTime  @db.Date // 订单日期
+  
+  // 关联产品 (来自你的 "SKU编号")
+  product       Product   @relation("ProductBatches", fields: [productId], references: [id])
+  productId     String
+  productSpec   String?   // 产品规格
+  
+  // 销售地 (来自你的 "销售地")
+  country       ManagedCountry @relation("CountryBatches", fields: [countryCode], references: [code])
+  countryCode   String
+  
+  // 数量与价格
+  quantity      Int       // 数量
+  unitPrice     Float     // 单价
+  totalPrice    Float     // 总价
+  
+  // 生产信息
+  productionTimeDays Int?  // 生产耗时 (天)
+  estimatedFactoryDate DateTime? @db.Date // 预计出库日期
+  
+  // 物流信息
+  logisticsProvider String? // 物流服务商
+  freightForwarder  String? // 货代
+  cartonCount       Int?    // 箱数
+  totalCbm        Float?    // 总 CBM
+  totalKg         Float?    // 总 KG
+  
+  // 最终入仓
+  estimatedWarehouseDate DateTime? @db.Date // 预计入仓日期
+  
+  notes         String?   @db.Text // 备注
+  createdAt     DateTime  @default(now())
+  
+  // 核心: 关联的物流事件 (用于追踪链路)
+  events        LogisticsEvent[]
+  
+  // 核心: 当前状态 (冗余存储，方便查询和看板)
+  currentStatus   LogisticsStatus @default(FACTORY)
+  
+  @@index([countryCode])
+  @@index([productId])
+  @@index([currentStatus])
+}
+
+// --- 19. 物流事件 (LogisticsEvent) 模型 ---
+// (用于实现你的 "可视化链路")
+model LogisticsEvent {
+  id          String   @id @default(cuid())
+  
+  // 关联到哪个批次
+  batch       LogisticsBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId     String
+  
+  status      LogisticsStatus // 状态 (例如: 已装柜, 运输中...)
+  eventDate   DateTime // 事件发生日期
+  notes       String?  @db.Text // 备注 (例如: 柜号, 提单号, 船名)
+  
+  // 由谁创建的
+  createdBy   User     @relation("LogisticsEventCreator", fields: [createdById], references: [id])
+  createdById String
+  createdAt   DateTime @default(now())
+  
+  @@index([batchId])
 }
 
 
@@ -313,6 +397,7 @@ enum ProductCategory {
   SCREEN
   STAND
   ACCESSORY
+  
   OTHER
 }
 
@@ -322,18 +407,29 @@ enum TaskPeriod {
   MONTHLY
 }
 
-// ⬇️ 【财务模块新增】
 enum PaymentMethod {
-  ALIPAY        // 支付宝
-  WECHAT_PAY    // 微信支付
-  BANK_TRANSFER // 银行转账
-  CREDIT_CARD   // 信用卡
-  CASH          // 现金
-  OTHER         // 其他
+  ALIPAY
+  WECHAT_PAY
+  BANK_TRANSFER
+  CREDIT_CARD
+  CASH
+  OTHER
 }
 
 enum InvoiceStatus {
-  NONE     // 无票
-  REGULAR  // 普票
-  SPECIAL  // 专票
+  NONE
+  REGULAR
+  SPECIAL
 }
+
+// ⬇️ --- 【物流模块新增】 ---
+enum LogisticsStatus {
+  FACTORY           // 生产中 (工厂)
+  WAREHOUSE_READY   // 待出库 (已在物流仓库)
+  CONTAINER_LOADED  // 已装柜
+  EXPORT_CUSTOMS    // 出口清关
+  SHIPPING          // 国际运输 (海运/空运)
+  IMPORT_CUSTOMS    // 进口清关
+  LOCAL_DELIVERY    // 本地派送
+  COMPLETED         // 已入仓
+} 

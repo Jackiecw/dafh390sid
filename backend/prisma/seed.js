@@ -10,91 +10,82 @@ async function main() {
   // --- 1. 创建所有“菜单项” ---
   console.log('正在创建菜单项...');
   
-  // ⬇️ --- 【修复】 补全所有缺失的菜单项 ---
   const menuDashboard = await prisma.menuItem.upsert({
-    where: { key: 'DASHBOARD' },
-    update: {},
+    where: { key: 'DASHBOARD' }, update: {},
     create: { key: 'DASHBOARD', name: '仪表盘' },
   });
   
   const menuCalendar = await prisma.menuItem.upsert({
-    where: { key: 'CALENDAR' },
-    update: { name: '工作日历' },
+    where: { key: 'CALENDAR' }, update: { name: '工作日历' },
     create: { key: 'CALENDAR', name: '工作日历' },
   });
 
   const menuSalesData = await prisma.menuItem.upsert({
-    where: { key: 'SALES_DATA' },
-    update: {},
+    where: { key: 'SALES_DATA' }, update: {},
     create: { key: 'SALES_DATA', name: '销售数据' },
   });
   const menuWeeklyReport = await prisma.menuItem.upsert({
-    where: { key: 'WEEKLY_REPORT' },
-    update: {},
+    where: { key: 'WEEKLY_REPORT' }, update: {},
     create: { key: 'WEEKLY_REPORT', name: '周报填写' },
   });
   const menuViewReports = await prisma.menuItem.upsert({
-    where: { key: 'VIEW_REPORTS' },
-    update: {},
+    where: { key: 'VIEW_REPORTS' }, update: {},
     create: { key: 'VIEW_REPORTS', name: '周报查看' },
   });
   
   const menuReports = await prisma.menuItem.upsert({
-    where: { key: 'REPORTS' },
-    update: {},
+    where: { key: 'REPORTS' }, update: {},
     create: { key: 'REPORTS', name: '周报 (父菜单)' },
   });
   
   const menuLinks = await prisma.menuItem.upsert({
-    where: { key: 'LINKS' },
-    update: {},
+    where: { key: 'LINKS' }, update: {},
     create: { key: 'LINKS', name: '常用链接' },
   });
   const menuAdminUsers = await prisma.menuItem.upsert({
-    where: { key: 'ADMIN_USERS' },
-    update: {},
+    where: { key: 'ADMIN_USERS' }, update: {},
     create: { key: 'ADMIN_USERS', name: '员工配置与管理' },
   });
   const menuAdminStores = await prisma.menuItem.upsert({
-    where: { key: 'ADMIN_STORES' },
-    update: {},
+    where: { key: 'ADMIN_STORES' }, update: {},
     create: { key: 'ADMIN_STORES', name: '店铺管理' },
   });
   
   const menuOnSaleProducts = await prisma.menuItem.upsert({
-    where: { key: 'ON_SALE_PRODUCTS' },
-    update: { name: '在售商品' },
+    where: { key: 'ON_SALE_PRODUCTS' }, update: { name: '在售商品' },
     create: { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
   });
-  // ⬆️ --- 【修复】 ---
 
   const menuOperationCenter = await prisma.menuItem.upsert({
-    where: { key: 'OPERATION_CENTER' },
-    update: {},
+    where: { key: 'OPERATION_CENTER' }, update: {},
     create: { key: 'OPERATION_CENTER', name: '运营中心' },
   });
   
   const menuFinanceAdmin = await prisma.menuItem.upsert({
-    where: { key: 'FINANCE_ADMIN' },
-    update: {},
+    where: { key: 'FINANCE_ADMIN' }, update: {},
     create: { key: 'FINANCE_ADMIN', name: '财务管理' },
   });
   const menuFinanceEntry = await prisma.menuItem.upsert({
-    where: { key: 'FINANCE_ENTRY' },
-    update: {},
+    where: { key: 'FINANCE_ENTRY' }, update: {},
     create: { key: 'FINANCE_ENTRY', name: '支出录入' },
   });
   const menuFinanceView = await prisma.menuItem.upsert({
-    where: { key: 'FINANCE_VIEW' },
-    update: {},
+    where: { key: 'FINANCE_VIEW' }, update: {},
     create: { key: 'FINANCE_VIEW', name: '支出查询' },
   });
 
   const menuFinanceExport = await prisma.menuItem.upsert({
-    where: { key: 'FINANCE_EXPORT' },
-    update: {},
+    where: { key: 'FINANCE_EXPORT' }, update: {},
     create: { key: 'FINANCE_EXPORT', name: '支出批量导出' },
   });
+  
+  // ⬇️ --- 【新增】 ---
+  const menuLogisticsMgmt = await prisma.menuItem.upsert({
+    where: { key: 'LOGISTICS_MGMT' },
+    update: {},
+    create: { key: 'LOGISTICS_MGMT', name: '生产与物流' },
+  });
+  // ⬆️ --- 【新增】 ---
   
   try {
     await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
@@ -122,12 +113,13 @@ async function main() {
           { id: menuCalendar.id },
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
+          { id: menuLogisticsMgmt.id }, // ⬅️ 【新增】
         ],
         disconnect: [ 
           { key: 'SALES_FORM' },
           { key: 'SALES_DATA_MGMT' },
           { key: 'ADMIN_PRODUCTS' },
-          { id: menuViewReports.id }, // ⬅️ 这一行 (第66行) 现在是安全的
+          { id: menuViewReports.id },
           { id: menuFinanceView.id },
           { id: menuFinanceExport.id }, 
         ]
@@ -148,6 +140,7 @@ async function main() {
           { id: menuCalendar.id },
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
+          { id: menuLogisticsMgmt.id }, // ⬅️ 【新增】
         ],
       },
     },
@@ -174,6 +167,7 @@ async function main() {
           { id: menuFinanceEntry.id },
           { id: menuFinanceView.id },
           { id: menuFinanceExport.id },
+          { id: menuLogisticsMgmt.id }, // ⬅️ 【新增】
         ],
         disconnect: [
           { key: 'SALES_FORM' },
@@ -202,6 +196,7 @@ async function main() {
           { id: menuFinanceEntry.id },
           { id: menuFinanceView.id },
           { id: menuFinanceExport.id },
+          { id: menuLogisticsMgmt.id }, // ⬅️ 【新增】
         ],
       },
     },

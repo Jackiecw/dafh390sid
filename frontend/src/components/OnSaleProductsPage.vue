@@ -158,16 +158,10 @@
         </div>
       </section>
     </div>
-
-    <ProductFormModal
-      :is-open="isModalOpen"
-      :product-to-edit-id="productToEditId"
-      @close="closeModal"
-      @product-created="handleProductChange"
-      @product-updated="handleProductChange"
-    />
   </div>
+
 </template>
+
 
 
 <script setup>
