@@ -9,6 +9,7 @@ const axios = require('axios');
 
 const router = express.Router();
 
+
 const { 
   getRates, 
   countryCurrencyMap, 
@@ -1100,6 +1101,16 @@ router.put('/calendar/weekly-focus/:id', authMiddleware, async (req, res) => {
   }
 });
 
+
+router.get('/rates', authMiddleware, async (req, res) => {
+  try {
+    const rates = await getRates(); // (复用 datahelpers.js 中的函数)
+    res.json(rates);
+  } catch (error) {
+    console.error('获取公开汇率失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
 // ⬆️ --- 【新增】 ---
 
 module.exports = router;

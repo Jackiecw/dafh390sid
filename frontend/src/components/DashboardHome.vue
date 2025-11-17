@@ -185,6 +185,15 @@ import DashboardSchedule from './DashboardSchedule.vue';
 import DashboardRecurringTask from './DashboardRecurringTask.vue';
 
 const authStore = useAuthStore();
+const DEFAULT_RATES = Object.freeze({
+  CNY_USD: 0.14,
+  CNY_IDR: 2300,
+  CNY_VND: 3500,
+  CNY_THB: 5,
+  CNY_MYR: 0.65,
+  CNY_PHP: 8,
+  CNY_SGD: 0.19,
+});
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -338,26 +347,41 @@ async function fetchDashboardData() {
     storeId: selectedStoreId.value,
   };
 
-  const summaryPromise = apiClient.get('/dashboard/summary', { params });
-  const ratesPromise = apiClient.get('/rates');
+  const summaryPromise = apiClient
+    .get('/dashboard/summary', { params })
+    .then((summaryResponse) => {
+      const schedule = summaryResponse.data.schedule || {};
+      summaryData.value = {
+        ...summaryResponse.data,
+        schedule: {
+          planNextWeek: schedule.planNextWeek || '',
+          teamFocus: schedule.teamFocus || '',
+        },
+      };
+    })
+    .catch((error) => {
+      console.error('加载 GMV 摘要失败:', error);
+    })
+    .finally(() => {
+      isLoading.value.summary = false;
+    });
 
-  try {
-    const [summaryResponse, ratesResponse] = await Promise.all([summaryPromise, ratesPromise]);
-    const schedule = summaryResponse.data.schedule || {};
-    summaryData.value = {
-      ...summaryResponse.data,
-      schedule: {
-        planNextWeek: schedule.planNextWeek || '',
-        teamFocus: schedule.teamFocus || '',
-      },
-    };
-    ratesData.value = ratesResponse.data;
-  } catch (error) {
-    console.error('加载仪表盘数据失败:', error);
-  } finally {
-    isLoading.value.summary = false;
-    isLoading.value.rates = false;
-  }
+  const ratesPromise = apiClient
+    .get('/rates')
+    .then((ratesResponse) => {
+      ratesData.value = ratesResponse.data || {};
+    })
+    .catch((error) => {
+      console.error('加载汇率失败:', error);
+      if (!Object.keys(ratesData.value || {}).length) {
+        ratesData.value = { ...DEFAULT_RATES };
+      }
+    })
+    .finally(() => {
+      isLoading.value.rates = false;
+    });
+
+  await Promise.all([summaryPromise, ratesPromise]);
 }
 
 onMounted(async () => {

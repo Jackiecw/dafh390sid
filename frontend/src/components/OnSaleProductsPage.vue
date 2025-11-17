@@ -22,187 +22,221 @@
       </div>
     </section>
 
-    <section class="rounded-3xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden">
-      <p v-if="isLoading" class="p-6 text-sm text-[#6B7280]">正在加载在售列表...</p>
-      <p v-if="errorMessage" class="p-6 text-sm text-red-600">{{ errorMessage }}</p>
-
-      <div v-if="!isLoading && listings.length > 0" class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-[#E5E7EB]">
-          <thead class="bg-[#F9FAFB]">
-            <tr>
-              <th class="table-th">店铺主图</th>
-              <th class="table-th">店铺标题</th>
-              <th class="table-th">在售店铺</th>
-              <th class="table-th">对应产品 (SKU)</th>
-              <th class="table-th">售价 (当地)</th>
-              <th class="table-th">售价 (RMB)</th>
-              <th class="table-th">上周销量</th>
-              <th class="table-th">本月销量</th>
-              <th class="table-th">总销量</th>
-              <th class="table-th">商品链接</th>
-              <th class="table-th">操作</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-[#E5E7EB]">
-            <tr v-for="listing in listings" :key="listing.id" class="hover:bg-[#F9FAFB]">
-              
-              <td class="table-td">
-                <img :src="getListingImageUrl(listing.storeImageUrl)" alt="listing" class="h-12 w-12 rounded-lg object-cover shadow" />
-              </td>
-              
-              <td class="table-td max-w-xs truncate" :title="listing.storeTitle">
-                {{ listing.storeTitle || 'N/A' }}
-              </td>
-              
-              <td class="table-td">
-                <div class="font-medium text-[#1F2937]">[{{ listing.store.country.code }}]</div>
-                <div class="text-xs text-[#6B7280]">{{ listing.store.name }}</div>
-              </td>
-
-              <td class="table-td">
-                <div class="font-medium text-[#1F2937]">{{ listing.product.sku }}</div>
-                <div class="text-xs text-[#6B7280]">{{ listing.product.publicName || listing.product.name }}</div>
-              </td>
-
-              <td class="table-td font-semibold text-[#1D4ED8]">
-                {{ formatCurrency(listing.currentPrice, listing.store.countryCode) }}
-              </td>
-              
-              <td class="table-td font-semibold text-[#1F2937]">
-                ¥ {{ listing.currentPriceRmb.toFixed(2) }}
-              </td>
-              
-              <td class="table-td">{{ listing.lastWeekSales }}</td>
-              <td class="table-td">{{ listing.thisMonthSales }}</td>
-              <td class="table-td font-bold">{{ listing.totalSales }}</td>
-              
-              <td class="table-td">
-                <a v-if="listing.platformUrl" :href="listing.platformUrl" target="_blank" rel="noopener noreferrer" 
-                   class="text-[#3B82F6] hover:text-[#2563EB] hover:underline">
-                  跳转
-                </a>
-                <span v-else class="text-[#94A3B8]">未提供</span>
-              </td>
-
-              <td class="table-td">
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-0 shadow-sm">
+      <div v-if="isLoading" class="p-6 text-sm text-[#6B7280]">正在加载在售列表...</div>
+      <div v-else>
+        <p v-if="errorMessage" class="px-6 pt-6 text-sm text-red-600">{{ errorMessage }}</p>
+        <div v-if="listings.length === 0" class="px-6 pb-6 text-sm text-[#6B7280]">
+          当前还没有在售商品，点击右上角「上架新商品」即可快速创建。
+        </div>
+        <div v-else class="flex flex-col gap-6 px-6 pb-6 lg:flex-row">
+          <aside class="lg:w-5/12 xl:w-1/3">
+            <div class="rounded-3xl border border-[#E2E8F0] bg-[#F8FAFF] p-3 shadow-inner">
+              <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">在售清单</p>
+              <div class="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
                 <button
-                  @click="openEditModal(listing)"
-                  class="text-sm font-semibold text-[#3B82F6] hover:text-[#2563EB]"
+                  v-for="listing in listings"
+                  :key="listing.id"
+                  class="w-full rounded-2xl border bg-white px-4 py-3 text-left transition"
+                  :class="
+                    selectedListingId === listing.id
+                      ? 'border-[#2563EB] shadow-lg shadow-blue-100'
+                      : 'border-transparent hover:border-[#CBD5F5] hover:shadow'
+                  "
+                  @click="selectListing(listing.id)"
                 >
-                  编辑
+                  <div class="flex items-start gap-4">
+                    <img
+                      :src="getListingImageUrl(listing.storeImageUrl)"
+                      alt="listing cover"
+                      class="h-16 w-16 flex-shrink-0 rounded-xl border border-[#E5E7EB] object-cover shadow"
+                    />
+                    <div class="flex-1">
+                      <p class="text-sm font-semibold text-[#1F2937] line-clamp-2">
+                        {{ listing.storeTitle || '未命名商品' }}
+                      </p>
+                      <p class="mt-1 text-xs text-[#64748B]">
+                        代码：{{ listing.productCode || '未设置' }}
+                      </p>
+                      <p class="text-xs text-[#94A3B8]">
+                        {{ listing.store.country.name }} · {{ listing.store.name }}
+                      </p>
+                      <p class="mt-2 text-sm font-semibold text-[#2563EB]">
+                        {{ formatLocalPrice(listing.currentPrice, getCurrencyCode(listing)) }}
+                      </p>
+                    </div>
+                  </div>
                 </button>
-                </td>
+              </div>
+            </div>
+          </aside>
 
-            </tr>
-          </tbody>
-        </table>
+          <article
+            v-if="selectedListing"
+            class="flex-1 rounded-3xl border border-[#E5E7EB] bg-white p-8 shadow-lg shadow-blue-50"
+          >
+            <div class="flex flex-col gap-6 lg:flex-row">
+              <div class="flex-shrink-0">
+                <img
+                  :src="getListingImageUrl(selectedListing.storeImageUrl)"
+                  alt="listing main"
+                  class="h-48 w-48 rounded-3xl border border-[#E2E8F0] object-cover shadow-lg"
+                />
+              </div>
+              <div class="flex-1 space-y-3">
+                <div class="flex items-center gap-2 text-sm text-[#64748B]">
+                  <span class="rounded-full bg-[#EEF2FF] px-3 py-1 font-semibold text-[#4338CA]">
+                    {{ selectedListing.store.country.code }}
+                  </span>
+                  <span>{{ selectedListing.store.name }}</span>
+                </div>
+                <h3 class="text-2xl font-semibold text-[#111827]">
+                  {{ selectedListing.storeTitle || '未命名商品' }}
+                </h3>
+                <p class="text-sm text-[#6B7280]">
+                  对应产品：{{ selectedListing.product.publicName || selectedListing.product.name }}
+                  (SKU: {{ selectedListing.product.sku }})
+                </p>
+                <p class="text-sm text-[#6B7280]">
+                  商品代码：
+                  <span class="font-semibold text-[#111827]">
+                    {{ selectedListing.productCode || '未设置' }}
+                  </span>
+                </p>
+                <div>
+                  <p class="text-xs uppercase tracking-wide text-[#94A3B8]">售价</p>
+                  <p class="text-3xl font-semibold text-[#111827]">
+                    {{ formatLocalPrice(selectedListing.currentPrice, getCurrencyCode(selectedListing)) }}
+                    <span class="ml-3 text-base font-medium text-[#059669]">
+                      ≈ ¥ {{ formatCnyPrice(selectedListing).toFixed(2) }}
+                    </span>
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-4 text-sm text-[#6B7280]">
+                  <span>上周销量：<strong class="text-[#111827]">{{ selectedListing.lastWeekSales }}</strong></span>
+                  <span>本月销量：<strong class="text-[#111827]">{{ selectedListing.thisMonthSales }}</strong></span>
+                  <span>总销量：<strong class="text-[#111827]">{{ selectedListing.totalSales }}</strong></span>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <button
+                    @click="openEditModal(selectedListing)"
+                    class="rounded-2xl bg-[#EEF2FF] px-4 py-2 text-sm font-semibold text-[#4338CA] hover:bg-[#E0E7FF]"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    v-if="isAdmin"
+                    @click="handleDelete(selectedListing)"
+                    class="rounded-2xl border border-[#FEE2E2] bg-[#FFF5F5] px-4 py-2 text-sm font-semibold text-[#DC2626] hover:bg-[#FFE4E6]"
+                  >
+                    删除
+                  </button>
+                  <a
+                    v-if="selectedListing.platformUrl"
+                    :href="selectedListing.platformUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-sm font-semibold text-[#2563EB] hover:underline"
+                  >
+                    查看商品链接
+                  </a>
+                  <span v-else class="text-sm text-[#94A3B8]">暂无商品链接</span>
+                </div>
+              </div>
+            </div>
+          </article>
+          <article
+            v-else
+            class="flex-1 rounded-3xl border border-dashed border-[#CBD5F5] bg-[#F8FAFF] p-6 text-center text-[#64748B]"
+          >
+            请选择左侧的商品以查看详细信息。
+          </article>
+        </div>
       </div>
     </section>
+
     <StoreListingFormModal
       :is-open="isModalOpen"
-      :listing-to-edit-id="listingToEditId" 
+      :listing-to-edit-id="listingToEditId"
       @close="closeModal"
       @listing-created="handleListingCreated"
       @listing-updated="handleListingUpdated"
     />
-    </div>
+  </div>
 </template>
 
-
-
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
-// ⬇️ 【修改】 导入新弹窗
 import StoreListingFormModal from './StoreListingFormModal.vue';
 
-// --- 状态 (State) ---
-const listings = ref([]); // (原: products)
+const authStore = useAuthStore();
+const listings = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref('');
-
-const authStore = useAuthStore();
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
-
-// --- 弹窗 (Modal) ---
 const isModalOpen = ref(false);
-const listingToEditId = ref(null); // (原: productToEditId)
+const listingToEditId = ref(null);
+const selectedListingId = ref(null);
+const ratesData = ref({});
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+const placeholderImage = 'https://via.placeholder.com/320x320?text=Listing';
 
+const isAdmin = computed(() => authStore.role === 'admin');
+const selectedListing = computed(() => listings.value.find((item) => item.id === selectedListingId.value) || null);
 
-// --- 1. 数据获取 ---
-async function fetchListings() { // (原: fetchProducts)
+const currencyFallbackMap = {
+  ID: 'IDR',
+  VN: 'VND',
+  TH: 'THB',
+  MY: 'MYR',
+  PH: 'PHP',
+  SG: 'SGD',
+};
+
+async function fetchListings(focusId = null) {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    // ⬇️ 【修改】 调用新的 API
     const response = await apiClient.get('/admin/store-listings');
     listings.value = response.data;
+    if (listings.value.length === 0) {
+      selectedListingId.value = null;
+    } else if (focusId && listings.value.some((item) => item.id === focusId)) {
+      selectedListingId.value = focusId;
+    } else if (!selectedListingId.value || !listings.value.some((item) => item.id === selectedListingId.value)) {
+      selectedListingId.value = listings.value[0]?.id || null;
+    }
   } catch (error) {
     console.error('获取店铺在售列表失败:', error);
-    errorMessage.value = '获取店铺在售列表失败。';
+    errorMessage.value = error.response?.data?.error || '获取店铺在售列表失败';
   } finally {
     isLoading.value = false;
   }
 }
 
-onMounted(() => {
-  fetchListings();
-});
-
-
-// --- 2. 辅助函数 ---
-function getListingImageUrl(imageUrl) {
-  if (!imageUrl) return 'https://via.placeholder.com/150'; // 默认图片
-  // (图片路径已在 P2 中修改为 /uploads/listings/)
-  return `${apiBaseUrl}${imageUrl}`; 
-}
-
-// (根据国家代码格式化当地货币)
-function formatCurrency(value, countryCode) {
-  const currencyMap = {
-    ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD',
-  };
-  const styleMap = {
-    IDR: { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 },
-    VND: { style: 'currency', currency: 'VND', maximumFractionDigits: 0 },
-    THB: { style: 'currency', currency: 'THB' },
-    MYR: { style: 'currency', currency: 'MYR' },
-    PHP: { style: 'currency', currency: 'PHP' },
-    SGD: { style: 'currency', currency: 'SGD' },
-  };
-  
-  const currency = currencyMap[countryCode] || 'USD'; // 默认
-  
+async function fetchRates() {
   try {
-    // (使用 Intl.NumberFormat 自动添加 Rp, ₫, ฿ 等符号)
-    return new Intl.NumberFormat('en-US', styleMap[currency] || { style: 'currency', currency: currency }).format(value);
-  } catch (e) {
-    return value.toFixed(2); // (回退)
+    const response = await apiClient.get('/rates');
+    ratesData.value = response.data || {};
+  } catch (error) {
+    console.error('获取汇率失败:', error);
   }
 }
 
+onMounted(() => {
+  fetchListings();
+  fetchRates();
+});
 
-// --- 3. 价格同步 (Price Sync) 逻辑 ---
-// ⬇️ 【已删除】
-// (旧的 inline-editing 逻辑 (editingListingId, editPrice, 等) 已被移除)
-// (编辑功能现在统一由 StoreListingFormModal 处理)
-
-
-// --- 4. 商品弹窗 (Modal) 逻辑 ---
 function openCreateModal() {
   listingToEditId.value = null;
   isModalOpen.value = true;
 }
 
 function openEditModal(listing) {
-  // (TODO: 编辑功能)
-  // (目前 StoreListingFormModal 只实现了“创建”)
-  // (要实现“编辑”，我们需要给 Modal 传入 listingToEditId 并让它 GET 详情)
-  // (为简单起见，我们暂时只开放创建)
-  alert('编辑功能尚未实现。请删除后重建。');
-  // listingToEditId.value = listing.id;
-  // isModalOpen.value = true;
+  listingToEditId.value = listing.id;
+  isModalOpen.value = true;
 }
 
 function closeModal() {
@@ -210,48 +244,82 @@ function closeModal() {
   listingToEditId.value = null;
 }
 
-// (当商品被创建或更新时)
-function handleListingCreated(newListing) {
-  listings.value.unshift(newListing); // (添加到列表顶部)
+function selectListing(id) {
+  selectedListingId.value = id;
+}
+
+async function handleListingCreated(newListing) {
+  await fetchListings(newListing.id);
   closeModal();
 }
 
-function handleListingUpdated(updatedListing) {
-  // (用于未来实现编辑)
-  const index = listings.value.findIndex(l => l.id === updatedListing.id);
-  if (index !== -1) {
-    listings.value[index] = updatedListing;
+async function handleListingUpdated(updatedListing) {
+  await fetchListings(updatedListing.id);
+  closeModal();
+}
+
+async function handleDelete(listing) {
+  if (!isAdmin.value) {
+    errorMessage.value = '仅超级管理员可以删除上架商品';
+    return;
   }
-  closeModal();
+  if (!confirm(`确定要删除「${listing.storeTitle || listing.product.publicName || listing.product.name}」吗？`)) {
+    return;
+  }
+
+  errorMessage.value = '';
+  try {
+    await apiClient.delete(`/admin/store-listings/${listing.id}`);
+    await fetchListings();
+  } catch (error) {
+    console.error('删除失败:', error);
+    errorMessage.value = error.response?.data?.error || '删除失败，请重试';
+  }
 }
 
+function getListingImageUrl(imageUrl) {
+  if (!imageUrl) return placeholderImage;
+  return `${apiBaseUrl}${imageUrl}`;
+}
+
+function getCurrencyCode(listing) {
+  if (!listing) return null;
+  return listing.currencyCode || currencyFallbackMap[listing.store?.country?.code] || null;
+}
+
+function getRateForCurrency(currencyCode) {
+  if (!currencyCode) return null;
+  return ratesData.value[`CNY_${currencyCode}`] ?? ratesData.value[currencyCode] ?? null;
+}
+
+function formatLocalPrice(value, currencyCode) {
+  const amount = Number(value) || 0;
+  if (!currencyCode) {
+    return amount.toFixed(2);
+  }
+  try {
+    const noDecimal = currencyCode === 'IDR' || currencyCode === 'VND';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currencyCode,
+      minimumFractionDigits: noDecimal ? 0 : 2,
+      maximumFractionDigits: noDecimal ? 0 : 2,
+    }).format(amount);
+  } catch (error) {
+    return `${currencyCode} ${amount.toFixed(2)}`;
+  }
+}
+
+function formatCnyPrice(listing) {
+  if (!listing) return 0;
+  const direct = Number(listing.currentPriceRmb);
+  if (!Number.isNaN(direct) && direct > 0) {
+    return direct;
+  }
+  const currencyCode = getCurrencyCode(listing);
+  const rate = getRateForCurrency(currencyCode);
+  if (!rate) return 0;
+  const amount = Number(listing.currentPrice) || 0;
+  return amount / rate;
+}
 </script>
-
-<style scoped>
-/* (复用) 表格样式 */
-.table-th {
-  padding: 0.75rem 1rem;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-}
-.table-td {
-  padding: 0.75rem 1rem;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  color: #374151;
-  vertical-align: middle;
-}
-.table-td.truncate {
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-</style>

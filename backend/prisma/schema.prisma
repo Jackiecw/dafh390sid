@@ -186,28 +186,25 @@ model Product {
 
 
 // --- 9. 店铺商品上架 (StoreProductListing) 模型 ---
-// ⬇️ === 【重大修改】 === ⬇️
+// ⬇️ === 【重大修改】=== ⬇️
 model StoreProductListing {
   id        String  @id @default(cuid())
   
-  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade) 
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
   storeId   String  // 关联的店铺
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade) 
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
   productId String  // 关联的“我有的产品”
-
+  productCode String?
   // --- 店铺清单特定字段 ---
-  storeTitle    String?  // 店铺标题 (例如 "Proyektor Mini...") [新增]
-  storeImageUrl String?  // 店铺主图 (URL) [新增]
+  storeTitle    String?  // 商品标题
+  storeImageUrl String?  // 店铺主图 (URL)
   
-  currentPrice  Float   @default(0) // 售价 (当地货币) (已有)
-  platformUrl   String?             // 商品链接 (已有)
-  lastSyncedAt  DateTime? @updatedAt // (已有)
+  currentPrice  Float   @default(0)
+  platformUrl   String?
+  lastSyncedAt  DateTime? @updatedAt
   
-  @@unique([storeId, productId])
 }
-// ⬆️ === 【重大修改】 === ⬆️
-
-
+// ⬆️ === 【重大修改】=== ⬆️
 // --- 10. SOP/责任人 (OperationModule) 模型 ---
 // (保持不变)
 model OperationModule {
