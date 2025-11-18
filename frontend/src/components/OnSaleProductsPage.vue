@@ -10,7 +10,7 @@
         <div class="flex gap-3">
           <div class="rounded-2xl bg-[#F9FAFB] px-4 py-3 text-right">
             <p class="text-xs text-[#94A3B8]">在售清单总数</p>
-            <p class="text-xl font-semibold text-[#1F2937]">{{ listings.length }}</p>
+            <p class="text-xl font-semibold text-[#1F2937]">{{ totalItems }}</p>
           </div>
           <button
             @click="openCreateModal"
@@ -26,14 +26,17 @@
       <div v-if="isLoading" class="p-6 text-sm text-[#6B7280]">正在加载在售列表...</div>
       <div v-else>
         <p v-if="errorMessage" class="px-6 pt-6 text-sm text-red-600">{{ errorMessage }}</p>
-        <div v-if="listings.length === 0" class="px-6 pb-6 text-sm text-[#6B7280]">
+        
+        <div v-if="listings.length === 0 && !errorMessage" class="px-6 pb-6 text-sm text-[#6B7280]">
           当前还没有在售商品，点击右上角「上架新商品」即可快速创建。
         </div>
+        
         <div v-else class="flex flex-col gap-6 px-6 pb-6 lg:flex-row">
-          <aside class="lg:w-5/12 xl:w-1/3">
-            <div class="rounded-3xl border border-[#E2E8F0] bg-[#F8FAFF] p-3 shadow-inner">
-              <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">在售清单</p>
-              <div class="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+          <aside class="lg:w-5/12 xl:w-1/3 flex flex-col gap-3">
+            <div class="flex-1 rounded-3xl border border-[#E2E8F0] bg-[#F8FAFF] p-3 shadow-inner flex flex-col">
+              <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">在售清单 (本页)</p>
+              
+              <div class="flex-1 overflow-y-auto pr-1 min-h-[50vh] space-y-3">
                 <button
                   v-for="listing in listings"
                   :key="listing.id"
@@ -51,14 +54,14 @@
                       alt="listing cover"
                       class="h-16 w-16 flex-shrink-0 rounded-xl border border-[#E5E7EB] object-cover shadow"
                     />
-                    <div class="flex-1">
+                    <div class="flex-1 min-w-0">
                       <p class="text-sm font-semibold text-[#1F2937] line-clamp-2">
                         {{ listing.storeTitle || '未命名商品' }}
                       </p>
                       <p class="mt-1 text-xs text-[#64748B]">
                         代码：{{ listing.productCode || '未设置' }}
                       </p>
-                      <p class="text-xs text-[#94A3B8]">
+                      <p class="text-xs text-[#94A3B8] truncate">
                         {{ listing.store.country.name }} · {{ listing.store.name }}
                       </p>
                       <p class="mt-2 text-sm font-semibold text-[#2563EB]">
@@ -68,12 +71,32 @@
                   </div>
                 </button>
               </div>
+
+              <div class="mt-3 flex items-center justify-between border-t border-[#E2E8F0] pt-3 px-2">
+                <button 
+                  @click="changePage(currentPage - 1)" 
+                  :disabled="currentPage <= 1"
+                  class="text-xs font-semibold text-[#64748B] hover:text-[#3B82F6] disabled:text-[#CBD5E1] disabled:cursor-not-allowed"
+                >
+                  ← 上一页
+                </button>
+                <span class="text-xs text-[#94A3B8]">
+                  {{ currentPage }} / {{ totalPages }}
+                </span>
+                <button 
+                  @click="changePage(currentPage + 1)" 
+                  :disabled="currentPage >= totalPages"
+                  class="text-xs font-semibold text-[#64748B] hover:text-[#3B82F6] disabled:text-[#CBD5E1] disabled:cursor-not-allowed"
+                >
+                  下一页 →
+                </button>
+              </div>
             </div>
           </aside>
 
           <article
             v-if="selectedListing"
-            class="flex-1 rounded-3xl border border-[#E5E7EB] bg-white p-8 shadow-lg shadow-blue-50"
+            class="flex-1 rounded-3xl border border-[#E5E7EB] bg-white p-8 shadow-lg shadow-blue-50 h-fit"
           >
             <div class="flex flex-col gap-6 lg:flex-row">
               <div class="flex-shrink-0">
@@ -117,7 +140,7 @@
                   <span>本月销量：<strong class="text-[#111827]">{{ selectedListing.thisMonthSales }}</strong></span>
                   <span>总销量：<strong class="text-[#111827]">{{ selectedListing.totalSales }}</strong></span>
                 </div>
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3 pt-4">
                   <button
                     @click="openEditModal(selectedListing)"
                     class="rounded-2xl bg-[#EEF2FF] px-4 py-2 text-sm font-semibold text-[#4338CA] hover:bg-[#E0E7FF]"
@@ -182,29 +205,48 @@ const ratesData = ref({});
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 const placeholderImage = 'https://via.placeholder.com/320x320?text=Listing';
 
+// ⬇️ 【新增】分页状态
+const currentPage = ref(1);
+const pageSize = ref(20);
+const totalItems = ref(0);
+
 const isAdmin = computed(() => authStore.role === 'admin');
 const selectedListing = computed(() => listings.value.find((item) => item.id === selectedListingId.value) || null);
+const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value) || 1);
 
 const currencyFallbackMap = {
-  ID: 'IDR',
-  VN: 'VND',
-  TH: 'THB',
-  MY: 'MYR',
-  PH: 'PHP',
-  SG: 'SGD',
+  ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD',
 };
 
+// ⬇️ 【修改】支持分页参数
 async function fetchListings(focusId = null) {
   isLoading.value = true;
   errorMessage.value = '';
   try {
-    const response = await apiClient.get('/admin/store-listings');
-    listings.value = response.data;
+    const response = await apiClient.get('/admin/store-listings', {
+      params: {
+        page: currentPage.value,
+        pageSize: pageSize.value
+      }
+    });
+    
+    // 适配后端新的返回结构: { data, total, page, pageSize }
+    // 兼容旧结构(如果后端没更新): response.data 可能直接是数组
+    if (Array.isArray(response.data)) {
+      listings.value = response.data;
+      totalItems.value = response.data.length;
+    } else {
+      listings.value = response.data.data || [];
+      totalItems.value = response.data.total || 0;
+    }
+
+    // 选中逻辑
     if (listings.value.length === 0) {
       selectedListingId.value = null;
     } else if (focusId && listings.value.some((item) => item.id === focusId)) {
       selectedListingId.value = focusId;
     } else if (!selectedListingId.value || !listings.value.some((item) => item.id === selectedListingId.value)) {
+      // 如果之前选中的不在当前页，默认选中第一个
       selectedListingId.value = listings.value[0]?.id || null;
     }
   } catch (error) {
@@ -213,6 +255,13 @@ async function fetchListings(focusId = null) {
   } finally {
     isLoading.value = false;
   }
+}
+
+// ⬇️ 【新增】翻页逻辑
+function changePage(page) {
+  if (page < 1 || page > totalPages.value) return;
+  currentPage.value = page;
+  fetchListings();
 }
 
 async function fetchRates() {
@@ -249,6 +298,8 @@ function selectListing(id) {
 }
 
 async function handleListingCreated(newListing) {
+  // 创建后回到第一页查看
+  currentPage.value = 1;
   await fetchListings(newListing.id);
   closeModal();
 }

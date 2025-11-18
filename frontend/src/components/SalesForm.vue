@@ -7,13 +7,13 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         <div class="space-y-2">
-          <label for="recordDate" class="block text-sm font-medium text-stone-700">记录日期 *</label>
+          <label for="recordDate" class="form-label">记录日期 *</label>
           <input type="date" id="recordDate" v-model="formOtherData.recordDate" required 
                  class="form-input" />
         </div>
 
         <div class="space-y-2">
-          <label for="country" class="block text-sm font-medium text-stone-700">国家 *</label>
+          <label for="country" class="form-label">国家 *</label>
           <select id="country" v-model="selectedCountry" required class="form-input">
             <option disabled value="">
               {{ isLoadingStores ? '正在加载...' : '请选择国家...' }}
@@ -25,7 +25,7 @@
         </div>
         
         <div class="space-y-2">
-          <label for="platform" class="block text-sm font-medium text-stone-700">平台 *</label>
+          <label for="platform" class="form-label">平台 *</label>
           <select id="platform" v-model="selectedPlatform" required 
                   :disabled="!selectedCountry" 
                   class="form-input disabled:bg-gray-100 disabled:cursor-not-allowed">
@@ -37,7 +37,7 @@
         </div>
         
         <div class="space-y-2">
-          <label for="store" class="block text-sm font-medium text-stone-700">店铺名称 *</label>
+          <label for="store" class="form-label">店铺名称 *</label>
           <select id="store" v-model="selectedStoreId" required 
                   :disabled="!selectedPlatform"
                   class="form-input disabled:bg-gray-100 disabled:cursor-not-allowed">
@@ -48,50 +48,60 @@
           </select>
         </div>
 
-        <div class="space-y-2">
-          <label for="product" class="block text-sm font-medium text-stone-700">商品 *</label>
+        <div class="space-y-2 md:col-span-2">
+          <label for="listing" class="form-label">
+            选择商品链接 (Listing) *
+            <span class="text-xs font-normal text-stone-500 ml-1">格式: [商品代码] 标题 (SKU)</span>
+          </label>
           <select 
-            id="product" 
-            v-model="selectedProductId" 
+            id="listing" 
+            v-model="selectedListingId" 
             required 
-            :disabled="!selectedStoreId || isLoadingProducts"
+            :disabled="!selectedStoreId || isLoadingListings"
             class="form-input disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
             <option disabled value="">
-              {{ isLoadingProducts ? '加载商品中...' : '请选择商品...' }}
+              {{ isLoadingListings ? '加载链接中...' : '请选择具体链接...' }}
             </option>
-            <option v-for="product in storeProducts" :key="product.id" :value="product.id">
-              {{ product.name }} ({{ product.sku }})
+            <option v-for="listing in storeListings" :key="listing.id" :value="listing.id">
+              <template v-if="listing.productCode">
+                [{{ listing.productCode }}]
+              </template>
+              {{ listing.storeTitle || '未命名链接' }} 
+              ({{ listing.product.sku }})
             </option>
           </select>
+          <p v-if="storeListings.length === 0 && selectedStoreId && !isLoadingListings" class="text-xs text-red-500">
+            该店铺下暂无上架商品，请先去「店铺在售」板块上架。
+          </p>
         </div>
 
         <div class="space-y-2">
-          <label for="salesVolume" class="block text-sm font-medium text-stone-700">销量 *</label>
+          <label for="salesVolume" class="form-label">销量 *</label>
           <input type="number" id="salesVolume" v-model="formOtherData.salesVolume" required 
                  class="form-input" />
         </div>
         
         <div class="space-y-2">
-          <label for="revenue" class="block text-sm font-medium text-stone-700">销售额 *</label>
+          <label for="revenue" class="form-label">销售额 (原币种) *</label>
           <input type="number" step="0.01" id="revenue" v-model="formOtherData.revenue" required 
                  class="form-input" />
         </div>
         
         <div class="space-y-2 md:col-span-2">
-          <label for="notes" class="block text-sm font-medium text-stone-700">备注 (可选)</label>
-          <textarea id="notes" rows="3" v-model="formOtherData.notes"
+          <label for="notes" class="form-label">备注 (可选)</label>
+          <textarea id="notes" rows="2" v-model="formOtherData.notes"
                     class="form-input"></textarea>
         </div>
-        </div>
+      </div>
 
       <button type="submit" 
               class="mt-8 inline-flex justify-center rounded-lg border border-transparent bg-indigo-600 px-6 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
         提 交 数 据
       </button>
 
-      <p v-if="successMessage" class="text-green-600 mt-4">{{ successMessage }}</p>
-      <p v-if="errorMessage" class="text-red-600 mt-4">{{ errorMessage }}</p>
+      <p v-if="successMessage" class="text-green-600 mt-4 text-sm font-medium">{{ successMessage }}</p>
+      <p v-if="errorMessage" class="text-red-600 mt-4 text-sm">{{ errorMessage }}</p>
     </form>
   </div>
 </template>
@@ -101,39 +111,39 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth'; 
 import apiClient from '../api';
 
-// --- 1. 状态定义 (修改) ---
+// --- 状态定义 ---
 
 const authStore = useAuthStore(); 
 
 const allStores = ref([]);
 const isLoadingStores = ref(true);
 
+// 级联选择状态
 const selectedCountry = ref(''); 
 const selectedPlatform = ref('');
 const selectedStoreId = ref(''); 
 
-const selectedProductId = ref(''); 
-const storeProducts = ref([]);
-const isLoadingProducts = ref(false);
+// ⬇️ 【修改】从 Product 变为 Listing
+const selectedListingId = ref(''); 
+const storeListings = ref([]);
+const isLoadingListings = ref(false);
 
 const formOtherData = ref({
   recordDate: new Date().toISOString().split('T')[0],
   salesVolume: null,
   revenue: null,
-  notes: '', // ⬅️ 【新增】
+  notes: '',
 });
 
 const successMessage = ref('');
 const errorMessage = ref('');
 
-// --- 2. 数据获取 (onMounted) (修改) ---
+// --- 数据获取 ---
+
 async function fetchStores() {
   isLoadingStores.value = true;
   try {
-    // ⬇️ --- 【修复】 ---
-    // (不再调用 /admin/stores，而是调用我们新建的 /stores-list)
     const response = await apiClient.get('/stores-list'); 
-    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败:', error);
@@ -147,8 +157,7 @@ onMounted(() => {
   fetchStores();
 });
 
-
-// --- 3. 级联逻辑 (Computed) (不变) ---
+// --- 级联逻辑 (Computed) ---
 
 const countryOptions = computed(() => {
   const uniqueCountriesMap = new Map();
@@ -163,7 +172,6 @@ const countryOptions = computed(() => {
   if (authStore.role === 'admin') {
     return allUniqueCountries; 
   }
-
   const userCountryCodes = authStore.operatedCountries; 
   return allUniqueCountries.filter(country => 
     userCountryCodes.includes(country.code)
@@ -172,17 +180,14 @@ const countryOptions = computed(() => {
 
 const platformOptions = computed(() => {
   if (!selectedCountry.value) return [];
-  
   const platforms = allStores.value
     .filter(store => store.countryCode === selectedCountry.value) 
     .map(store => store.platform);
-  
   return [...new Set(platforms)].sort();
 });
 
 const storeOptions = computed(() => {
   if (!selectedCountry.value || !selectedPlatform.value) return [];
-  
   return allStores.value
     .filter(store => 
       store.countryCode === selectedCountry.value &&
@@ -191,72 +196,78 @@ const storeOptions = computed(() => {
     .sort((a, b) => a.name.localeCompare(b.name));
 });
 
+// --- 级联逻辑 (Watch) ---
 
-// --- 4. 级联逻辑 (Watch) (不变) ---
-// (这部分在上次修复中已完成)
-
-// (监视国家变化)
-watch(selectedCountry, (newCountry) => {
+watch(selectedCountry, () => {
   selectedPlatform.value = '';
   selectedStoreId.value = '';
-  selectedProductId.value = '';
-  storeProducts.value = [];
+  selectedListingId.value = '';
+  storeListings.value = [];
 });
 
-// (监视平台变化)
-watch(selectedPlatform, (newPlatform) => {
+watch(selectedPlatform, () => {
   selectedStoreId.value = '';
-  selectedProductId.value = '';
-  storeProducts.value = [];
+  selectedListingId.value = '';
+  storeListings.value = [];
 });
 
-// (监视店铺变化，获取商品)
+// ⬇️ 【修改】监视店铺变化，获取 Listing
 watch(selectedStoreId, async (newStoreId) => {
-  selectedProductId.value = '';
-  storeProducts.value = [];
+  selectedListingId.value = '';
+  storeListings.value = [];
   errorMessage.value = '';
   
   if (!newStoreId) return; 
 
-  isLoadingProducts.value = true;
+  isLoadingListings.value = true;
   try {
-    const response = await apiClient.get(`/stores/${newStoreId}/products`);
-    storeProducts.value = response.data;
+    // 调用新接口
+    const response = await apiClient.get(`/stores/${newStoreId}/listings`);
+    storeListings.value = response.data;
   } catch (error) {
-    console.error('获取店铺商品失败:', error);
-    errorMessage.value = '无法加载该店铺的商品列表。';
+    console.error('获取店铺链接失败:', error);
+    errorMessage.value = '无法加载该店铺的商品链接。';
   } finally {
-    isLoadingProducts.value = false;
+    isLoadingListings.value = false;
   }
 });
 
+// --- 提交逻辑 ---
 
-// --- 5. 提交逻辑 (修改) ---
 const handleSubmit = async () => {
   successMessage.value = '';
   errorMessage.value = '';
 
-  if (!selectedStoreId.value || !selectedProductId.value) {
-    errorMessage.value = '请选择一个有效的店铺和商品';
+  if (!selectedStoreId.value || !selectedListingId.value) {
+    errorMessage.value = '请选择一个有效的店铺和商品链接';
     return;
   }
 
-  // ⬇️ 【修改】
+  // ⬇️ 【修改】根据 listingId 找到对应的 productId
+  const targetListing = storeListings.value.find(l => l.id === selectedListingId.value);
+  if (!targetListing) {
+    errorMessage.value = '链接数据异常，请刷新重试';
+    return;
+  }
+
   const payload = {
     ...formOtherData.value,
     storeId: selectedStoreId.value, 
-    productId: selectedProductId.value, 
+    listingId: selectedListingId.value, // ⬅️ 发送链接 ID
+    productId: targetListing.product.id, // ⬅️ 发送产品 ID (后端为了兼容性仍需要)
     salesVolume: parseInt(formOtherData.value.salesVolume) || 0,
     revenue: parseFloat(formOtherData.value.revenue) || 0,
-    notes: formOtherData.value.notes || null, // ⬅️ 【新增】
+    notes: formOtherData.value.notes || null,
   };
 
   try {
     const response = await apiClient.post('/sales', payload);
     successMessage.value = '数据提交成功！(ID: ' + response.data.id + ')';
     
-    // (可选) 提交成功后清空备注
-    // formOtherData.value.notes = ''; 
+    // 重置部分表单
+    formOtherData.value.salesVolume = null;
+    formOtherData.value.revenue = null;
+    // formOtherData.value.notes = ''; // 可选：清空备注
 
   } catch (error) {
     console.error('提交失败:', error.response);
@@ -270,18 +281,31 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-/* (不变) */
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-weight: bold;
+  font-size: 0.875rem;
+}
 .form-input {
   display: block;
   width: 100%;
-  border-radius: 0.375rem; /* rounded-md */
-  border: 1px solid #d4d4d4; /* border-stone-300 */
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
-  padding: 0.5rem 0.75rem; /* 调整内边距 */
+  border-radius: 0.375rem;
+  border: 1px solid #d4d4d4;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+  background-color: #fff;
 }
 .form-input:focus {
-  border-color: #4f46e5; /* focus:border-indigo-500 */
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3); /* focus:ring-indigo-500 */
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
   outline: none;
+}
+.form-input:disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
 }
 </style>

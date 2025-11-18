@@ -59,51 +59,101 @@
     <p v-if="isLoading" class="text-stone-500">正在加载数据...</p>
     <p v-if="errorMessage" class="text-red-600">{{ errorMessage }}</p>
     
-    <div v-if="!isLoading && salesData.length > 0" class="bg-white rounded-lg shadow overflow-x-auto">
-      <table class="min-w-full divide-y divide-stone-200">
-        <thead class="bg-stone-50">
-          <tr>
-            <th @click="setSort('recordDate')" class="table-th cursor-pointer">
-              日期 <SortIcon :field="'recordDate'" :sorting="sorting" />
-            </th>
-            <th class="table-th">国家</th>
-            <th class="table-th">店铺</th>
-            <th class="table-th">商品 (SKU)</th>
-            <th @click="setSort('salesVolume')" class="table-th cursor-pointer">
-              销量 <SortIcon :field="'salesVolume'" :sorting="sorting" />
-            </th>
-            <th @click="setSort('revenue')" class="table-th cursor-pointer">
-              销售额 <SortIcon :field="'revenue'" :sorting="sorting" />
-            </th>
-            <th class="table-th">备注</th>
-            <th class="table-th">录入人</th>
-            <th class="table-th">操作</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-stone-200">
-          <tr v-for="row in salesData" :key="row.id">
-            <td class="table-td">{{ formatDate(row.recordDate) }}</td>
-            <td class="table-td">{{ row.store.country.name }}</td>
-            <td class="table-td">{{ row.store.name }}</td>
-            <td class="table-td">{{ row.product.sku }}</td>
-            <td class="table-td">{{ row.salesVolume }}</td>
-            <td class="table-td">{{ row.revenue.toFixed(2) }}</td>
-            <td class="table-td max-w-xs truncate" :title="row.notes || ''">{{ row.notes || 'N/A' }}</td>
-            <td class="table-td">{{ row.enteredBy.nickname }}</td>
-            <td class="table-td">
-              <div v-if="row.canManage">
-                <button @click="openEditModal(row)" class="text-indigo-600 hover:text-indigo-900 mr-4">
-                  修改
-                </button>
-                <button @click="handleDelete(row.id)" class="text-red-600 hover:text-red-900">
-                  删除
-                </button>
-              </div>
-              <span v-else class="text-gray-400 text-xs">无权限</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="!isLoading && salesData.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-stone-200">
+          <thead class="bg-stone-50">
+            <tr>
+              <th @click="setSort('recordDate')" class="table-th cursor-pointer">
+                日期 <SortIcon :field="'recordDate'" :sorting="sorting" />
+              </th>
+              <th class="table-th">国家</th>
+              <th class="table-th">店铺</th>
+              <th class="table-th">商品链接 / SKU</th>
+              <th @click="setSort('salesVolume')" class="table-th cursor-pointer">
+                销量 <SortIcon :field="'salesVolume'" :sorting="sorting" />
+              </th>
+              <th @click="setSort('revenue')" class="table-th cursor-pointer">
+                销售额 <SortIcon :field="'revenue'" :sorting="sorting" />
+              </th>
+              <th class="table-th">备注</th>
+              <th class="table-th">录入人</th>
+              <th class="table-th">操作</th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-stone-200">
+            <tr v-for="row in salesData" :key="row.id">
+              <td class="table-td">{{ formatDate(row.recordDate) }}</td>
+              <td class="table-td">{{ row.store.country.name }}</td>
+              <td class="table-td">{{ row.store.name }}</td>
+              <td class="table-td">
+                <div v-if="row.listing && row.listing.productCode" class="flex flex-col">
+                  <span class="font-semibold text-indigo-600">{{ row.listing.productCode }}</span>
+                  <span class="text-xs text-stone-500">{{ row.product.sku }}</span>
+                </div>
+                <div v-else class="text-stone-600">
+                  {{ row.product.sku }} <span class="text-xs text-stone-400">(旧数据)</span>
+                </div>
+              </td>
+              <td class="table-td">{{ row.salesVolume }}</td>
+              <td class="table-td">{{ row.revenue.toFixed(2) }}</td>
+              <td class="table-td max-w-xs truncate" :title="row.notes || ''">{{ row.notes || 'N/A' }}</td>
+              <td class="table-td">{{ row.enteredBy.nickname }}</td>
+              <td class="table-td">
+                <div v-if="row.canManage">
+                  <button @click="openEditModal(row)" class="text-indigo-600 hover:text-indigo-900 mr-4">
+                    修改
+                  </button>
+                  <button @click="handleDelete(row.id)" class="text-red-600 hover:text-red-900">
+                    删除
+                  </button>
+                </div>
+                <span v-else class="text-gray-400 text-xs">无权限</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6">
+        <div class="flex flex-1 justify-between sm:hidden">
+          <button @click="changePage(page - 1)" :disabled="page <= 1" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            上一页
+          </button>
+          <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+            下一页
+          </button>
+        </div>
+        <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+          <div>
+            <p class="text-sm text-gray-700">
+              显示第
+              <span class="font-medium">{{ (page - 1) * pageSize + 1 }}</span>
+              至
+              <span class="font-medium">{{ Math.min(page * pageSize, total) }}</span>
+              条，共
+              <span class="font-medium">{{ total }}</span>
+              条
+            </p>
+          </div>
+          <div>
+            <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+              <button @click="changePage(page - 1)" :disabled="page <= 1" class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="sr-only">上一页</span>
+                <ChevronLeftIcon class="h-5 w-5" aria-hidden="true" />
+              </button>
+              <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 focus:outline-offset-0">
+                {{ page }} / {{ totalPages }}
+              </span>
+              <button @click="changePage(page + 1)" :disabled="page >= totalPages" class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="sr-only">下一页</span>
+                <ChevronRightIcon class="h-5 w-5" aria-hidden="true" />
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
     </div>
     
     <div v-if="!isLoading && salesData.length === 0 && !errorMessage" class="p-6 bg-white rounded-lg shadow text-center text-stone-500">
@@ -124,13 +174,19 @@ import { ref, onMounted, computed, watch } from 'vue';
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
 import SalesDataEditModal from './SalesDataEditModal.vue';
-import { FunnelIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon } from '@heroicons/vue/20/solid';
+import { FunnelIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid';
 
 // --- 状态 (State) ---
 const salesData = ref([]);
 const isLoading = ref(true);
 const errorMessage = ref('');
 const authStore = useAuthStore();
+
+// 分页状态
+const page = ref(1);
+const pageSize = ref(20);
+const total = ref(0);
+const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1);
 
 // 筛选器状态
 const allStores = ref([]);
@@ -162,18 +218,20 @@ const SortIcon = {
 
 // --- 核心方法 (Methods) ---
 
-// 1. 获取数据 (核心)
-async function fetchData(showLoading = true) {
-  if (showLoading) isLoading.value = true;
+async function fetchData(resetPage = false) {
+  if (resetPage) {
+    page.value = 1;
+  }
+  isLoading.value = true;
   errorMessage.value = '';
   
-  // 准备查询参数
   const params = {
     sortBy: sorting.value.by,
     sortOrder: sorting.value.order,
+    page: page.value,
+    pageSize: pageSize.value,
   };
   
-  // 添加非空筛选
   for (const key in filters.value) {
     if (filters.value[key]) {
       params[key] = filters.value[key];
@@ -182,34 +240,46 @@ async function fetchData(showLoading = true) {
 
   try {
     const response = await apiClient.get('/sales-data', { params });
-    salesData.value = response.data;
+    
+    if (Array.isArray(response.data)) {
+      // 兼容旧接口
+      salesData.value = response.data;
+      total.value = response.data.length;
+    } else {
+      // 新分页接口
+      salesData.value = response.data.data;
+      total.value = response.data.total;
+      page.value = response.data.page;
+    }
   } catch (error) {
     console.error('获取销售数据失败:', error);
     errorMessage.value = '获取数据失败，请重试。';
   } finally {
-    if (showLoading) isLoading.value = false;
+    isLoading.value = false;
   }
 }
 
-// 2. 获取筛选器选项 (用于下拉菜单)
 async function fetchStoresForFilter() {
   try {
-    // ⬇️ --- 【修复】 ---
     const response = await apiClient.get('/stores-list');
-    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败(用于筛选):', error);
   }
 }
 
-// (生命周期) 页面加载时
+function changePage(newPage) {
+  if (newPage < 1 || newPage > totalPages.value) return;
+  page.value = newPage;
+  fetchData(false);
+}
+
 onMounted(() => {
   fetchData();
   fetchStoresForFilter();
 });
 
-// 3. 筛选器相关 (级联菜单)
+// ... (后续代码如 countryOptions, platformOptions 等保持不变)
 const countryOptions = computed(() => {
   const uniqueCountriesMap = new Map();
   allStores.value.forEach(store => {
@@ -220,7 +290,6 @@ const countryOptions = computed(() => {
   const allUniqueCountries = Array.from(uniqueCountriesMap.values())
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // (权限) Admin 看所有，运营只看自己负责的
   if (authStore.role === 'admin') {
     return allUniqueCountries; 
   }
@@ -230,10 +299,8 @@ const countryOptions = computed(() => {
   );
 });
 
-// ⬇️ 【修改】
 const platformOptions = computed(() => {
   let storesToFilter = allStores.value;
-  // (如果选择了国家，先按国家过滤)
   if (filters.value.countryCode) {
     storesToFilter = storesToFilter.filter(store => store.countryCode === filters.value.countryCode);
   }
@@ -241,7 +308,6 @@ const platformOptions = computed(() => {
   return [...new Set(platforms)].sort();
 });
 
-// ⬇️ 【修改】
 const storeOptions = computed(() => {
   let storesToFilter = allStores.value;
   
@@ -259,20 +325,17 @@ const storeOptions = computed(() => {
   return storesToFilter.sort((a, b) => a.name.localeCompare(b.name));
 });
 
-// (级联) ⬇️ 【修改】
 watch(() => filters.value.countryCode, () => {
-  // (不再重置 platform，只重置 store)
   filters.value.storeId = '';
 });
 watch(() => filters.value.platform, () => {
   filters.value.storeId = '';
 });
 
-// 4. 操作 (筛选、重置、排序)
 function resetFilters() {
   filters.value = defaultFilters();
   sorting.value = { by: 'recordDate', order: 'desc' };
-  fetchData();
+  fetchData(true); // 重置筛选时也重置页码
 }
 
 function setSort(field) {
@@ -282,10 +345,9 @@ function setSort(field) {
     sorting.value.by = field;
     sorting.value.order = 'desc';
   }
-  fetchData(false); // (重新排序时不显示全屏加载)
+  fetchData(false); // 排序时保持在当前页
 }
 
-// 5. CRUD 操作
 async function handleDelete(id) {
   if (confirm('确定要删除这条销售数据吗？此操作不可逆。')) {
     try {
@@ -298,7 +360,6 @@ async function handleDelete(id) {
   }
 }
 
-// 6. 弹窗控制
 function openEditModal(row) {
   selectedSaleData.value = row;
   isModalOpen.value = true;
@@ -317,16 +378,13 @@ function handleSaleUpdated(updatedRow) {
   closeModal();
 }
 
-// --- 辅助函数 ---
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
   return new Date(dateString).toISOString().split('T')[0];
 }
-
 </script>
 
 <style scoped>
-/* (复用样式) */
 .input-group {
   display: flex;
   flex-direction: column;
@@ -335,7 +393,7 @@ function formatDate(dateString) {
   margin-bottom: 0.5rem;
   color: #333;
   font-weight: bold;
-  font-size: 0.875rem; /* 14px */
+  font-size: 0.875rem; 
 }
 .form-input {
   padding: 0.75rem;
@@ -344,18 +402,18 @@ function formatDate(dateString) {
   font-size: 1rem;
 }
 .table-th {
-  padding: 0.75rem 1.5rem; /* 12px 24px */
+  padding: 0.75rem 1.5rem; 
   text-align: left;
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.75rem; 
   font-weight: 500;
-  color: #6b7280; /* stone-500 */
+  color: #6b7280; 
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 .table-td {
-  padding: 1rem 1.5rem; /* 16px 24px */
+  padding: 1rem 1.5rem; 
   white-space: nowrap;
-  font-size: 0.875rem; /* 14px */
-  color: #374151; /* stone-700 */
+  font-size: 0.875rem; 
+  color: #374151; 
 }
 </style>

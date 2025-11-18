@@ -22,15 +22,17 @@ const {
 
 // --- Zod 验证模式 (用于 sales-data) ---
 const salesDataSchema = z.object({
-  recordDate: z.string().date("日期格式无效"), // ⬅️ 【已修复】
+  recordDate: z.string().date("日期格式无效"),
   storeId: z.string().min(1),
   productId: z.string().min(1),
+  // ⬇️ 【新增】 Listing ID (可选，兼容旧数据)
+  listingId: z.string().optional().nullable(),
   salesVolume: z.number().int().min(0),
   revenue: z.number().min(0),
   notes: z.string().optional().nullable(),
 });
 
-// ⬇️ --- 【新增：Zod 验证 (保持不变)】 ---
+// --- 其他 Zod 验证 ---
 const calendarEventSchema = z.object({
   title: z.string().min(1, "标题不能为空"),
   startAt: z.string().datetime("开始时间无效"),
@@ -48,21 +50,17 @@ const calendarEventUpdateSchema = z.object({
 const weeklyFocusUpdateSchema = z.object({
   content: z.string().min(1, "内容不能为空"),
 });
-// ⬆️ --- 【新增：Zod 验证 (保持不变)】 ---
 
+// --- 下拉菜单辅助接口 ---
 
-// ⬇️ --- 【新增路由】 ---
 /**
  * GET /api/stores-list (获取所有店铺列表，用于下拉菜单)
- * 这是一个新的、受 authMiddleware 保护（非 Admin）的路由
- * 供销售、财务等表单填充下拉框使用
  */
 router.get('/stores-list', authMiddleware, async (req, res) => {
   try {
     const stores = await prisma.store.findMany({
       orderBy: { name: 'asc' },
       include: {
-        // (我们只需要国家信息用于级联)
         country: {
           select: { code: true, name: true }
         }
@@ -74,14 +72,37 @@ router.get('/stores-list', authMiddleware, async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
-// ⬆️ --- 【新增路由】 ---
+
+/**
+ * GET /api/stores/:id/listings
+ * (新增) 获取指定店铺的所有“在售链接”清单
+ * 用于销售录入时的下拉菜单
+ */
+router.get('/stores/:id/listings', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const listings = await prisma.storeProductListing.findMany({
+      where: { storeId: id },
+      include: {
+        product: {
+          select: { id: true, sku: true, name: true }
+        }
+      },
+      // 按商品代码排序，方便查找
+      orderBy: { productCode: 'asc' } 
+    });
+    res.json(listings);
+  } catch (error) {
+    console.error('获取店铺链接失败:', error);
+    res.status(500).json({ error: '获取店铺链接失败' });
+  }
+});
 
 
 // ------------------------------------------
-// --- ⬇️ (不变) 仪表盘 API (Dashboard) ---
+// --- 仪表盘 API (Dashboard) ---
 // ------------------------------------------
 
-// (Zod 验证)
 const todoSchema = z.object({
   content: z.string().min(1, "内容不能为空"),
   isCompleted: z.boolean().optional(),
@@ -92,11 +113,8 @@ const recurringTaskSchema = z.object({
   period: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
 });
 
-
-
-
 /**
- * 【GET /api/dashboard/summary】 (修改)
+ * GET /api/dashboard/summary
  */
 router.get('/dashboard/summary', authMiddleware, async (req, res) => {
   try {
@@ -134,8 +152,6 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
       }),
     ]);
 
-    // ⬇️ --- 【修改】 ---
-    // (逻辑修改：获取或创建本周的 WeeklyFocus)
     const currentWeekStart = getStartOfWeek();
     const [personalPlan, teamFocusRecord] = await Promise.all([
       getPlanPreviewForWeek(userId, currentWeekStart),
@@ -146,7 +162,7 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
 
     const planNextWeek = personalPlan || '暂无计划内容，请在周报中填写“下周计划”。';
     const teamFocusContent = teamFocusRecord?.content || '';
-    // ⬆️ --- 【修改】 ---
+    
     let currency = 'CNY'; 
     let rateToCny = 1;
     const targetCountry = (countryCode && countryCode !== 'ALL') ? countryCode : (operatedCountries[0] || null);
@@ -193,7 +209,7 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
 });
 
 /**
- * 【GET /api/dashboard/filter-options】 (不变)
+ * GET /api/dashboard/filter-options
  */
 router.get('/dashboard/filter-options', authMiddleware, async (req, res) => {
   try {
@@ -231,8 +247,7 @@ router.get('/dashboard/filter-options', authMiddleware, async (req, res) => {
 });
 
 
-// --- (不变) 待办事项 (Todo) API ---
-// GET /api/todos
+// --- 待办事项 (Todo) API ---
 router.get('/todos', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -247,7 +262,6 @@ router.get('/todos', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/todos
 router.post('/todos', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -269,12 +283,11 @@ router.post('/todos', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/todos/:id (用于切换状态)
 router.put('/todos/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
     const { id } = req.params;
-    const validation = todoSchema.safeParse(req.body); // (期望 { isCompleted: true/false })
+    const validation = todoSchema.safeParse(req.body); 
     
     if (!validation.success || typeof validation.data.isCompleted !== 'boolean') {
       return res.status(400).json({ error: '输入无效: 必须提供 isCompleted 字段' });
@@ -283,7 +296,7 @@ router.put('/todos/:id', authMiddleware, async (req, res) => {
     const updatedTodo = await prisma.todo.update({
       where: { 
         id: id,
-        authorId: userId // (安全) 确保用户只能修改自己的
+        authorId: userId 
       },
       data: {
         isCompleted: validation.data.isCompleted,
@@ -299,7 +312,6 @@ router.put('/todos/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/todos/:id
 router.delete('/todos/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -308,7 +320,7 @@ router.delete('/todos/:id', authMiddleware, async (req, res) => {
     await prisma.todo.delete({
       where: { 
         id: id,
-        authorId: userId // (安全) 确保用户只能删除自己的
+        authorId: userId 
       },
     });
     res.status(204).send();
@@ -322,8 +334,7 @@ router.delete('/todos/:id', authMiddleware, async (req, res) => {
 });
 
 
-// --- (不变) 周期任务 (Recurring Task) API ---
-// GET /api/recurring-tasks
+// --- 周期任务 (Recurring Task) API ---
 router.get('/recurring-tasks', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -367,7 +378,6 @@ router.get('/recurring-tasks', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/recurring-tasks
 router.post('/recurring-tasks', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -389,7 +399,6 @@ router.post('/recurring-tasks', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/recurring-tasks/:id/toggle
 router.put('/recurring-tasks/:id/toggle', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -419,7 +428,6 @@ router.put('/recurring-tasks/:id/toggle', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/recurring-tasks/:id
 router.delete('/recurring-tasks/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -442,14 +450,9 @@ router.delete('/recurring-tasks/:id', authMiddleware, async (req, res) => {
 });
 
 // ------------------------------------------
-// --- ⬇️ (不变) 现有 API ---
+// --- 其他 API ---
 // ------------------------------------------
 
-// (此处省略不变的 /reports, /me, /sales, /reports (POST), /stores/:id/products, 
-//    /sales-data, /sales-data/:id, /sales-data/:id (DELETE), 
-//    /countries, /products-list, /listings/:id, /links ...)
-
-// GET /api/reports (不变)
 router.get('/reports', adminMiddleware, async (req, res) => {
   try {
     const reports = await prisma.weeklyReport.findMany({
@@ -477,7 +480,6 @@ router.delete('/reports/:id', adminMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/me (不变)
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -500,7 +502,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/sales (不变)
+// POST /api/sales (录入销售数据 - 更新)
 router.post('/sales', authMiddleware, async (req, res) => {
   try {
     const validation = salesDataSchema.safeParse(req.body);
@@ -511,7 +513,8 @@ router.post('/sales', authMiddleware, async (req, res) => {
       });
     }
     
-    const { recordDate, storeId, productId, salesVolume, revenue, notes } = validation.data;
+    // ⬇️ 【修改】支持 listingId
+    const { recordDate, storeId, productId, listingId, salesVolume, revenue, notes } = validation.data;
     const userId = req.user.userId;
 
     const newSalesData = await prisma.salesData.create({
@@ -523,19 +526,20 @@ router.post('/sales', authMiddleware, async (req, res) => {
         enteredById: userId, 
         storeId: storeId,
         productId: productId, 
+        // ⬇️ 【新增】
+        listingId: listingId || null, 
       }
     });
     res.status(201).json(newSalesData);
   } catch (error) {
     console.error('提交销售数据失败:', error);
     if (error.code === 'P2003') { 
-      return res.status(400).json({ error: '提交失败：所选的店铺或商品无效' });
+      return res.status(400).json({ error: '提交失败：所选的店铺、商品或链接无效' });
     }
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
 
-// POST /api/reports (不变)
 router.post('/reports', authMiddleware, async (req, res) => {
   try {
     const { 
@@ -564,11 +568,10 @@ router.post('/reports', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/stores/:id/products (不变)
+// GET /api/stores/:id/products (获取店铺商品)
 router.get('/stores/:id/products', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
-    // 修正：我们现在用 listings
     const store = await prisma.store.findUnique({
       where: { id: id },
       include: {
@@ -594,7 +597,7 @@ router.get('/stores/:id/products', authMiddleware, async (req, res) => {
 });
 
 
-// (不变) 销售数据管理 API...
+// GET /api/sales-data (销售数据管理 - 更新)
 router.get('/sales-data', authMiddleware, async (req, res) => {
   try {
     const { role, operatedCountries, supervisedCountries } = req.user;
@@ -652,6 +655,10 @@ router.get('/sales-data', authMiddleware, async (req, res) => {
         product: { 
           select: { sku: true, name: true }
         },
+        // ⬇️ 【新增】包含 listing 信息，以便显示商品代码
+        listing: {
+           select: { productCode: true, storeTitle: true }
+        },
         enteredBy: { 
           select: { nickname: true }
         }
@@ -673,7 +680,7 @@ router.get('/sales-data', authMiddleware, async (req, res) => {
   }
 });
 
-// (辅助函数，不变)
+// 辅助权限检查函数
 async function checkManagementPermission(userId, salesDataId) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -701,6 +708,7 @@ async function checkManagementPermission(userId, salesDataId) {
   return { canManage: false, error: '权限不足：您不是该国家的主管', status: 403 };
 }
 
+// PUT /api/sales-data/:id (更新)
 router.put('/sales-data/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
@@ -719,13 +727,16 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
       });
     }
     
-    const { recordDate, storeId, productId, salesVolume, revenue, notes } = validation.data;
+    // ⬇️ 【修改】支持 listingId
+    const { recordDate, storeId, productId, listingId, salesVolume, revenue, notes } = validation.data;
     const updatedSalesData = await prisma.salesData.update({
       where: { id: id },
       data: {
         recordDate: new Date(recordDate),
         storeId: storeId,
         productId: productId,
+        // ⬇️ 【新增】更新 listingId
+        listingId: listingId || null,
         salesVolume: salesVolume,
         revenue: revenue,
         notes: notes || null,
@@ -733,6 +744,8 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
       include: {
         store: { include: { country: true } }, 
         product: { select: { sku: true, name: true } },
+        // ⬇️ 【新增】返回 listing 信息
+        listing: { select: { productCode: true, storeTitle: true } },
         enteredBy: { select: { nickname: true } }
       }
     });
@@ -745,7 +758,7 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('更新销售数据失败:', error);
     if (error.code === 'P2003') { 
-      return res.status(400).json({ error: '更新失败：所选的店铺或商品无效' });
+      return res.status(400).json({ error: '更新失败：所选的店铺、商品或链接无效' });
     }
     if (error.code === 'P2025') {
       return res.status(404).json({ error: '数据未找到' });
@@ -779,7 +792,6 @@ router.delete('/sales-data/:id', authMiddleware, async (req, res) => {
 });
 
 
-// (不变) 非 Admin 路由...
 router.get('/countries', authMiddleware, async (req, res) => {
   try {
     const countries = await prisma.managedCountry.findMany({
@@ -810,7 +822,7 @@ router.get('/products-list', authMiddleware, async (req, res) => {
     });
     res.json(products);
   } catch (error) {
-    console.error("获取在售商品列表失败:", error);
+    console.error("获取在售商品列表(products-list)失败:", error);
     res.status(500).json({ error: '获取在售商品列表失败' });
   }
 });
@@ -867,7 +879,6 @@ router.put('/listings/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// (不变) 常用链接 (公共读取)
 router.get('/links', authMiddleware, async (req, res) => {
   try {
     const links = await prisma.commonLink.findMany({
@@ -881,10 +892,8 @@ router.get('/links', authMiddleware, async (req, res) => {
 });
 
 
-// ⬇️ --- 【新增】 工作日历 API (员工) ---
-// ------------------------------------------
+// --- 工作日历 API (员工) ---
 
-// GET /api/calendar/events?start=...&end=... (获取“我的”日历)
 router.get('/calendar/events', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -914,7 +923,6 @@ router.get('/calendar/events', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /api/calendar/events (员工创建自己的)
 router.post('/calendar/events', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -937,7 +945,6 @@ router.post('/calendar/events', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/calendar/events/:id (员工修改自己的)
 router.put('/calendar/events/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -977,7 +984,6 @@ router.put('/calendar/events/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// DELETE /api/calendar/events/:id (员工删除自己的)
 router.delete('/calendar/events/:id', authMiddleware, async (req, res) => {
   try {
     const { userId } = req.user;
@@ -1012,10 +1018,9 @@ router.delete('/calendar/events/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// ⬇️ --- 【新增】 每周重点 API (员工) ---
-// ------------------------------------------
 
-// GET /api/calendar/weekly-focus?weekStartDate=... (获取或创建每周重点)
+// --- 每周重点 API (员工) ---
+
 router.get('/calendar/weekly-focus', authMiddleware, async (req, res) => {
   try {
     const { userId, role } = req.user;
@@ -1064,7 +1069,6 @@ router.get('/calendar/weekly-focus', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/calendar/weekly-focus/:id (更新每周重点)
 router.put('/calendar/weekly-focus/:id', authMiddleware, async (req, res) => {
   try {
     const { userId, role } = req.user;
@@ -1111,6 +1115,87 @@ router.get('/rates', authMiddleware, async (req, res) => {
     res.status(500).json({ error: '服务器内部错误' });
   }
 });
-// ⬆️ --- 【新增】 ---
+
+// GET /api/sales-data
+router.get('/sales-data', authMiddleware, async (req, res) => {
+  try {
+    const { role, operatedCountries, supervisedCountries } = req.user;
+    const { 
+      countryCode, platform, storeId, startDate, endDate, 
+      sortBy, sortOrder,
+      // 分页参数
+      page = 1, pageSize = 20 
+    } = req.query;
+
+    // (构建 where 条件，保持不变)
+    const where = {};
+    if (role !== 'admin') {
+      where.store = { countryCode: { in: operatedCountries } };
+    }
+    if (countryCode) where.store = { ...where.store, countryCode: countryCode };
+    if (platform) where.store = { ...where.store, platform: platform };
+    if (storeId) where.storeId = storeId;
+    if (startDate && endDate) {
+      where.recordDate = { 
+        gte: new Date(startDate), 
+        lte: new Date(new Date(endDate).setDate(new Date(endDate).getDate() + 1)) 
+      };
+    } else if (startDate) {
+      where.recordDate = { gte: new Date(startDate) };
+    }
+
+    // (构建 orderBy，保持不变)
+    const orderBy = {};
+    if (sortBy && (sortOrder === 'asc' || sortOrder === 'desc')) {
+      const allowedSortBy = ['recordDate', 'salesVolume', 'revenue', 'createdAt'];
+      if (allowedSortBy.includes(sortBy)) orderBy[sortBy] = sortOrder;
+      else orderBy.recordDate = 'desc';
+    } else {
+      orderBy.recordDate = 'desc'; 
+    }
+
+    // 计算分页
+    const p = parseInt(page) || 1;
+    const ps = parseInt(pageSize) || 20;
+    const skip = (p - 1) * ps;
+
+    // 使用事务查询总数和数据
+    const [total, salesData] = await prisma.$transaction([
+      prisma.salesData.count({ where }),
+      prisma.salesData.findMany({
+        where: where,
+        orderBy: orderBy,
+        skip: skip,
+        take: ps,
+        include: {
+          store: { include: { country: true } }, 
+          product: { select: { sku: true, name: true } },
+          listing: { select: { productCode: true, storeTitle: true } },
+          enteredBy: { select: { nickname: true } }
+        }
+      })
+    ]);
+
+    const supervisedCodes = supervisedCountries || [];
+    const isAdmin = role === 'admin';
+    
+    const formattedData = salesData.map(row => ({
+      ...row,
+      canManage: isAdmin || supervisedCodes.includes(row.store.countryCode)
+    }));
+
+    // ⬇️ 返回分页结构
+    res.json({
+      data: formattedData,
+      total,
+      page: p,
+      pageSize: ps
+    });
+
+  } catch (error) {
+    console.error('获取销售数据列表失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
 
 module.exports = router;

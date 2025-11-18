@@ -100,6 +100,9 @@ model SalesData {
 
   product     Product @relation(fields: [productId], references: [id])
   productId   String
+
+  listing     StoreProductListing? @relation(fields: [listingId], references: [id])
+  listingId   String?
 }
 
 // --- 6. 周报模型 (WeeklyReport) ---
@@ -202,6 +205,8 @@ model StoreProductListing {
   currentPrice  Float   @default(0)
   platformUrl   String?
   lastSyncedAt  DateTime? @updatedAt
+  
+  salesData     SalesData[]
   
 }
 // ⬆️ === 【重大修改】=== ⬆️

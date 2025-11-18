@@ -74,16 +74,33 @@
                     </select>
                   </div>
 
-                  <div class="space-y-2">
-                    <label for="edit_product" class="form-label">商品 *</label>
-                    <select id="edit_product" v-model="formData.productId" required :disabled="!formData.storeId || isLoadingProducts" class="form-input disabled:bg-gray-100">
+                  <div class="space-y-2 md:col-span-2">
+                    <label for="edit_listing" class="form-label">
+                      选择商品链接 (Listing) *
+                      <span class="text-xs font-normal text-stone-500 ml-1">格式: [商品代码] 标题 (SKU)</span>
+                    </label>
+                    <select 
+                      id="edit_listing" 
+                      v-model="formData.listingId" 
+                      required 
+                      :disabled="!formData.storeId || isLoadingListings" 
+                      class="form-input disabled:bg-gray-100"
+                    >
                       <option disabled value="">
-                        {{ isLoadingProducts ? '加载商品中...' : '请选择商品...' }}
+                        {{ isLoadingListings ? '加载链接中...' : '请选择具体链接...' }}
                       </option>
-                      <option v-for="product in storeProducts" :key="product.id" :value="product.id">
-                        {{ product.name }} ({{ product.sku }})
+                      <option v-for="listing in storeListings" :key="listing.id" :value="listing.id">
+                        <template v-if="listing.productCode">
+                          [{{ listing.productCode }}]
+                        </template>
+                        {{ listing.storeTitle || '未命名链接' }} 
+                        ({{ listing.product.sku }})
                       </option>
                     </select>
+                    
+                    <p v-if="!saleDataToEdit?.listingId && !formData.listingId" class="text-xs text-amber-600 mt-1">
+                      提示：这是一条旧数据，请重新关联到一个具体的商品链接。
+                    </p>
                   </div>
 
                   <div class="space-y-2">
@@ -150,17 +167,15 @@ const errorMessage = ref('');
 
 // --- 级联菜单状态 ---
 const allStores = ref([]);
-const storeProducts = ref([]);
-const isLoadingProducts = ref(false);
+const storeListings = ref([]); // ⬅️ 【修改】改为 Listings
+const isLoadingListings = ref(false);
 const selectedCountry = ref('');
 const selectedPlatform = ref('');
 
-// --- 级联菜单逻辑 (同 SalesForm) ---
+// --- 级联菜单逻辑 ---
 async function fetchStores() {
   try {
-    // ⬇️ --- 【修复】 ---
     const response = await apiClient.get('/stores-list');
-    // ⬆️ --- 【修复】 ---
     allStores.value = response.data;
   } catch (error) {
     console.error('获取店铺列表失败:', error);
@@ -205,33 +220,38 @@ watch(selectedCountry, (newVal) => {
   if (newVal !== formData.value.store?.countryCode) {
     selectedPlatform.value = '';
     formData.value.storeId = '';
-    formData.value.productId = '';
+    formData.value.listingId = '';
   }
 });
 watch(selectedPlatform, (newVal) => {
   if (newVal !== formData.value.store?.platform) {
     formData.value.storeId = '';
-    formData.value.productId = '';
+    formData.value.listingId = '';
   }
 });
 
-// (级联) 获取商品
+// (级联) 获取 Listings
 watch(() => formData.value.storeId, async (newStoreId, oldStoreId) => {
-  if (newStoreId === oldStoreId) return; // (防止初始化时重复调用)
+  // 如果是初次加载（oldStoreId 为 undefined）且 storeId 没变，则不清空
+  if (newStoreId && newStoreId === props.saleDataToEdit?.storeId && !oldStoreId) {
+     // 保留 listingId，不做操作
+  } else if (newStoreId !== oldStoreId) {
+     formData.value.listingId = ''; // 切换店铺时清空
+  }
   
-  formData.value.productId = ''; // 清空商品选择
-  storeProducts.value = [];
+  storeListings.value = [];
   
   if (!newStoreId) return;
   
-  isLoadingProducts.value = true;
+  isLoadingListings.value = true;
   try {
-    const response = await apiClient.get(`/stores/${newStoreId}/products`);
-    storeProducts.value = response.data;
+    // ⬇️ 【修改】调用 listings 接口
+    const response = await apiClient.get(`/stores/${newStoreId}/listings`);
+    storeListings.value = response.data;
   } catch (error) {
-    errorMessage.value = '无法加载该店铺的商品列表。';
+    errorMessage.value = '无法加载店铺链接列表。';
   } finally {
-    isLoadingProducts.value = false;
+    isLoadingListings.value = false;
   }
 });
 
@@ -244,28 +264,28 @@ watch(() => props.isOpen, async (newVal) => {
     // 1. 复制数据到表单
     formData.value = {
       ...props.saleDataToEdit,
-      // (确保日期是 YYYY-MM-DD 格式)
       recordDate: new Date(props.saleDataToEdit.recordDate).toISOString().split('T')[0],
-      notes: props.saleDataToEdit.notes || ''
+      notes: props.saleDataToEdit.notes || '',
+      // ⬇️ 【新增】绑定 listingId
+      listingId: props.saleDataToEdit.listingId || ''
     };
 
     // 2. 加载所有店铺选项
     await fetchStores();
 
-    // 3. (关键) 触发级联菜单
+    // 3. 触发级联菜单
     selectedCountry.value = props.saleDataToEdit.store.countryCode;
     selectedPlatform.value = props.saleDataToEdit.store.platform;
-    // (formData.value.storeId 已在上面设置)
     
-    // 4. (关键) 单独加载当前店铺的商品列表
-    isLoadingProducts.value = true;
-    try {
-      const response = await apiClient.get(`/stores/${props.saleDataToEdit.storeId}/products`);
-      storeProducts.value = response.data;
-    } catch (error) {
-      errorMessage.value = '无法加载商品列表。';
-    } finally {
-      isLoadingProducts.value = false;
+    // 4. 手动触发一次 Listings 加载
+    if (props.saleDataToEdit.storeId) {
+       isLoadingListings.value = true;
+       try {
+         const res = await apiClient.get(`/stores/${props.saleDataToEdit.storeId}/listings`);
+         storeListings.value = res.data;
+       } finally {
+         isLoadingListings.value = false;
+       }
     }
     
     isLoading.value = false;
@@ -275,12 +295,24 @@ watch(() => props.isOpen, async (newVal) => {
 // --- 提交 ---
 async function handleSubmit() {
   errorMessage.value = '';
+
+  if (!formData.value.listingId) {
+    errorMessage.value = '请选择一个商品链接';
+    return;
+  }
   
-  // (准备 payload，移除多余的嵌套对象)
+  // ⬇️ 【新增】查找 listing 对应的 productId
+  const targetListing = storeListings.value.find(l => l.id === formData.value.listingId);
+  if (!targetListing) {
+    errorMessage.value = '链接数据无效，请刷新重试';
+    return;
+  }
+  
   const payload = {
     recordDate: formData.value.recordDate,
     storeId: formData.value.storeId,
-    productId: formData.value.productId,
+    listingId: formData.value.listingId, // ⬇️ 提交 listingId
+    productId: targetListing.product.id, // ⬇️ 提交对应的 productId
     salesVolume: parseInt(formData.value.salesVolume) || 0,
     revenue: parseFloat(formData.value.revenue) || 0,
     notes: formData.value.notes || null
