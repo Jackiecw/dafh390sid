@@ -98,37 +98,26 @@
 </template>
 <script setup>
 import { ref } from 'vue';
-import axios from 'axios'; 
 import { useAuthStore } from '../stores/auth';
-// 1. 导入图标
+import apiClient from '../api';
 import { UserIcon, LockClosedIcon } from '@heroicons/vue/20/solid';
-
-// 2. 【操作指引】: 导入你的 Logo
-//    请将 'logo.png' 替换为你实际的文件名
-import logoUrl from '../assets/logo.png'; 
-//    (如果你没有 Logo，可以注释掉上面这行，并删除 <template> 中的 <img :src="logoUrl" ... />)
-
+import logoUrl from '../assets/logo.png';
 
 const username = ref('');
 const password = ref('');
-const errorMessage = ref(''); 
+const errorMessage = ref('');
 const authStore = useAuthStore();
 
 const handleLogin = async () => {
-  errorMessage.value = ''; 
+  errorMessage.value = '';
   try {
-    const response = await axios.post(
-      `${import.meta.env.VITE_API_BASE_URL}/login`, 
-      {
-        username: username.value,
-        password: password.value,
-      }
-    );
-    
-    authStore.login(response.data.token);
-
+    const { data } = await apiClient.post('/login', {
+      username: username.value,
+      password: password.value,
+    });
+    authStore.login(data.token);
   } catch (error) {
-    if (error.response && error.response.data.error) {
+    if (error.response?.data?.error) {
       errorMessage.value = error.response.data.error;
     } else {
       errorMessage.value = '登录失败，请检查网络或联系管理员';

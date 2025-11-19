@@ -3,76 +3,75 @@
 // 1. (关键) 在所有代码之前加载 .env 环境变量
 require('dotenv').config();
 
-// 2. 导入“零件”
+// 2. 导入依赖
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); 
-const fs = require('fs'); //
+const helmet = require('helmet');
+const path = require('path');
 
-// (新增) 导入我们分离出去的路由文件
-const authRoutes = require('./routes/auth');
-const dataRoutes = require('./routes/data');
-const adminRoutes = require('./routes/admin');
-const managementRoutes = require('./routes/management');
-const productRoutes = require('./routes/products'); 
-const profileRoutes = require('./routes/profile'); 
-const operationRoutes = require('./routes/operation');
-const financeRoutes = require('./routes/finance');
-const logisticsRoutes = require('./routes/logistics');
-const storeListingsRoutes = require('./routes/storeListings');
+// 路由注册器与配置
+const registerRoutes = require('./routes');
+const config = require('./config');
+const logger = require('./logger');
 
 // 3. 初始化
 const app = express();
 
-// 4. 配置“中间件” (Middleware)
-app.use(cors()); // 允许跨域请求
-app.use(express.json()); // 允许 Express 解析 JSON 格式的请求体
+// 4. 配置中间件
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
 
-// (不变) 开放整个 /uploads 目录
+// 简单请求日志，方便排查
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.http(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
+
+// 静态文件
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-
-// 5. 健康检查路由 (保留这个，用于测试服务器是否启动)
+// 健康检查
 app.get('/', (req, res) => {
   res.send('后端 API 服务器正在运行！地基已打好！');
 });
 
-// ------------------------------------------
-// --- 挂载 API 路由 ---
-// ------------------------------------------
+// 挂载路由
+registerRoutes(app);
 
-// (非 Admin 路由)
-app.use('/api', authRoutes);
-app.use('/api', dataRoutes);
-app.use('/api', profileRoutes);
-
-// (Admin 路由)
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin', managementRoutes);
-app.use('/api/admin', productRoutes); 
-app.use('/api/admin', storeListingsRoutes);
-
-
-app.use('/api', operationRoutes);
-app.use('/api', financeRoutes);
-app.use('/api', logisticsRoutes);
+// 全局错误处理
+app.use((err, req, res, next) => {
+  logger.error('未捕获的路由错误', err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ error: '服务器内部错误', message: err.message });
+});
 
 // 6. 启动服务器
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '0.0.0.0'; 
-
-const server = app.listen(PORT, HOST, () => {
-  console.log(`🚀 服务器已启动，正在监听所有网络...`);
-  console.log(`   - 本机访问: http://localhost:${PORT}`);
+const server = app.listen(config.PORT, config.HOST, () => {
+  logger.info('🚀 服务器已启动，正在监听所有网络...');
+  logger.info(`   - 本机访问: http://localhost:${config.PORT}`);
 });
 
 server.on('error', (error) => {
-  console.error('❌ 服务器启动失败:', error.message);
+  logger.error('❌ 服务器启动失败', error);
   if (error.code === 'EADDRINUSE') {
-    console.error(`端口 ${PORT} 已被占用，请修改环境变量 PORT 或释放该端口。`);
+    logger.error(`端口 ${config.PORT} 已被占用，请修改环境变量 PORT 或释放该端口。`);
   } else if (error.code === 'EACCES') {
-    console.error(`权限不足：无法监听端口 ${PORT}，请使用更高的端口或调整权限。`);
+    logger.error(`权限不足：无法监听端口 ${config.PORT}，请使用更高的端口或调整权限。`);
   }
   process.exit(1);
 });
 
+process.on('unhandledRejection', (reason) => {
+  logger.error('未处理的 Promise 拒绝', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('未捕获的异常', error);
+});

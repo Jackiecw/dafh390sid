@@ -26,9 +26,70 @@
       <div v-if="isLoading" class="p-6 text-sm text-[#6B7280]">正在加载在售列表...</div>
       <div v-else>
         <p v-if="errorMessage" class="px-6 pt-6 text-sm text-red-600">{{ errorMessage }}</p>
+
+        <div class="flex flex-col gap-3 px-6 pt-6 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex flex-1 flex-col gap-3 lg:flex-row lg:items-center">
+            <div class="flex flex-1 items-center rounded-2xl border border-[#E2E8F0] bg-white px-4 py-2 shadow-sm">
+              <input
+                v-model="searchKeyword"
+                type="text"
+                placeholder="搜索商品名称 / SKU / 店铺"
+                class="w-full border-none bg-transparent text-sm text-[#1F2937] placeholder:text-[#94A3B8] focus:outline-none"
+              />
+            </div>
+            <div class="flex items-center gap-2 rounded-2xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm text-[#475569] shadow-sm">
+              <span>国家 / 区域</span>
+              <select
+                v-model="selectedCountry"
+                class="rounded-xl border border-[#E2E8F0] bg-white px-3 py-1 text-sm text-[#1F2937] focus:border-[#2563EB] focus:outline-none"
+              >
+                <option value="ALL">全部</option>
+                <option
+                  v-for="country in countryOptions"
+                  :key="country.code"
+                  :value="country.code"
+                >
+                  {{ country.name }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 rounded-2xl border border-[#E2E8F0] bg-white px-3 py-2 text-sm shadow-sm">
+            <button
+              class="rounded-xl px-3 py-1 text-sm font-medium transition"
+              :class="sortMode === 'recent' ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-[#64748B]'"
+              @click="sortMode = 'recent'"
+            >
+              最新
+            </button>
+            <button
+              class="rounded-xl px-3 py-1 text-sm font-medium transition"
+              :class="sortMode === 'priceDesc' ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-[#64748B]'"
+              @click="sortMode = 'priceDesc'"
+            >
+              价格高到低
+            </button>
+            <button
+              class="rounded-xl px-3 py-1 text-sm font-medium transition"
+              :class="sortMode === 'priceAsc' ? 'bg-[#2563EB]/10 text-[#2563EB]' : 'text-[#64748B]'"
+              @click="sortMode = 'priceAsc'"
+            >
+              价格低到高
+            </button>
+          </div>
+        </div>
         
-        <div v-if="listings.length === 0 && !errorMessage" class="px-6 pb-6 text-sm text-[#6B7280]">
+        <div
+          v-if="filteredListings.length === 0 && listings.length === 0 && !errorMessage"
+          class="px-6 pb-6 text-sm text-[#6B7280]"
+        >
           当前还没有在售商品，点击右上角「上架新商品」即可快速创建。
+        </div>
+        <div
+          v-else-if="filteredListings.length === 0"
+          class="px-6 pb-6 text-sm text-[#6B7280]"
+        >
+          没有符合筛选条件的在售商品，尝试调整搜索或筛选条件。
         </div>
         
         <div v-else class="flex flex-col gap-6 px-6 pb-6 lg:flex-row">
@@ -38,7 +99,7 @@
               
               <div class="flex-1 overflow-y-auto pr-1 min-h-[50vh] space-y-3">
                 <button
-                  v-for="listing in listings"
+                  v-for="listing in filteredListings"
                   :key="listing.id"
                   class="w-full rounded-2xl border bg-white px-4 py-3 text-left transition"
                   :class="
@@ -189,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
 import StoreListingFormModal from './StoreListingFormModal.vue';
@@ -205,18 +266,89 @@ const ratesData = ref({});
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 const placeholderImage = 'https://via.placeholder.com/320x320?text=Listing';
 
-// ⬇️ 【新增】分页状态
+const searchKeyword = ref('');
+const selectedCountry = ref('ALL');
+const sortMode = ref('recent');
+
 const currentPage = ref(1);
 const pageSize = ref(20);
 const totalItems = ref(0);
 
 const isAdmin = computed(() => authStore.role === 'admin');
-const selectedListing = computed(() => listings.value.find((item) => item.id === selectedListingId.value) || null);
 const totalPages = computed(() => Math.ceil(totalItems.value / pageSize.value) || 1);
 
 const currencyFallbackMap = {
-  ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD',
+  ID: 'IDR',
+  VN: 'VND',
+  TH: 'THB',
+  MY: 'MYR',
+  PH: 'PHP',
+  SG: 'SGD',
 };
+
+const countryOptions = computed(() => {
+  const map = new Map();
+  listings.value.forEach((item) => {
+    const code = item.store?.country?.code;
+    const name = item.store?.country?.name;
+    if (code && !map.has(code)) {
+      map.set(code, name || code);
+    }
+  });
+  return Array.from(map, ([code, name]) => ({ code, name }));
+});
+
+const filteredListings = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase();
+  let result = [...listings.value];
+
+  if (keyword) {
+    result = result.filter((item) => {
+      const candidates = [
+        item.storeTitle,
+        item.product?.name,
+        item.product?.publicName,
+        item.product?.sku,
+        item.store?.name,
+      ]
+        .filter(Boolean)
+        .map((txt) => txt.toLowerCase());
+      return candidates.some((text) => text.includes(keyword));
+    });
+  }
+
+  if (selectedCountry.value !== 'ALL') {
+    result = result.filter((item) => item.store?.country?.code === selectedCountry.value);
+  }
+
+  if (sortMode.value === 'priceDesc') {
+    result.sort((a, b) => Number(b.currentPrice || 0) - Number(a.currentPrice || 0));
+  } else if (sortMode.value === 'priceAsc') {
+    result.sort((a, b) => Number(a.currentPrice || 0) - Number(b.currentPrice || 0));
+  } else {
+    result.sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt || 0).getTime() -
+        new Date(a.updatedAt || a.createdAt || 0).getTime(),
+    );
+  }
+
+  return result;
+});
+
+const selectedListing = computed(
+  () => filteredListings.value.find((item) => item.id === selectedListingId.value) || null,
+);
+
+watch(filteredListings, (items) => {
+  if (!items.length) {
+    selectedListingId.value = null;
+    return;
+  }
+  if (!selectedListingId.value || !items.some((item) => item.id === selectedListingId.value)) {
+    selectedListingId.value = items[0].id;
+  }
+});
 
 // ⬇️ 【修改】支持分页参数
 async function fetchListings(focusId = null) {
