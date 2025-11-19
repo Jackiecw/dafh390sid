@@ -58,10 +58,21 @@ app.use('/api', financeRoutes);
 app.use('/api', logisticsRoutes);
 
 // 6. 启动服务器
-const PORT = 3000;
-const HOST = '0.0.0.0'; 
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '0.0.0.0'; 
 
-app.listen(PORT, HOST, () => { 
+const server = app.listen(PORT, HOST, () => {
   console.log(`🚀 服务器已启动，正在监听所有网络...`);
   console.log(`   - 本机访问: http://localhost:${PORT}`);
 });
+
+server.on('error', (error) => {
+  console.error('❌ 服务器启动失败:', error.message);
+  if (error.code === 'EADDRINUSE') {
+    console.error(`端口 ${PORT} 已被占用，请修改环境变量 PORT 或释放该端口。`);
+  } else if (error.code === 'EACCES') {
+    console.error(`权限不足：无法监听端口 ${PORT}，请使用更高的端口或调整权限。`);
+  }
+  process.exit(1);
+});
+

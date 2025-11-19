@@ -12,6 +12,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
+    ports:             # <--- 新增这部分
+      - "5432:5432"    # <--- 将容器的 5432 映射到电脑的 5432
     volumes:
       - db-data:/var/lib/postgresql/data
     # 数据库端口 5432 不需要对外部暴露，保持内部访问最安全
@@ -23,14 +25,12 @@ services:
     restart: always
     environment:
       # (关键) 将 .env 变量注入后端容器
-      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD_ENCODED}@db:5432/${POSTGRES_DB}"
       JWT_SECRET: ${JWT_SECRET}
       EXCHANGE_RATE_API_KEY: ${EXCHANGE_RATE_API_KEY}
+      PORT: 3000
     ports:
-      # ⬇️ 关键修改
-      # 你的 3000 和 3001 都被占用了，我们使用 3002
-      # 将服务器的 3002 端口 映射到 容器内部的 3000 端口
-      - "3002:3000"
+      - "3100:3000"
     volumes:
       # (关键) 持久化用户上传的文件
       - ./backend/uploads:/app/uploads
