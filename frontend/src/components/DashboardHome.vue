@@ -130,28 +130,86 @@
 
       <div class="space-y-6">
         <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
-          <h4 class="mb-4 text-lg font-semibold text-[#1F2937]">今日汇率 (CNY)</h4>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h4 class="text-lg font-semibold text-[#1F2937]">今日汇率</h4>
+            <div class="flex flex-col items-start gap-2 text-xs text-[#6B7280] sm:flex-row sm:items-center sm:gap-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <span v-if="formattedRatesUpdatedAt" class="text-xs text-[#6B7280]">更新于 {{ formattedRatesUpdatedAt }}</span>
+                <button
+                  type="button"
+                  class="rounded-full border border-[#D1D5DB] px-3 py-1 text-xs font-medium transition hover:border-[#3B82F6] hover:text-[#3B82F6]"
+                  :class="isCalculationMode ? 'bg-[#3B82F6] text-white border-[#3B82F6]' : 'text-[#1F2937]'"
+                  @click="toggleCalculationMode"
+                >
+                  {{ isCalculationMode ? '退出计算模式' : '开启计算模式' }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-[#D1D5DB] px-3 py-1 text-xs font-medium transition hover:border-[#10B981] hover:text-[#10B981]"
+                  :class="[
+                    canTriggerManualRefresh ? 'text-[#1F2937]' : 'text-[#9CA3AF] cursor-not-allowed opacity-60',
+                    manualRefreshStatus.isRefreshing ? 'border-[#10B981] text-[#10B981]' : ''
+                  ]"
+                  :disabled="!canTriggerManualRefresh"
+                  @click="handleManualRatesRefresh"
+                >
+                  {{ manualRefreshStatus.isRefreshing ? '更新中...' : '手动更新' }}
+                </button>
+              </div>
+              <div class="flex flex-col gap-1 text-xs text-[#9CA3AF]">
+                <span>{{ manualRefreshQuotaText }}</span>
+                <span v-if="manualRefreshStatus.error" class="text-red-500">{{ manualRefreshStatus.error }}</span>
+              </div>
+            </div>
+          </div>
           <div v-if="isLoading.rates" class="text-[#6B7280]">
             加载汇率中...
           </div>
-          <div v-else class="space-y-4">
-            <div class="flex items-center justify-between rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-2">
-              <span class="text-sm font-medium text-[#1F2937]">1 CNY =</span>
-              <span class="text-lg font-semibold text-[#10B981]">
-                {{ ratesData.CNY_USD?.toFixed(4) || 'N/A' }} USD
-              </span>
-            </div>
-            <div class="space-y-2 text-sm">
-              <div
-                v-for="code in userCountryCodesForRates"
-                :key="code"
-                class="flex items-center justify-between rounded-2xl border border-[#E5E7EB] px-3 py-2"
-              >
-                <span class="font-medium text-[#1F2937]">1 CNY =</span>
-                <span class="font-semibold text-[#1F2937]">
-                  {{ ratesData[`CNY_${code}`]?.toFixed(2) || 'N/A' }} {{ code }}
-                </span>
+          <div v-else class="space-y-3">
+            <div
+              v-for="row in rateRows"
+              :key="row.code"
+              class="space-y-3 rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4"
+            >
+              <div class="flex items-center gap-3">
+                <div class="flex flex-1 items-center gap-3 text-sm text-[#6B7280]">
+                  <div class="flex items-center gap-2">
+                    <template v-if="isCalculationMode">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        class="w-24 rounded-xl border border-[#D1D5DB] bg-white px-3 py-1 text-sm text-[#111827] shadow-sm focus:border-[#3B82F6] focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+                        :value="rateStates[row.code]?.amount ?? 1"
+                        @input="updateRateAmount(row.code, $event.target.value)"
+                      />
+                    </template>
+                    <template v-else>
+                      <span class="text-lg font-semibold text-[#1F2937]">
+                        {{ formatInputAmount(rateStates[row.code]?.amount ?? 1) }}
+                      </span>
+                    </template>
+                    <span class="text-sm font-medium text-[#1F2937]">{{ row.baseCurrency }}</span>
+                  </div>
+                  <span class="text-xs text-[#9CA3AF]">=</span>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-xl border border-transparent bg-white p-2 text-[#6B7280] shadow-sm transition hover:text-[#111827]"
+                  @click="toggleRateDirection(row.code)"
+                >
+                  <ArrowsRightLeftIcon class="h-5 w-5" />
+                </button>
+                <div class="text-right">
+                  <p class="text-lg font-semibold text-[#1F2937]">
+                    {{ formatRateValue(row.convertedValue, row.quoteCurrency) }}
+                  </p>
+                  <p class="text-xs text-[#6B7280]">{{ row.quoteCurrency }}</p>
+                </div>
               </div>
+              <p class="text-xs text-[#9CA3AF]">
+                1 {{ row.baseCurrency }} = {{ formatRateValue(row.unitRate, row.quoteCurrency, true) }} {{ row.quoteCurrency }}
+              </p>
             </div>
           </div>
         </section>
@@ -178,7 +236,7 @@ import {
   ListboxOptions,
   ListboxOption,
 } from '@headlessui/vue';
-import { ChevronUpDownIcon } from '@heroicons/vue/20/solid';
+import { ChevronUpDownIcon, ArrowsRightLeftIcon } from '@heroicons/vue/20/solid';
 
 import DashboardTodo from './DashboardTodo.vue';
 import DashboardSchedule from './DashboardSchedule.vue';
@@ -194,6 +252,7 @@ const DEFAULT_RATES = Object.freeze({
   CNY_PHP: 8,
   CNY_SGD: 0.19,
 });
+const MANUAL_REFRESH_LIMIT = 3;
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -225,6 +284,14 @@ const summaryData = ref({
   schedule: { planNextWeek: '加载中...', teamFocus: '' },
 });
 const ratesData = ref({});
+const ratesUpdatedAt = ref(null);
+const rateStates = ref({});
+const isCalculationMode = ref(false);
+const remainingManualRefreshes = ref(null);
+const manualRefreshStatus = ref({
+  isRefreshing: false,
+  error: '',
+});
 const allCountries = ref([]);
 const allStores = ref([]);
 const selectedCountryCode = ref(null);
@@ -301,6 +368,101 @@ const userCountryCodesForRates = computed(() => {
     .filter(Boolean);
 });
 
+const supportedRateCodes = computed(() => {
+  const codes = ['USD', ...userCountryCodesForRates.value];
+  return Array.from(new Set(codes.filter(Boolean)));
+});
+
+watch(
+  supportedRateCodes,
+  (codes) => {
+    const nextState = {};
+    codes.forEach((code) => {
+      nextState[code] = rateStates.value[code] || { amount: 1, swapped: false };
+    });
+    rateStates.value = nextState;
+  },
+  { immediate: true }
+);
+
+const rateRows = computed(() => {
+  return supportedRateCodes.value.map((code) => {
+    const state = rateStates.value[code] || { amount: 1, swapped: false };
+    const baseCurrency = state.swapped ? code : 'CNY';
+    const quoteCurrency = state.swapped ? 'CNY' : code;
+    const amount = Number.isFinite(state.amount) ? state.amount : 1;
+    const rawRate = ratesData.value[`CNY_${code}`];
+    let unitRate = null;
+    if (typeof rawRate === 'number' && rawRate > 0) {
+      unitRate = state.swapped ? 1 / rawRate : rawRate;
+    }
+    const convertedValue = unitRate !== null ? amount * unitRate : null;
+    return {
+      code,
+      baseCurrency,
+      quoteCurrency,
+      amount,
+      unitRate,
+      convertedValue,
+    };
+  });
+});
+
+const formattedRatesUpdatedAt = computed(() => {
+  if (!ratesUpdatedAt.value) return '';
+  try {
+    return new Date(ratesUpdatedAt.value).toLocaleString('zh-CN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      month: '2-digit',
+      day: '2-digit',
+    });
+  } catch (error) {
+    return '';
+  }
+});
+
+const isRateRefreshLimited = computed(() => authStore.role !== 'admin');
+
+const manualRefreshQuotaText = computed(() => {
+  if (!isRateRefreshLimited.value) {
+    return '管理员刷新不限次数';
+  }
+  const remaining =
+    typeof remainingManualRefreshes.value === 'number'
+      ? remainingManualRefreshes.value
+      : MANUAL_REFRESH_LIMIT;
+  return `今日剩余 ${remaining} 次`;
+});
+
+const canTriggerManualRefresh = computed(() => {
+  if (manualRefreshStatus.value.isRefreshing) {
+    return false;
+  }
+  if (!isRateRefreshLimited.value) {
+    return true;
+  }
+  const remaining = remainingManualRefreshes.value;
+  if (typeof remaining !== 'number') {
+    return MANUAL_REFRESH_LIMIT > 0;
+  }
+  return remaining > 0;
+});
+
+function applyRatesPayload(payload = {}) {
+  const incomingRates = payload.rates;
+  if (incomingRates && Object.keys(incomingRates).length) {
+    ratesData.value = incomingRates;
+  } else if (!Object.keys(ratesData.value || {}).length) {
+    ratesData.value = { ...DEFAULT_RATES };
+  }
+  ratesUpdatedAt.value = payload.updatedAt || new Date().toISOString();
+  if (Object.prototype.hasOwnProperty.call(payload, 'remainingRefreshes')) {
+    remainingManualRefreshes.value = payload.remainingRefreshes;
+  }
+}
+
 async function fetchHitokoto() {
   try {
     const response = await fetch('https://v1.hitokoto.cn/?c=i&encode=text');
@@ -369,12 +531,13 @@ async function fetchDashboardData() {
   const ratesPromise = apiClient
     .get('/rates')
     .then((ratesResponse) => {
-      ratesData.value = ratesResponse.data || {};
+      applyRatesPayload(ratesResponse.data || {});
     })
     .catch((error) => {
       console.error('加载汇率失败:', error);
       if (!Object.keys(ratesData.value || {}).length) {
         ratesData.value = { ...DEFAULT_RATES };
+        ratesUpdatedAt.value = new Date().toISOString();
       }
     })
     .finally(() => {
@@ -409,6 +572,72 @@ watch(selectedStoreId, (newVal, oldVal) => {
   if (newVal === oldVal || !newVal) return;
   fetchDashboardData();
 });
+
+watch(
+  () => authStore.role,
+  (role) => {
+    if (role === 'admin') {
+      remainingManualRefreshes.value = null;
+    }
+  },
+  { immediate: true }
+);
+
+async function handleManualRatesRefresh() {
+  if (!canTriggerManualRefresh.value) return;
+  manualRefreshStatus.value.error = '';
+  manualRefreshStatus.value.isRefreshing = true;
+  try {
+    const response = await apiClient.post('/rates/refresh');
+    applyRatesPayload(response.data || {});
+  } catch (error) {
+    manualRefreshStatus.value.error =
+      error.response?.data?.error || '刷新失败，请稍后再试';
+  } finally {
+    manualRefreshStatus.value.isRefreshing = false;
+  }
+}
+
+function toggleCalculationMode() {
+  isCalculationMode.value = !isCalculationMode.value;
+}
+
+function toggleRateDirection(code) {
+  if (!rateStates.value[code]) return;
+  rateStates.value = {
+    ...rateStates.value,
+    [code]: {
+      ...rateStates.value[code],
+      swapped: !rateStates.value[code].swapped,
+    },
+  };
+}
+
+function updateRateAmount(code, rawValue) {
+  if (!rateStates.value[code]) return;
+  const numericValue = parseFloat(rawValue);
+  const safeValue = Number.isFinite(numericValue) ? Math.max(numericValue, 0) : 0;
+  rateStates.value = {
+    ...rateStates.value,
+    [code]: {
+      ...rateStates.value[code],
+      amount: safeValue,
+    },
+  };
+}
+
+function formatInputAmount(value) {
+  if (!Number.isFinite(value)) return '0';
+  return Number.isInteger(value) ? value.toString() : value.toFixed(2);
+}
+
+function formatRateValue(value, currency, allowPlaceholder = false) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return allowPlaceholder ? 'N/A' : '--';
+  }
+  const decimals = currency === 'USD' ? 4 : 2;
+  return value.toFixed(decimals);
+}
 
 function formatCurrency(value, currency) {
   if (currency === 'CNY') {

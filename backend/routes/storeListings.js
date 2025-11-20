@@ -157,7 +157,7 @@ router.get('/store-listings', async (req, res) => {
     const listingIds = listings.map(l => l.id);
     const weekStart = getStartOfWeek();
     const monthStart = getStartOfMonth();
-    const rates = await getRates();
+    const { rates: rateMap } = await getRates();
 
     // 5. (数据库级聚合) 只聚合当前页 ID 的销量
     //    由于 Prisma groupBy 不支持在一次查询中对不同时间段做条件聚合 (Conditional Aggregation)，
@@ -206,7 +206,7 @@ router.get('/store-listings', async (req, res) => {
       const countryCode = listing.store.countryCode;
       const currencyCode = countryCurrencyMap[countryCode] || null; 
       let priceRmb = null;
-      const rate = resolveRateValue(rates, currencyCode);
+      const rate = resolveRateValue(rateMap, currencyCode);
       if (rate) {
         priceRmb = listing.currentPrice / rate;
       }
@@ -263,7 +263,7 @@ router.post('/store-listings', upload.single('storeImageUrl'), async (req, res) 
       return res.status(403).json({ error: '权限不足：无法在该国家的店铺上架' });
     }
     
-    const rates = await getRates();
+    const { rates } = await getRates();
     const currencyCode = countryCurrencyMap[targetStore.countryCode] || null;
 
     const payload = {

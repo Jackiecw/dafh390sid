@@ -256,7 +256,7 @@ const handleSubmit = async () => {
     }
   }
 };
-</script></script>
+</script>
 
 <style scoped>
 .form-label {

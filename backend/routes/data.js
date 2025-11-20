@@ -8,6 +8,31 @@ const { z } = require('zod');
 const axios = require('axios'); 
 
 const router = express.Router();
+const logger = require('../logger');
+
+const RATE_REFRESH_LIMIT = 3;
+const rateRefreshTracker = new Map();
+
+function getTodayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getRateRefreshRecord(userId) {
+  const todayKey = getTodayKey();
+  const existing = rateRefreshTracker.get(userId);
+  if (!existing || existing.date !== todayKey) {
+    const freshRecord = { date: todayKey, count: 0 };
+    rateRefreshTracker.set(userId, freshRecord);
+    return freshRecord;
+  }
+  return existing;
+}
+
+function getRemainingRefreshes(user) {
+  if (!user || user.role === 'admin') return null;
+  const record = getRateRefreshRecord(user.userId);
+  return Math.max(RATE_REFRESH_LIMIT - record.count, 0);
+}
 
 
 const { 
@@ -158,7 +183,7 @@ router.get('/dashboard/summary', authMiddleware, async (req, res) => {
       const targetCurrencyCode = countryCurrencyMap[targetCountry];
       currency = currencySymbols[targetCurrencyCode] || targetCurrencyCode;
       
-      const currentRates = await getRates(); 
+      const { rates: currentRates } = await getRates(); 
       const cnyRate = currentRates[`CNY_${targetCurrencyCode}`]; 
       if (cnyRate) {
         rateToCny = 1 / cnyRate; 
@@ -863,11 +888,49 @@ router.put('/calendar/weekly-focus/:id', authMiddleware, async (req, res) => {
 
 router.get('/rates', authMiddleware, async (req, res) => {
   try {
-    const rates = await getRates(); // (复用 datahelpers.js 中的函数)
-    res.json(rates);
+    const { rates, lastFetched } = await getRates(); // (复用 datahelpers.js 中的函数)
+    res.json({
+      rates,
+      updatedAt: lastFetched ? new Date(lastFetched).toISOString() : null,
+      remainingRefreshes: getRemainingRefreshes(req.user),
+    });
   } catch (error) {
     console.error('获取公开汇率失败:', error);
     res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+router.post('/rates/refresh', authMiddleware, async (req, res) => {
+  try {
+    logger.info('手动刷新汇率请求', {
+      userId: req.user.userId,
+      role: req.user.role,
+    });
+    if (req.user.role !== 'admin') {
+      const record = getRateRefreshRecord(req.user.userId);
+      if (record.count >= RATE_REFRESH_LIMIT) {
+        logger.warn('手动刷新次数已达上限', {
+          userId: req.user.userId,
+          date: record.date,
+        });
+        return res.status(429).json({ error: '今日刷新次数已用完，请明日再试' });
+      }
+      record.count += 1;
+    }
+    const { rates, lastFetched } = await getRates({ forceRefresh: true });
+    logger.info('手动刷新汇率成功', {
+      userId: req.user.userId,
+      role: req.user.role,
+      fetchedAt: new Date(lastFetched).toISOString(),
+    });
+    res.json({
+      rates,
+      updatedAt: lastFetched ? new Date(lastFetched).toISOString() : null,
+      remainingRefreshes: getRemainingRefreshes(req.user),
+    });
+  } catch (error) {
+    logger.error('手动刷新汇率失败', { message: error.message, stack: error.stack });
+    res.status(500).json({ error: error?.message || '手动刷新汇率失败' });
   }
 });
 

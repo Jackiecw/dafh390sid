@@ -28,7 +28,23 @@ const normalizeMeta = (meta) => {
   return Object.keys(normalized).length ? normalized : undefined;
 };
 
+const LEVEL_ORDER = ['ERROR', 'WARN', 'INFO', 'HTTP', 'DEBUG'];
+const configuredLevel = (() => {
+  const raw = process.env.LOG_LEVEL ? process.env.LOG_LEVEL.toUpperCase() : 'INFO';
+  return LEVEL_ORDER.includes(raw) ? raw : 'INFO';
+})();
+
+const shouldLog = (level) => {
+  const normalizedLevel = level.toUpperCase();
+  const levelIndex = LEVEL_ORDER.indexOf(normalizedLevel);
+  const thresholdIndex = LEVEL_ORDER.indexOf(configuredLevel);
+  if (levelIndex === -1) return true;
+  return levelIndex <= thresholdIndex;
+};
+
 const log = (level, message, meta) => {
+  if (!shouldLog(level)) return;
+
   const payload = {
     timestamp: new Date().toISOString(),
     level,
@@ -53,4 +69,5 @@ module.exports = {
   warn: (msg, meta) => log('WARN', msg, meta),
   error: (msg, errOrMeta) => log('ERROR', msg, errOrMeta),
   http: (msg, meta) => log('HTTP', msg, meta),
+  debug: (msg, meta) => log('DEBUG', msg, meta),
 };

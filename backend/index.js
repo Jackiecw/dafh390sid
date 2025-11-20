@@ -1,13 +1,22 @@
 // ./backend/index.js
 
 // 1. (关键) 在所有代码之前加载 .env 环境变量
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+const envFiles = [
+  path.resolve(__dirname, '..', '.env'),
+  path.resolve(__dirname, '.env'),
+];
+
+envFiles.forEach((envPath) => {
+  dotenv.config({ path: envPath, override: true });
+});
 
 // 2. 导入依赖
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
 const { randomUUID } = require('crypto');
 
 // 路由注册器与配置

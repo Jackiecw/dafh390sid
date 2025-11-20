@@ -399,7 +399,7 @@ function changePage(page) {
 async function fetchRates() {
   try {
     const response = await apiClient.get('/rates');
-    ratesData.value = response.data || {};
+    ratesData.value = response.data?.rates || {};
   } catch (error) {
     console.error('获取汇率失败:', error);
   }
