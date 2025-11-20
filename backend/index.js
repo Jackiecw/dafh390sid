@@ -10,7 +10,7 @@ const envFiles = [
 ];
 
 envFiles.forEach((envPath) => {
-  dotenv.config({ path: envPath, override: true });
+  dotenv.config({ path: envPath});
 });
 
 // 2. 导入依赖
