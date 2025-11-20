@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../prismaClient');
 const { z } = require('zod');
+const loginRateLimiter = require('../loginRateLimiter');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -72,7 +73,7 @@ router.post('/register', async (req, res) => {
 
 // 接口 2: (POST) 用户登录
 // ⬇️ 【重大修改】
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, async (req, res) => {
   try {
     // 1. (不变) 验证输入
     const validation = loginSchema.safeParse(req.body);

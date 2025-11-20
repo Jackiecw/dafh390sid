@@ -153,6 +153,7 @@ import {
 } from '@headlessui/vue';
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
+import useStoreListings from '../composables/useStoreListings';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -161,31 +162,29 @@ const props = defineProps({
 const emit = defineEmits(['close', 'sale-updated']);
 
 const authStore = useAuthStore();
+const {
+  stores,
+  fetchStores,
+  storesError,
+  getStoresByCountry,
+  getStoresByCountryAndPlatform,
+  fetchListings,
+} = useStoreListings();
 const formData = ref({});
 const isLoading = ref(false);
 const errorMessage = ref('');
 
 // --- 级联菜单状态 ---
-const allStores = ref([]);
 const storeListings = ref([]); // ⬅️ 【修改】改为 Listings
 const isLoadingListings = ref(false);
 const selectedCountry = ref('');
 const selectedPlatform = ref('');
 
 // --- 级联菜单逻辑 ---
-async function fetchStores() {
-  try {
-    const response = await apiClient.get('/stores-list');
-    allStores.value = response.data;
-  } catch (error) {
-    console.error('获取店铺列表失败:', error);
-    errorMessage.value = '无法加载店铺选项。';
-  }
-}
 
 const countryOptions = computed(() => {
   const uniqueCountriesMap = new Map();
-  allStores.value.forEach(store => {
+  stores.value.forEach(store => {
     if (store.country) {
       uniqueCountriesMap.set(store.country.code, store.country);
     }
@@ -199,20 +198,21 @@ const countryOptions = computed(() => {
 
 const platformOptions = computed(() => {
   if (!selectedCountry.value) return [];
-  const platforms = allStores.value
-    .filter(store => store.countryCode === selectedCountry.value)
+  const platforms = getStoresByCountry(selectedCountry.value)
     .map(store => store.platform);
   return [...new Set(platforms)].sort();
 });
 
 const storeOptions = computed(() => {
   if (!selectedCountry.value || !selectedPlatform.value) return [];
-  return allStores.value
-    .filter(store => 
-      store.countryCode === selectedCountry.value &&
-      store.platform === selectedPlatform.value
-    )
+  return getStoresByCountryAndPlatform(selectedCountry.value, selectedPlatform.value)
     .sort((a, b) => a.name.localeCompare(b.name));
+});
+
+watch(() => storesError.value, (val) => {
+  if (val) {
+    errorMessage.value = val;
+  }
 });
 
 // (级联) 重置
@@ -245,11 +245,9 @@ watch(() => formData.value.storeId, async (newStoreId, oldStoreId) => {
   
   isLoadingListings.value = true;
   try {
-    // ⬇️ 【修改】调用 listings 接口
-    const response = await apiClient.get(`/stores/${newStoreId}/listings`);
-    storeListings.value = response.data;
+    storeListings.value = await fetchListings(newStoreId);
   } catch (error) {
-    errorMessage.value = '无法加载店铺链接列表。';
+    errorMessage.value = error.message || '无法加载店铺链接列表。';
   } finally {
     isLoadingListings.value = false;
   }
@@ -281,8 +279,7 @@ watch(() => props.isOpen, async (newVal) => {
     if (props.saleDataToEdit.storeId) {
        isLoadingListings.value = true;
        try {
-         const res = await apiClient.get(`/stores/${props.saleDataToEdit.storeId}/listings`);
-         storeListings.value = res.data;
+         storeListings.value = await fetchListings(props.saleDataToEdit.storeId);
        } finally {
          isLoadingListings.value = false;
        }

@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const { randomUUID } = require('crypto');
 
 // 路由注册器与配置
 const registerRoutes = require('./routes');
@@ -22,12 +23,28 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 
+// 为每个请求注入 Request ID
+app.use((req, res, next) => {
+  const requestId = randomUUID();
+  req.requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  next();
+});
+
 // 简单请求日志，方便排查
 app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    logger.http(`${req.method} ${req.originalUrl} -> ${res.statusCode} (${duration}ms)`);
+    logger.http('HTTP request completed', {
+      requestId: req.requestId,
+      method: req.method,
+      url: req.originalUrl,
+      statusCode: res.statusCode,
+      durationMs: duration,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
   });
   next();
 });

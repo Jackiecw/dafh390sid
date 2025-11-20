@@ -108,23 +108,27 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { useAuthStore } from '../stores/auth'; 
+import { useAuthStore } from '../stores/auth';
 import apiClient from '../api';
+import useStoreListings from '../composables/useStoreListings';
 
-// --- 状态定义 ---
+const authStore = useAuthStore();
+const {
+  stores,
+  fetchStores,
+  storesLoading,
+  storesError,
+  getStoresByCountry,
+  getStoresByCountryAndPlatform,
+  permittedCountries,
+  fetchListings,
+} = useStoreListings();
+const isLoadingStores = storesLoading;
 
-const authStore = useAuthStore(); 
-
-const allStores = ref([]);
-const isLoadingStores = ref(true);
-
-// 级联选择状态
-const selectedCountry = ref(''); 
+const selectedCountry = ref('');
 const selectedPlatform = ref('');
-const selectedStoreId = ref(''); 
-
-// ⬇️ 【修改】从 Product 变为 Listing
-const selectedListingId = ref(''); 
+const selectedStoreId = ref('');
+const selectedListingId = ref('');
 const storeListings = ref([]);
 const isLoadingListings = ref(false);
 
@@ -138,65 +142,48 @@ const formOtherData = ref({
 const successMessage = ref('');
 const errorMessage = ref('');
 
-// --- 数据获取 ---
-
-async function fetchStores() {
-  isLoadingStores.value = true;
-  try {
-    const response = await apiClient.get('/stores-list'); 
-    allStores.value = response.data;
-  } catch (error) {
-    console.error('获取店铺列表失败:', error);
-    errorMessage.value = '无法加载店铺选项，请联系管理员。';
-  } finally {
-    isLoadingStores.value = false;
-  }
-}
-
 onMounted(() => {
   fetchStores();
 });
 
-// --- 级联逻辑 (Computed) ---
+watch(() => storesError.value, (val) => {
+  if (val) {
+    errorMessage.value = val;
+  }
+});
 
 const countryOptions = computed(() => {
   const uniqueCountriesMap = new Map();
-  allStores.value.forEach(store => {
+  stores.value.forEach((store) => {
     if (store.country) {
       uniqueCountriesMap.set(store.country.code, store.country);
     }
   });
-  const allUniqueCountries = Array.from(uniqueCountriesMap.values())
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const allUniqueCountries = Array.from(uniqueCountriesMap.values()).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   if (authStore.role === 'admin') {
-    return allUniqueCountries; 
+    return allUniqueCountries;
   }
-  const userCountryCodes = authStore.operatedCountries; 
-  return allUniqueCountries.filter(country => 
-    userCountryCodes.includes(country.code)
+
+  return allUniqueCountries.filter((country) =>
+    permittedCountries.value.includes(country.code)
   );
 });
 
 const platformOptions = computed(() => {
   if (!selectedCountry.value) return [];
-  const platforms = allStores.value
-    .filter(store => store.countryCode === selectedCountry.value) 
-    .map(store => store.platform);
+  const platforms = getStoresByCountry(selectedCountry.value).map((store) => store.platform);
   return [...new Set(platforms)].sort();
 });
 
 const storeOptions = computed(() => {
   if (!selectedCountry.value || !selectedPlatform.value) return [];
-  return allStores.value
-    .filter(store => 
-      store.countryCode === selectedCountry.value &&
-      store.platform === selectedPlatform.value
-    )
-    .sort((a, b) => a.name.localeCompare(b.name));
+  return getStoresByCountryAndPlatform(selectedCountry.value, selectedPlatform.value).sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 });
-
-// --- 级联逻辑 (Watch) ---
 
 watch(selectedCountry, () => {
   selectedPlatform.value = '';
@@ -211,74 +198,65 @@ watch(selectedPlatform, () => {
   storeListings.value = [];
 });
 
-// ⬇️ 【修改】监视店铺变化，获取 Listing
 watch(selectedStoreId, async (newStoreId) => {
   selectedListingId.value = '';
   storeListings.value = [];
   errorMessage.value = '';
-  
-  if (!newStoreId) return; 
+
+  if (!newStoreId) return;
 
   isLoadingListings.value = true;
   try {
-    // 调用新接口
-    const response = await apiClient.get(`/stores/${newStoreId}/listings`);
-    storeListings.value = response.data;
+    storeListings.value = await fetchListings(newStoreId);
   } catch (error) {
-    console.error('获取店铺链接失败:', error);
-    errorMessage.value = '无法加载该店铺的商品链接。';
+    console.error('????????:', error);
+    errorMessage.value = error.message || '?????????????';
   } finally {
     isLoadingListings.value = false;
   }
 });
-
-// --- 提交逻辑 ---
 
 const handleSubmit = async () => {
   successMessage.value = '';
   errorMessage.value = '';
 
   if (!selectedStoreId.value || !selectedListingId.value) {
-    errorMessage.value = '请选择一个有效的店铺和商品链接';
+    errorMessage.value = '????????????????';
     return;
   }
 
-  // ⬇️ 【修改】根据 listingId 找到对应的 productId
-  const targetListing = storeListings.value.find(l => l.id === selectedListingId.value);
+  const targetListing = storeListings.value.find((l) => l.id === selectedListingId.value);
   if (!targetListing) {
-    errorMessage.value = '链接数据异常，请刷新重试';
+    errorMessage.value = '????????????';
     return;
   }
 
   const payload = {
     ...formOtherData.value,
-    storeId: selectedStoreId.value, 
-    listingId: selectedListingId.value, // ⬅️ 发送链接 ID
-    productId: targetListing.product.id, // ⬅️ 发送产品 ID (后端为了兼容性仍需要)
-    salesVolume: parseInt(formOtherData.value.salesVolume) || 0,
+    storeId: selectedStoreId.value,
+    listingId: selectedListingId.value,
+    productId: targetListing.product.id,
+    salesVolume: parseInt(formOtherData.value.salesVolume, 10) || 0,
     revenue: parseFloat(formOtherData.value.revenue) || 0,
     notes: formOtherData.value.notes || null,
   };
 
   try {
     const response = await apiClient.post('/sales', payload);
-    successMessage.value = '数据提交成功！(ID: ' + response.data.id + ')';
-    
-    // 重置部分表单
+    successMessage.value = `???????ID: ${response.data.id}?`;
+
     formOtherData.value.salesVolume = null;
     formOtherData.value.revenue = null;
-    // formOtherData.value.notes = ''; // 可选：清空备注
-
   } catch (error) {
-    console.error('提交失败:', error.response);
+    console.error('????:', error.response);
     if (error.response && error.response.data.error) {
       errorMessage.value = error.response.data.error;
     } else {
-      errorMessage.value = '提交失败，请检查网络或联系管理员';
+      errorMessage.value = '?????????????????';
     }
   }
 };
-</script>
+</script></script>
 
 <style scoped>
 .form-label {

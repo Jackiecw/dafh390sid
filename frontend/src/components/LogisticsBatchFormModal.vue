@@ -72,7 +72,7 @@
                     <select id="countryCode" v-model="formData.countryCode" class="form-input">
                       <option disabled value="">请选择...</option>
                       <option
-                        v-for="c in allCountries"
+                        v-for="c in countryOptions"
                         :key="c.code"
                         :value="c.code"
                       >
@@ -206,15 +206,16 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
-import {
-  TransitionRoot,
-  TransitionChild,
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-} from '@headlessui/vue';
-import apiClient from '../api';
+  import { ref, watch, computed } from 'vue';
+  import {
+    TransitionRoot,
+    TransitionChild,
+    Dialog,
+    DialogPanel,
+    DialogTitle,
+  } from '@headlessui/vue';
+  import apiClient from '../api';
+  import useManagedCountries from '../composables/useManagedCountries';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -241,10 +242,18 @@ const defaultFormData = () => ({
 const formData = ref(defaultFormData());
 const errorMessage = ref('');
 
-// --- 下拉菜单选项 ---
-const isLoadingOptions = ref(false);
-const allProducts = ref([]);
-const allCountries = ref([]);
+  // --- 下拉菜单选项 ---
+  const isLoadingOptions = ref(false);
+  const allProducts = ref([]);
+  const {
+    countries,
+    fetchCountries,
+    countriesError,
+    isLoadingCountries,
+  } = useManagedCountries();
+  const countryOptions = computed(() =>
+    countries.value.slice().sort((a, b) => a.name.localeCompare(b.name)),
+  );
 
 // (计算总价)
 const totalPrice = computed(() => {
@@ -257,35 +266,46 @@ const totalPrice = computed(() => {
 });
 
 // --- 数据获取 ---
-async function fetchOptions() {
-  isLoadingOptions.value = true;
-  try {
-    // (并行获取产品和国家)
-    const [productsRes, countriesRes] = await Promise.all([
-      apiClient.get('/admin/products'), // (使用你已有的 /admin/products)
-      apiClient.get('/admin/countries'), // (使用你已有的 /admin/countries)
-    ]);
-    allProducts.value = productsRes.data;
-    allCountries.value = countriesRes.data;
-  } catch (error) {
-    console.error('加载选项失败:', error);
-    errorMessage.value = '无法加载 SKU 和国家列表，请联系管理员。';
-  } finally {
-    isLoadingOptions.value = false;
-  }
-}
-
-watch(
-  () => props.isOpen,
-  (newVal) => {
-    if (newVal) {
-      resetForm();
-      if (allProducts.value.length === 0) {
-        fetchOptions();
+  async function fetchOptions() {
+    isLoadingOptions.value = true;
+    try {
+      if (!countries.value.length && !isLoadingCountries.value) {
+        await fetchCountries();
       }
+      const productsRes = await apiClient.get('/admin/products');
+      allProducts.value = productsRes.data;
+      if (!formData.value.countryCode && countryOptions.value.length > 0) {
+        formData.value.countryCode = countryOptions.value[0].code;
+      }
+    } catch (error) {
+      console.error('加载选项失败:', error);
+      errorMessage.value = countriesError.value || '无法加载 SKU 和国家列表，请联系管理员。';
+    } finally {
+      isLoadingOptions.value = false;
     }
   }
-);
+
+  watch(countryOptions, (options) => {
+    if (!formData.value.countryCode && options.length > 0) {
+      formData.value.countryCode = options[0].code;
+    }
+  });
+
+  watch(countriesError, (val) => {
+    if (val) {
+      errorMessage.value = val;
+    }
+  });
+
+  watch(
+    () => props.isOpen,
+    async (newVal) => {
+      if (newVal) {
+        resetForm();
+        await fetchOptions();
+      }
+    }
+  );
 
 // --- 提交 ---
 async function handleSubmit() {

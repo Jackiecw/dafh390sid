@@ -103,6 +103,11 @@ model SalesData {
 
   listing     StoreProductListing? @relation(fields: [listingId], references: [id])
   listingId   String?
+
+  @@index([storeId])
+  @@index([recordDate])
+  @@index([storeId, recordDate])
+  @@index([storeId, listingId])
 }
 
 // --- 6. 周报模型 (WeeklyReport) ---

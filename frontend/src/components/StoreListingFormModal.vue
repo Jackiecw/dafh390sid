@@ -54,7 +54,7 @@
                       :disabled="isEditMode"
                     >
                       <option disabled value="">请选择...</option>
-                      <option v-for="country in allCountries" :key="country.code" :value="country.code">
+                      <option v-for="country in countryOptions" :key="country.code" :value="country.code">
                         [{{ country.code }}] {{ country.name }}
                       </option>
                     </select>
@@ -173,6 +173,7 @@ import {
   DialogTitle,
 } from '@headlessui/vue';
 import apiClient from '../api';
+import useStoreListings from '../composables/useStoreListings';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -191,8 +192,6 @@ const defaultFormData = () => ({
 
 const formData = ref(defaultFormData());
 const allProducts = ref([]);
-const allStores = ref([]);
-const allCountries = ref([]);
 const currencyMap = ref({});
 const selectedCountryCode = ref('');
 const isLoading = ref(false);
@@ -204,9 +203,31 @@ const errorMessage = ref('');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 
 const isEditMode = computed(() => !!props.listingToEditId);
+const {
+  stores,
+  fetchStores,
+  storesError,
+  getStoresByCountry,
+} = useStoreListings();
+
+const countryOptions = computed(() => {
+  const uniqueCountriesMap = new Map();
+  stores.value.forEach((store) => {
+    if (store.country) {
+      uniqueCountriesMap.set(store.country.code, store.country);
+    } else if (store.countryCode) {
+      uniqueCountriesMap.set(store.countryCode, {
+        code: store.countryCode,
+        name: store.country?.name || store.countryCode,
+      });
+    }
+  });
+  return Array.from(uniqueCountriesMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+});
+
 const filteredStores = computed(() => {
   if (!selectedCountryCode.value) return [];
-  return allStores.value.filter((store) => store.countryCode === selectedCountryCode.value);
+  return getStoresByCountry(selectedCountryCode.value);
 });
 const currentCurrencyLabel = computed(() => {
   if (!selectedCountryCode.value) return '请选择国家';
@@ -218,10 +239,11 @@ async function fetchCreateOptions() {
   isLoadingMessage.value = '正在加载产品与店铺列表...';
   errorMessage.value = '';
   try {
+    await fetchStores();
     const response = await apiClient.get('/admin/store-listings/options');
     applyOptionPayload(response.data);
-    if (!selectedCountryCode.value && allCountries.value.length > 0) {
-      selectedCountryCode.value = allCountries.value[0].code;
+    if (!selectedCountryCode.value && countryOptions.value.length > 0) {
+      selectedCountryCode.value = countryOptions.value[0].code;
     }
     if (!formData.value.productId && allProducts.value.length > 0) {
       formData.value.productId = allProducts.value[0].id;
@@ -240,6 +262,7 @@ async function fetchListingDetails() {
   isLoadingMessage.value = '正在加载商品详情...';
   errorMessage.value = '';
   try {
+    await fetchStores();
     const [listingRes, optionsRes] = await Promise.all([
       apiClient.get(`/admin/store-listings/${props.listingToEditId}`),
       apiClient.get('/admin/store-listings/options'),
@@ -272,8 +295,6 @@ async function fetchListingDetails() {
 
 function applyOptionPayload(payload = {}) {
   allProducts.value = payload.products || [];
-  allStores.value = payload.stores || [];
-  allCountries.value = payload.countries || [];
   currencyMap.value = payload.currencyMap || {};
 }
 
@@ -330,6 +351,18 @@ async function handleSubmit() {
   }
 }
 
+watch(countryOptions, (options) => {
+  if (!selectedCountryCode.value && options.length > 0) {
+    selectedCountryCode.value = options[0].code;
+  }
+});
+
+watch(() => storesError.value, (val) => {
+  if (val) {
+    errorMessage.value = val;
+  }
+});
+
 watch(selectedCountryCode, () => {
   if (!filteredStores.value.some((store) => store.id === formData.value.storeId)) {
     formData.value.storeId = filteredStores.value[0]?.id || '';
@@ -338,13 +371,13 @@ watch(selectedCountryCode, () => {
 
 watch(
   () => props.isOpen,
-  (newVal) => {
+  async (newVal) => {
     if (newVal) {
       resetForm();
       if (isEditMode.value) {
-        fetchListingDetails();
+        await fetchListingDetails();
       } else {
-        fetchCreateOptions();
+        await fetchCreateOptions();
       }
     } else {
       if (previewUrl.value && previewUrl.value.startsWith('blob:')) {

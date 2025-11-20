@@ -173,6 +173,7 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
+import useStoreListings from '../composables/useStoreListings';
 import SalesDataEditModal from './SalesDataEditModal.vue';
 import { FunnelIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid';
 
@@ -189,7 +190,11 @@ const total = ref(0);
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value) || 1);
 
 // 筛选器状态
-const allStores = ref([]);
+const {
+  stores,
+  fetchStores,
+  storesError,
+} = useStoreListings();
 const defaultFilters = () => ({
   startDate: '',
   endDate: '',
@@ -259,15 +264,6 @@ async function fetchData(resetPage = false) {
   }
 }
 
-async function fetchStoresForFilter() {
-  try {
-    const response = await apiClient.get('/stores-list');
-    allStores.value = response.data;
-  } catch (error) {
-    console.error('获取店铺列表失败(用于筛选):', error);
-  }
-}
-
 function changePage(newPage) {
   if (newPage < 1 || newPage > totalPages.value) return;
   page.value = newPage;
@@ -276,13 +272,19 @@ function changePage(newPage) {
 
 onMounted(() => {
   fetchData();
-  fetchStoresForFilter();
+  fetchStores();
+});
+
+watch(() => storesError.value, (val) => {
+  if (val) {
+    errorMessage.value = val;
+  }
 });
 
 // ... (后续代码如 countryOptions, platformOptions 等保持不变)
 const countryOptions = computed(() => {
   const uniqueCountriesMap = new Map();
-  allStores.value.forEach(store => {
+  stores.value.forEach(store => {
     if (store.country) {
       uniqueCountriesMap.set(store.country.code, store.country);
     }
@@ -300,7 +302,7 @@ const countryOptions = computed(() => {
 });
 
 const platformOptions = computed(() => {
-  let storesToFilter = allStores.value;
+  let storesToFilter = stores.value;
   if (filters.value.countryCode) {
     storesToFilter = storesToFilter.filter(store => store.countryCode === filters.value.countryCode);
   }
@@ -309,7 +311,7 @@ const platformOptions = computed(() => {
 });
 
 const storeOptions = computed(() => {
-  let storesToFilter = allStores.value;
+  let storesToFilter = stores.value;
   
   if (filters.value.countryCode) {
     storesToFilter = storesToFilter.filter(store => 

@@ -8,6 +8,7 @@ module.exports = function registerRoutes(app) {
   // 非 Admin 路由
   app.use('/api', require('./auth'));
   app.use('/api', require('./data'));
+  app.use('/api', require('./salesData'));
   app.use('/api', require('./profile'));
 
   // Admin 路由
