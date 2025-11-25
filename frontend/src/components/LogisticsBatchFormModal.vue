@@ -14,9 +14,7 @@
       </TransitionChild>
 
       <div class="fixed inset-0 overflow-y-auto">
-        <div
-          class="flex min-h-full items-center justify-center p-4 text-center"
-        >
+        <div class="flex min-h-full items-center justify-center p-4 text-center">
           <TransitionChild
             as="template"
             enter="duration-300 ease-out"
@@ -36,10 +34,7 @@
                 新建生产物流批次
               </DialogTitle>
 
-              <div
-                v-if="isLoadingOptions"
-                class="mt-4 p-6 text-center text-stone-500"
-              >
+              <div v-if="isLoadingOptions" class="mt-4 p-6 text-center text-stone-500">
                 正在加载表单选项 (SKU/国家)...
               </div>
 
@@ -48,16 +43,6 @@
                   <h4 class="md:col-span-4 text-sm font-semibold text-indigo-600 border-b pb-1">
                     1. 基本信息
                   </h4>
-                  <div class="input-group">
-                    <label for="batchNumber">批次号 *</label>
-                    <input
-                      type="text"
-                      id="batchNumber"
-                      v-model="formData.batchNumber"
-                      placeholder="例如: ID0001"
-                      class="form-input"
-                    />
-                  </div>
                   <div class="input-group">
                     <label for="orderDate">订单日期 *</label>
                     <input
@@ -80,6 +65,16 @@
                       </option>
                     </select>
                   </div>
+                  <div class="md:col-span-2 input-group">
+                    <label for="notes">批次备注</label>
+                    <input
+                      type="text"
+                      id="notes"
+                      v-model="formData.notes"
+                      placeholder="可选"
+                      class="form-input"
+                    />
+                  </div>
 
                   <h4 class="md:col-span-4 mt-4 text-sm font-semibold text-indigo-600 border-b pb-1">
                     2. 产品信息
@@ -94,12 +89,32 @@
                     </select>
                   </div>
                   <div class="input-group">
-                    <label for="productSpec">产品规格</label>
+                    <label for="productColor">颜色 *</label>
+                    <input
+                      type="text"
+                      id="productColor"
+                      v-model="formData.productColor"
+                      placeholder="例: 黑色"
+                      class="form-input"
+                    />
+                  </div>
+                  <div class="input-group">
+                    <label for="productSpec">产品规格 *</label>
                     <input
                       type="text"
                       id="productSpec"
                       v-model="formData.productSpec"
                       placeholder="例: 同捆版"
+                      class="form-input"
+                    />
+                  </div>
+                  <div class="input-group">
+                    <label for="plugSpec">插头 *</label>
+                    <input
+                      type="text"
+                      id="plugSpec"
+                      v-model="formData.plugSpec"
+                      placeholder="例: 欧规"
                       class="form-input"
                     />
                   </div>
@@ -113,7 +128,7 @@
                     />
                   </div>
                   <div class="input-group">
-                    <label for="unitPrice">单价 *</label>
+                    <label for="unitPrice">单价 ($) *</label>
                     <input
                       type="number"
                       step="0.01"
@@ -123,7 +138,7 @@
                     />
                   </div>
                   <div class="input-group">
-                    <label for="totalPrice">总价 *</label>
+                    <label for="totalPrice">总价 ($) *</label>
                     <input
                       type="number"
                       step="0.01"
@@ -135,44 +150,43 @@
                   </div>
 
                   <h4 class="md:col-span-4 mt-4 text-sm font-semibold text-indigo-600 border-b pb-1">
-                    3. 生产与物流 (可选)
+                    3. 物流预填 (可选)
                   </h4>
                   <div class="input-group">
-                    <label for="estimatedFactoryDate">预计出库日</label>
-                    <input
-                      type="date"
-                      id="estimatedFactoryDate"
-                      v-model="formData.estimatedFactoryDate"
-                      class="form-input"
-                    />
+                    <label for="billingMethod">计费方式</label>
+                    <select id="billingMethod" v-model="formData.billingMethod" class="form-input">
+                      <option value="">未确定</option>
+                      <option value="BY_CBM">按体积 (CBM)</option>
+                      <option value="BY_WEIGHT">按重量 (KG)</option>
+                      <option value="FLAT_FEE">一次性费用</option>
+                    </select>
                   </div>
-                  <div class="input-group">
-                    <label for="freightForwarder">货代</label>
-                    <input
-                      type="text"
-                      id="freightForwarder"
-                      v-model="formData.freightForwarder"
-                      class="form-input"
-                    />
+
+                  <!-- 动态显示的字段 -->
+                  <div v-if="formData.billingMethod === 'BY_CBM'" class="input-group">
+                    <label for="billingCbm">计费体积 (CBM)</label>
+                    <input type="number" step="0.001" id="billingCbm" v-model="formData.billingCbm" class="form-input" />
                   </div>
-                  <div class="input-group">
-                    <label for="totalCbm">总 CBM</label>
-                    <input
-                      type="number"
-                      step="0.001"
-                      id="totalCbm"
-                      v-model="formData.totalCbm"
-                      class="form-input"
-                    />
+                  <div v-if="formData.billingMethod === 'BY_WEIGHT'" class="input-group">
+                    <label for="billingKg">计费重量 (KG)</label>
+                    <input type="number" step="0.01" id="billingKg" v-model="formData.billingKg" class="form-input" />
                   </div>
+                  <div v-if="formData.billingMethod && formData.billingMethod !== 'FLAT_FEE'" class="input-group">
+                    <label for="logisticsUnitPrice">物流单价</label>
+                    <input type="number" step="0.01" id="logisticsUnitPrice" v-model="formData.logisticsUnitPrice" class="form-input" />
+                  </div>
+                  
                   <div class="input-group">
-                    <label for="totalKg">总 KG</label>
+                    <label for="logisticsFee">预估物流费</label>
                     <input
                       type="number"
                       step="0.01"
-                      id="totalKg"
-                      v-model="formData.totalKg"
+                      id="logisticsFee"
+                      :value="estimatedLogisticsFee || formData.logisticsFee"
+                      :disabled="formData.billingMethod && formData.billingMethod !== 'FLAT_FEE'"
+                      @input="e => formData.logisticsFee = e.target.value"
                       class="form-input"
+                      :class="{'bg-gray-100': formData.billingMethod && formData.billingMethod !== 'FLAT_FEE'}"
                     />
                   </div>
                 </div>
@@ -206,16 +220,16 @@
 </template>
 
 <script setup>
-  import { ref, watch, computed } from 'vue';
-  import {
-    TransitionRoot,
-    TransitionChild,
-    Dialog,
-    DialogPanel,
-    DialogTitle,
-  } from '@headlessui/vue';
-  import apiClient from '../api';
-  import useManagedCountries from '../composables/useManagedCountries';
+import { ref, watch, computed } from 'vue';
+import {
+  TransitionRoot,
+  TransitionChild,
+  Dialog,
+  DialogPanel,
+  DialogTitle,
+} from '@headlessui/vue';
+import apiClient from '../api';
+import useManagedCountries from '../composables/useManagedCountries';
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -223,39 +237,39 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'batch-created']);
 
-// --- 状态 ---
 const defaultFormData = () => ({
-  batchNumber: '',
   orderDate: new Date().toISOString().split('T')[0],
   productId: '',
-  productSpec: '',
   countryCode: '',
+  notes: '',
+  productColor: '',
+  productSpec: '',
+  plugSpec: '',
   quantity: null,
   unitPrice: null,
-  // (totalPrice 是计算属性)
-  estimatedFactoryDate: null,
-  freightForwarder: '',
-  totalCbm: null,
-  totalKg: null,
+  
+  billingMethod: '',
+  billingCbm: null,
+  billingKg: null,
+  logisticsUnitPrice: null,
+  logisticsFee: null,
 });
 
 const formData = ref(defaultFormData());
 const errorMessage = ref('');
+const isLoadingOptions = ref(false);
+const allProducts = ref([]);
+const {
+  countries,
+  fetchCountries,
+  countriesError,
+  isLoadingCountries,
+} = useManagedCountries();
 
-  // --- 下拉菜单选项 ---
-  const isLoadingOptions = ref(false);
-  const allProducts = ref([]);
-  const {
-    countries,
-    fetchCountries,
-    countriesError,
-    isLoadingCountries,
-  } = useManagedCountries();
-  const countryOptions = computed(() =>
-    countries.value.slice().sort((a, b) => a.name.localeCompare(b.name)),
-  );
+const countryOptions = computed(() =>
+  countries.value.slice().sort((a, b) => a.name.localeCompare(b.name)),
+);
 
-// (计算总价)
 const totalPrice = computed(() => {
   const qty = parseFloat(formData.value.quantity);
   const price = parseFloat(formData.value.unitPrice);
@@ -265,75 +279,86 @@ const totalPrice = computed(() => {
   return 0;
 });
 
-// --- 数据获取 ---
-  async function fetchOptions() {
-    isLoadingOptions.value = true;
-    try {
-      if (!countries.value.length && !isLoadingCountries.value) {
-        await fetchCountries();
-      }
-      const productsRes = await apiClient.get('/admin/products');
-      allProducts.value = productsRes.data;
-      if (!formData.value.countryCode && countryOptions.value.length > 0) {
-        formData.value.countryCode = countryOptions.value[0].code;
-      }
-    } catch (error) {
-      console.error('加载选项失败:', error);
-      errorMessage.value = countriesError.value || '无法加载 SKU 和国家列表，请联系管理员。';
-    } finally {
-      isLoadingOptions.value = false;
-    }
+const estimatedLogisticsFee = computed(() => {
+  const method = formData.value.billingMethod;
+  const unit = parseFloat(formData.value.logisticsUnitPrice);
+  if (method === 'BY_CBM' && !isNaN(unit)) {
+    const vol = parseFloat(formData.value.billingCbm);
+    return !isNaN(vol) ? (vol * unit).toFixed(2) : null;
   }
+  if (method === 'BY_WEIGHT' && !isNaN(unit)) {
+    const w = parseFloat(formData.value.billingKg);
+    return !isNaN(w) ? (w * unit).toFixed(2) : null;
+  }
+  return null;
+});
 
-  watch(countryOptions, (options) => {
-    if (!formData.value.countryCode && options.length > 0) {
-      formData.value.countryCode = options[0].code;
+async function fetchOptions() {
+  isLoadingOptions.value = true;
+  try {
+    if (!countries.value.length && !isLoadingCountries.value) {
+      await fetchCountries();
     }
-  });
-
-  watch(countriesError, (val) => {
-    if (val) {
-      errorMessage.value = val;
+    const productsRes = await apiClient.get('/admin/products');
+    allProducts.value = productsRes.data;
+    if (!formData.value.countryCode && countryOptions.value.length > 0) {
+      formData.value.countryCode = countryOptions.value[0].code;
     }
-  });
-
-  watch(
-    () => props.isOpen,
-    async (newVal) => {
-      if (newVal) {
-        resetForm();
-        await fetchOptions();
-      }
+    if (!formData.value.productId && allProducts.value.length > 0) {
+      formData.value.productId = allProducts.value[0].id;
     }
-  );
+  } catch (error) {
+    console.error('加载选项失败:', error);
+    errorMessage.value = countriesError.value || '无法加载 SKU 和国家列表';
+  } finally {
+    isLoadingOptions.value = false;
+  }
+}
 
-// --- 提交 ---
+watch(() => props.isOpen, async (newVal) => {
+  if (newVal) {
+    resetForm();
+    await fetchOptions();
+  }
+});
+
 async function handleSubmit() {
   errorMessage.value = '';
+  
+  const selectedProduct = allProducts.value.find(p => p.id === formData.value.productId);
+  
+  // 构建订单数组 (目前单批次单订单，后续可扩展)
+  const orders = [{
+    orderDate: formData.value.orderDate,
+    productId: formData.value.productId,
+    skuName: selectedProduct ? selectedProduct.sku : '',
+    productColor: formData.value.productColor,
+    productSpec: formData.value.productSpec,
+    salesRegion: formData.value.countryCode,
+    plugSpec: formData.value.plugSpec,
+    quantity: Number(formData.value.quantity),
+    unitPrice: Number(formData.value.unitPrice),
+    totalPrice: Number(totalPrice.value),
+    
+    billingMethod: formData.value.billingMethod || null,
+    billingCbm: formData.value.billingCbm ? Number(formData.value.billingCbm) : null,
+    billingKg: formData.value.billingKg ? Number(formData.value.billingKg) : null,
+    logisticsUnitPrice: formData.value.logisticsUnitPrice ? Number(formData.value.logisticsUnitPrice) : null,
+    logisticsFee: estimatedLogisticsFee.value ? Number(estimatedLogisticsFee.value) : (formData.value.logisticsFee ? Number(formData.value.logisticsFee) : null)
+  }];
 
   try {
     const payload = {
-      ...formData.value,
-      // (将 null/空字符串 转为 null)
-      productSpec: formData.value.productSpec || null,
-      estimatedFactoryDate: formData.value.estimatedFactoryDate || null,
-      freightForwarder: formData.value.freightForwarder || null,
-      totalCbm: formData.value.totalCbm || null,
-      totalKg: formData.value.totalKg || null,
-      // (自动计算总价)
-      totalPrice: parseFloat(totalPrice.value)
+      countryCode: formData.value.countryCode,
+      notes: formData.value.notes || null,
+      orders
     };
     
-    // (调用我们在阶段1创建的 API)
-    const response = await apiClient.post(
-      '/admin/logistics/batches',
-      payload
-    );
-    
-    emit('batch-created', response.data); // (通知父组件)
+    await apiClient.post('/admin/production/batches', payload);
+    emit('batch-created');
     closeModal();
   } catch (error) {
-    console.error('创建批次失败:', error);
+    console.error('创建失败:', error);
     if (error.response && error.response.data.details) {
       errorMessage.value = error.response.data.details.map(d => d.message).join('; ');
     } else {
@@ -352,26 +377,24 @@ function resetForm() {
 </script>
 
 <style scoped>
-/* (复用样式) */
 .input-group {
   display: flex;
   flex-direction: column;
 }
 .input-group label {
   margin-bottom: 0.5rem;
-  color: #333;
-  font-weight: bold;
-  font-size: 0.875rem; /* 14px */
+  color: #374151;
+  font-weight: 600;
+  font-size: 0.875rem;
 }
-.input-group input,
-.input-group select,
-.input-group textarea {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
+.form-input {
+  padding: 0.6rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.95rem;
 }
 .form-input:disabled {
-  background-color: #f3f4f6; /* bg-gray-100 */
+  background-color: #f3f4f6;
+  cursor: not-allowed;
 }
 </style>
