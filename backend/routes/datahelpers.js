@@ -1,6 +1,6 @@
 // ./backend/routes/datahelpers.js
 const axios = require('axios');
-const prisma = require('../prismaClient'); // (需要 prisma 来获取周报)
+const prisma = require('../prismaClient');
 const logger = require('../logger');
 
 // --- 汇率缓存 ---
@@ -19,30 +19,100 @@ const FALLBACK_RATES = {
   CNY_SGD: 0.19,
 };
 const currencySymbols = {
-  CNY: '¥', USD: '$', IDR: 'Rp', VND: '₫', THB: '฿', MYR: 'RM', PHP: '₱', SGD: 'S$'
+  CNY: 'CNY',
+  USD: 'USD',
+  IDR: 'IDR',
+  VND: 'VND',
+  THB: 'THB',
+  MYR: 'MYR',
+  PHP: 'PHP',
+  SGD: 'SGD',
 };
 const countryCurrencyMap = {
-  ID: 'IDR', VN: 'VND', TH: 'THB', MY: 'MYR', PH: 'PHP', SG: 'SGD',
+  ID: 'IDR',
+  VN: 'VND',
+  TH: 'THB',
+  MY: 'MYR',
+  PH: 'PHP',
+  SG: 'SGD',
 };
 
-// --- 日期辅助函数 (东八区 - 不变) ---
-const getTimeZoneDate = () => {
-  return new Date();
-};
+// --- 日期辅助函数 ---
+const getTimeZoneDate = () => new Date();
 const getStartOfToday = () => {
   const now = getTimeZoneDate();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 };
 const getStartOfWeek = () => {
   const now = getStartOfToday();
-  const day = now.getDay(); 
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1); // 调整为周一
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
   return new Date(now.setDate(diff));
 };
 const getStartOfMonth = () => {
   const now = getTimeZoneDate();
   return new Date(now.getFullYear(), now.getMonth(), 1);
 };
+
+/**
+ * 计算延误天数（ETA 已过且未到港）
+ */
+function computeShipmentDelay(eta, ata, today = getStartOfToday()) {
+  if (!eta) {
+    return { isDelayed: false, delayDays: 0 };
+  }
+  if (ata) {
+    return { isDelayed: false, delayDays: 0 };
+  }
+  const etaDate = new Date(eta);
+  const diffMs = today.getTime() - etaDate.getTime();
+  if (diffMs <= 0) {
+    return { isDelayed: false, delayDays: 0 };
+  }
+  const delayDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return { isDelayed: delayDays > 0, delayDays };
+}
+
+/**
+ * 将整柜费用按 CBM/重量/数量 分摊给每个 shipment item
+ */
+function allocateCostShare(items, totalCost = 0, strategy = 'cbm') {
+  if (!items || items.length === 0) {
+    return [];
+  }
+  const key =
+    strategy === 'weight' ? 'totalKg' : strategy === 'quantity' ? 'quantity' : 'totalCbm';
+  const denominators = items.map((item) => {
+    const value = Number(item?.[key] || 0);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  });
+  let base = denominators.reduce((sum, v) => sum + v, 0);
+  if (base <= 0) {
+    // 退化为平均分摊
+    base = items.length;
+    return items.map((item) => ({
+      id: item.id,
+      share: totalCost / items.length,
+    }));
+  }
+  return items.map((item, index) => {
+    const numerator = denominators[index];
+    const share = totalCost ? (totalCost * numerator) / base : 0;
+    return { id: item.id, share: Number.isFinite(share) ? share : 0 };
+  });
+}
+
+/**
+ * 计算单件到岸成本：采购单价 + 运费分摊/件 + 关税分摊/件
+ */
+function computeLandedCost(unitPrice = 0, freightShare = 0, dutyShare = 0, quantity = 0) {
+  if (!quantity || quantity <= 0) {
+    return unitPrice;
+  }
+  const perUnitFreight = freightShare / quantity;
+  const perUnitDuty = dutyShare / quantity;
+  return unitPrice + perUnitFreight + perUnitDuty;
+}
 
 // (依赖 prisma)
 async function getPlanPreviewForWeek(userId, currentWeekStart) {
@@ -62,12 +132,12 @@ async function getPlanPreviewForWeek(userId, currentWeekStart) {
 }
 
 /**
- * 【辅助函数】获取并缓存汇率
+ * 获取并缓存汇率，优先 API，降级使用预设汇率
  */
 async function getRates(options = {}) {
   const { forceRefresh = false } = options;
   const now = Date.now();
-  if (!forceRefresh && ratesCache.rates && (now - ratesCache.lastFetched < CACHE_DURATION)) {
+  if (!forceRefresh && ratesCache.rates && now - ratesCache.lastFetched < CACHE_DURATION) {
     logger.debug('使用缓存汇率', {
       cachedAt: new Date(ratesCache.lastFetched).toISOString(),
     });
@@ -79,7 +149,6 @@ async function getRates(options = {}) {
   try {
     const apiKey = process.env.EXCHANGE_RATE_API_KEY;
     if (!apiKey) {
-      // (重要) 在开发中，如果没 key，返回一个模拟数据
       logger.warn('未配置汇率 API 密钥，将使用模拟数据', {
         fallbackRates: FALLBACK_RATES,
       });
@@ -129,7 +198,6 @@ async function getRates(options = {}) {
         lastFetched: ratesCache.lastFetched,
       };
     }
-    // (如果 API 失败或从未成功，返回模拟数据)
     ratesCache = {
       rates: { ...FALLBACK_RATES },
       lastFetched: now,
@@ -144,7 +212,6 @@ async function getRates(options = {}) {
   }
 }
 
-// 导出所有需要复用的函数和常量
 module.exports = {
   getRates,
   countryCurrencyMap,
@@ -152,5 +219,8 @@ module.exports = {
   getStartOfToday,
   getStartOfWeek,
   getStartOfMonth,
-  getPlanPreviewForWeek
+  getPlanPreviewForWeek,
+  computeShipmentDelay,
+  allocateCostShare,
+  computeLandedCost,
 };

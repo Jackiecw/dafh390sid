@@ -8,7 +8,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "migrate": "prisma migrate dev",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "migrate:logistics": "node scripts/migrateLogistics.js"
   },
   "keywords": [],
   "author": "",

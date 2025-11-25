@@ -61,7 +61,11 @@
         </p>
 
         <div v-else class="flex flex-col gap-6 lg:flex-row">
-          <aside class="lg:w-5/12 xl:w-1/3 flex flex-col gap-3">
+          <!-- Product List (Hidden on mobile if detail is shown) -->
+          <aside 
+            class="lg:w-5/12 xl:w-1/3 flex flex-col gap-3"
+            :class="{ 'hidden lg:flex': showMobileDetail }"
+          >
             <div class="flex-1 rounded-3xl border border-[#E2E8F0] bg-[#F8FAFF] p-3 shadow-inner flex flex-col">
               <p class="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-[#94A3B8]">产品列表</p>
               <div class="flex-1 overflow-y-auto pr-1 min-h-[50vh] space-y-3">
@@ -102,10 +106,23 @@
             </div>
           </aside>
 
+          <!-- Product Detail (Full screen on mobile) -->
           <article
             v-if="selectedProduct"
             class="flex-1 rounded-3xl border border-[#E5E7EB] bg-white p-8 shadow-lg shadow-blue-50"
+            :class="{ 'hidden lg:block': !showMobileDetail }"
           >
+            <!-- Mobile Back Button -->
+            <div class="mb-4 lg:hidden">
+              <button 
+                @click="clearSelection"
+                class="flex items-center text-sm text-[#6B7280] hover:text-[#1F2937]"
+              >
+                <ArrowLeftIcon class="mr-1 h-4 w-4" />
+                返回列表
+              </button>
+            </div>
+
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="flex items-start gap-4">
                 <img
@@ -207,6 +224,7 @@
           <article
             v-else
             class="flex-1 rounded-3xl border border-dashed border-[#CBD5F5] bg-[#F8FAFF] p-6 text-center text-[#64748B]"
+            :class="{ 'hidden lg:block': showMobileDetail }"
           >
             请选择左侧的商品以查看详细信息。
           </article>
@@ -228,6 +246,7 @@
 import { ref, onMounted, computed, watch, defineComponent, h } from 'vue';
 import apiClient from '../api';
 import ProductFormModal from './ProductFormModal.vue';
+import { ArrowLeftIcon } from '@heroicons/vue/20/solid';
 
 const products = ref([]);
 const isLoading = ref(true);
@@ -238,6 +257,9 @@ const selectedProductId = ref(null);
 const searchKeyword = ref('');
 const selectedCategory = ref('ALL');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
+
+// Mobile state
+const showMobileDetail = ref(false);
 
 const categoryOptions = computed(() => {
   const set = new Set();
@@ -270,7 +292,11 @@ watch(filteredProducts, (items) => {
     selectedProductId.value = null;
     return;
   }
+  // Only auto-select on desktop or if we already have a selection
+  // On mobile, we might want to start with no selection to show list
   if (!selectedProductId.value || !items.some((item) => item.id === selectedProductId.value)) {
+    // On desktop, auto-select first. On mobile, maybe not?
+    // For simplicity, we auto-select first, but showMobileDetail starts false.
     selectedProductId.value = items[0].id;
   }
 });
@@ -315,6 +341,11 @@ function closeModal() {
 
 function selectProduct(id) {
   selectedProductId.value = id;
+  showMobileDetail.value = true; // Switch to detail view on mobile
+}
+
+function clearSelection() {
+  showMobileDetail.value = false; // Back to list view on mobile
 }
 
 function handleProductCreated(newProduct) {

@@ -139,6 +139,10 @@ model ManagedCountry {
   operationModules OperationModule[]
   
   logisticsBatches LogisticsBatch[] @relation("CountryBatches")
+  productionBatches ProductionBatch[] @relation("CountryProductionBatches")
+  purchaseOrders   PurchaseOrder[]
+  shipments        Shipment[]
+  inbounds         Inbound[]
 }
 
 // --- 8. 商品模型 (Product) - (我有的产品) ---
@@ -189,6 +193,9 @@ model Product {
   listings     StoreProductListing[] // 关联“店铺在售商品”
   salesData    SalesData[]           // 关联“销售数据”
   logisticsBatches LogisticsBatch[] @relation("ProductBatches")
+  productionOrders ProductionOrder[]
+  purchaseOrders   PurchaseOrder[]
+  shipmentItems    ShipmentItem[]
 }
 // ⬆️ === 【重大修改】 === ⬆️
 
@@ -483,3 +490,248 @@ enum Keystone_Method {
   NONE
 }
 // ⬆️ === 【新增枚举】 === ⬆️
+
+// === 物流重构新增枚举 ===
+enum TransportMode {
+  SEA
+  AIR
+  RAIL
+  TRUCK
+  EXPRESS
+}
+
+enum PurchaseOrderStatus {
+  PENDING_PRODUCTION
+  IN_PRODUCTION
+  QC_PENDING
+  PARTIAL_SHIPPED
+  COMPLETED
+  CANCELED
+}
+
+enum MilestoneType {
+  BOOKING
+  LOADING
+  EXPORT_CLEARANCE
+  DEPARTED
+  ARRIVED
+  IMPORT_CLEARANCE
+  LAST_MILE
+  DELIVERED
+  WAREHOUSE_IN
+}
+
+// === 物流重构新增模型 ===
+/// 采购/生产单
+model PurchaseOrder {
+  id               String              @id @default(cuid())
+  poNumber         String              @unique
+  orderDate        DateTime            @db.Date
+  exFactoryDate    DateTime?           @db.Date
+  quantity         Int
+  unitPrice        Float
+  shippedQuantity  Int                 @default(0)
+  status           PurchaseOrderStatus @default(PENDING_PRODUCTION)
+  notes            String?             @db.Text
+  isProductionLate Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  product     Product        @relation(fields: [productId], references: [id])
+  productId   String
+  country     ManagedCountry @relation(fields: [countryCode], references: [code])
+  countryCode String
+
+  shipmentItems ShipmentItem[]
+
+  @@index([countryCode, status])
+  @@index([productId])
+}
+
+/// 发运单
+model Shipment {
+  id             String         @id @default(cuid())
+  shipmentNumber String         @unique
+  country        ManagedCountry @relation(fields: [countryCode], references: [code])
+  countryCode    String
+
+  transportMode  TransportMode
+  forwarder      String?
+  blNo           String?
+  containerNo    String?
+  trackingNumber String?
+
+  etd            DateTime? @db.Date
+  eta            DateTime? @db.Date
+  atd            DateTime? @db.Date
+  ata            DateTime? @db.Date
+
+  freightCost    Float?
+  duty           Float?
+  otherCharges   Float?
+
+  isDelayed      Boolean   @default(false)
+  delayDays      Int       @default(0)
+  notes          String?   @db.Text
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  items      ShipmentItem[]
+  milestones ShipmentMilestone[]
+
+  @@index([countryCode, eta])
+  @@index([isDelayed])
+}
+
+/// 多对多：发运包含多个采购单行
+model ShipmentItem {
+  id              String        @id @default(cuid())
+  shipment        Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId      String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  product         Product       @relation(fields: [productId], references: [id])
+  productId       String
+
+  quantity        Int
+  totalCbm        Float?
+  totalKg         Float?
+  freightShare    Float?
+  dutyShare       Float?
+  landedCost      Float?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  inboundRecords  Inbound[]
+
+  @@index([shipmentId])
+  @@index([purchaseOrderId])
+  @@index([productId])
+}
+
+/// 入库记录（到仓即成记录，不再用状态字段代替）
+model Inbound {
+  id             String         @id @default(cuid())
+  inboundDate    DateTime       @db.Date
+  quantity       Int
+  warehouse      String?
+  country        ManagedCountry @relation(fields: [countryCode], references: [code])
+  countryCode    String
+  createdAt      DateTime       @default(now())
+
+  shipmentItem   ShipmentItem   @relation(fields: [shipmentItemId], references: [id], onDelete: Cascade)
+  shipmentItemId String
+
+  @@index([countryCode, inboundDate])
+  @@index([shipmentItemId])
+}
+
+/// 物流里程碑/单据
+model ShipmentMilestone {
+  id          String       @id @default(cuid())
+  type        MilestoneType
+  occurredAt  DateTime?    @db.Date
+  documentUrl String?
+  notes       String?      @db.Text
+  createdAt   DateTime     @default(now())
+
+  shipment    Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  shipmentId  String
+
+  @@index([shipmentId, type])
+}
+
+// === 新的生产与物流模型（批次、订单、状态流） ===
+
+enum ProductionOrderStatus {
+  IN_PRODUCTION      // 生产中
+  PRODUCTION_DONE    // 生产完成
+  SHIPPED_OUT        // 已出库
+  CONTAINER_LOADED   // 已装柜
+  EXPORTED           // 出口
+  IN_TRANSIT         // 运输
+  IMPORTED           // 进口
+  DELIVERING         // 派送
+  WAREHOUSED         // 入仓（完成）
+}
+
+enum LogisticsBillingMethod {
+  BY_CBM     // 按体积计费
+  BY_WEIGHT  // 按重量计费
+  FLAT_FEE   // 一次性费用
+}
+
+model ProductionBatch {
+  id            String          @id @default(cuid())
+  country       ManagedCountry  @relation("CountryProductionBatches", fields: [countryCode], references: [code])
+  countryCode   String
+  batchSequence Int             // 同一国家内的批次序号（1 起）
+  batchNumber   String          // 例如 "01"
+  notes         String?         @db.Text
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  orders        ProductionOrder[]
+
+  @@unique([countryCode, batchSequence])
+  @@index([countryCode])
+}
+
+model ProductionOrder {
+  id              String                 @id @default(cuid())
+  orderCode       String                 @unique // 编号，例如 ID0101
+  orderSequence   Int                    // 批次内序号（1 起）
+  orderDate       DateTime               @db.Date
+  status          ProductionOrderStatus  @default(IN_PRODUCTION)
+
+  product         Product                @relation(fields: [productId], references: [id])
+  productId       String
+  skuName         String
+  productColor    String
+  productSpec     String
+  salesRegion     String
+  plugSpec        String
+  quantity        Int
+  unitPrice       Float
+  totalPrice      Float
+
+  outboundDate        DateTime?               @db.Date
+  logisticsProvider   String?
+  logisticsUnitPrice  Float?
+  warehousingProvider String?
+  cartonCount         Int?
+  totalCbm            Float?
+  totalKg             Float?
+  billingCbm          Float?
+  billingKg           Float?
+  billingMethod       LogisticsBillingMethod?
+  logisticsFee        Float?
+  warehouseDate       DateTime?               @db.Date
+  notes               String?                 @db.Text
+
+  batch           ProductionBatch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batchId         String
+
+  statusEvents    ProductionOrderStatusEvent[]
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([batchId])
+  @@index([status])
+  @@index([salesRegion])
+}
+
+model ProductionOrderStatusEvent {
+  id         String                @id @default(cuid())
+  status     ProductionOrderStatus
+  occurredAt DateTime              @db.Date
+  createdAt  DateTime              @default(now())
+
+  order      ProductionOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+
+  @@unique([orderId, status])
+  @@index([orderId, status])
+}
