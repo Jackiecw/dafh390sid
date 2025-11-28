@@ -1,0 +1,155 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import request from 'supertest';
+import express from 'express';
+
+// Define mocks using vi.hoisted to ensure they are available for hoisted vi.mock calls
+const mocks = vi.hoisted(() => {
+    return {
+        prisma: {
+            listingMapping: {
+                findFirst: vi.fn(),
+                create: vi.fn(),
+            },
+            storeProductListing: {
+                findFirst: vi.fn(),
+                findUnique: vi.fn(),
+            },
+            salesData: {
+                upsert: vi.fn(),
+            },
+            $connect: vi.fn(),
+            $disconnect: vi.fn(),
+        }
+    };
+});
+
+// Mock @prisma/client
+vi.mock('@prisma/client', () => {
+    return {
+        PrismaClient: vi.fn(() => mocks.prisma),
+    };
+});
+
+// Mock prismaClient.js
+vi.mock('../prismaClient', () => {
+    return {
+        default: mocks.prisma,
+        ...mocks.prisma
+    };
+});
+
+describe('POST /api/sales-import/confirm', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.clearAllMocks();
+    });
+
+    it('should confirm sales data and upsert', async () => {
+        // Dynamic import to ensure mocks are applied
+        const salesImportRouter = (await import('../routes/salesImport')).default;
+
+        const testApp = express();
+        testApp.use(express.json());
+        testApp.use((req, res, next) => {
+            req.user = { id: 'test-user-id' };
+            next();
+        });
+        testApp.use('/api', salesImportRouter);
+
+        const payload = {
+            platform: 'SHOPEE',
+            storeId: 'store-123',
+            items: [
+                {
+                    platformOrderId: 'order-1',
+                    orderStatus: 'COMPLETED',
+                    revenue: 10000,
+                    quantity: 1,
+                    unitPrice: 10000,
+                    listingId: 'listing-1',
+                    createMapping: false
+                }
+            ]
+        };
+
+        // Mock listing found
+        mocks.prisma.storeProductListing.findUnique.mockResolvedValue({
+            id: 'listing-1',
+            productId: 'product-1'
+        });
+
+        mocks.prisma.salesData.upsert.mockResolvedValue({});
+
+        const res = await request(testApp)
+            .post('/api/sales-import/confirm')
+            .send(payload);
+
+        if (res.body.success !== 1) {
+            console.error('Test Failed. Response Body:', JSON.stringify(res.body, null, 2));
+        }
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(1);
+        expect(mocks.prisma.salesData.upsert).toHaveBeenCalled();
+    });
+
+    it('should create mapping if requested', async () => {
+        const salesImportRouter = (await import('../routes/salesImport')).default;
+
+        const testApp = express();
+        testApp.use(express.json());
+        testApp.use((req, res, next) => {
+            req.user = { id: 'test-user-id' };
+            next();
+        });
+        testApp.use('/api', salesImportRouter);
+
+        const payload = {
+            platform: 'SHOPEE',
+            storeId: 'store-123',
+            items: [
+                {
+                    platformOrderId: 'order-2',
+                    orderStatus: 'COMPLETED',
+                    revenue: 20000,
+                    quantity: 1,
+                    unitPrice: 20000,
+                    listingId: 'listing-2',
+                    createMapping: true,
+                    title: 'External Title',
+                    sku: 'External SKU'
+                }
+            ]
+        };
+
+        // Mock listing found
+        mocks.prisma.storeProductListing.findUnique.mockResolvedValue({
+            id: 'listing-2',
+            productId: 'product-2'
+        });
+
+        // Mock mapping not found
+        mocks.prisma.listingMapping.findFirst.mockResolvedValue(null);
+        mocks.prisma.listingMapping.create.mockResolvedValue({});
+        mocks.prisma.salesData.upsert.mockResolvedValue({});
+
+        const res = await request(testApp)
+            .post('/api/sales-import/confirm')
+            .send(payload);
+
+        if (res.body.success !== 1) {
+            console.error('Test Failed. Response Body:', JSON.stringify(res.body, null, 2));
+        }
+
+        expect(res.status).toBe(200);
+        expect(res.body.success).toBe(1);
+        expect(mocks.prisma.listingMapping.create).toHaveBeenCalledWith({
+            data: {
+                platform: 'SHOPEE',
+                externalTitle: 'External Title',
+                externalSku: 'External SKU',
+                listingId: 'listing-2'
+            }
+        });
+    });
+});

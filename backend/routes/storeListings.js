@@ -38,10 +38,10 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ 
-  storage: storage, 
+const upload = multer({
+  storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 1024 * 1024 * 5 } 
+  limits: { fileSize: 1024 * 1024 * 5 }
 });
 
 // ... (辅助函数 getAllowedCountries, ensureCountryAccess 等保持不变) ...
@@ -162,7 +162,7 @@ router.get('/store-listings', async (req, res) => {
     // 5. (数据库级聚合) 只聚合当前页 ID 的销量
     //    由于 Prisma groupBy 不支持在一次查询中对不同时间段做条件聚合 (Conditional Aggregation)，
     //    我们需要分三次查询，或者使用 rawQuery。为了代码清晰，这里用三次 groupBy (性能通常可接受，因为 listingIds 数量有限)。
-    
+
     const [totalSalesAgg, monthSalesAgg, weekSalesAgg] = await prisma.$transaction([
       // 总销量
       prisma.salesData.groupBy({
@@ -186,7 +186,7 @@ router.get('/store-listings', async (req, res) => {
 
     // 6. 将聚合结果转为 Map 方便查找
     const salesMap = new Map(); // Key: listingId, Value: { total, month, week }
-    
+
     // 初始化 Map
     listingIds.forEach(id => salesMap.set(id, { total: 0, month: 0, week: 0 }));
 
@@ -204,22 +204,22 @@ router.get('/store-listings', async (req, res) => {
     // 7. 组合最终数据
     const data = listings.map(listing => {
       const countryCode = listing.store.countryCode;
-      const currencyCode = countryCurrencyMap[countryCode] || null; 
+      const currencyCode = countryCurrencyMap[countryCode] || null;
       let priceRmb = null;
       const rate = resolveRateValue(rateMap, currencyCode);
       if (rate) {
         priceRmb = listing.currentPrice / rate;
       }
-      
+
       const sales = salesMap.get(listing.id);
-      
+
       return {
         ...listing,
         currencyCode,
         currentPriceRmb: priceRmb,
         lastWeekSales: sales.week,
         thisMonthSales: sales.month,
-        totalSales: sales.total, 
+        totalSales: sales.total,
       };
     });
 
@@ -240,211 +240,248 @@ router.get('/store-listings', async (req, res) => {
 // (为了节省篇幅，这里省略 create/update/delete 代码，请确保保留原文件中的这些部分)
 // 下面仅列出 POST 的开头以确认位置
 router.post('/store-listings', upload.single('storeImageUrl'), async (req, res) => {
-    // ... (代码不变)
-    // 1. 验证文本数据
-    const validation = createListingSchema.safeParse(req.body);
-    // ... (省略具体实现，请直接使用原文件代码)
+  // ... (代码不变)
+  // 1. 验证文本数据
+  const validation = createListingSchema.safeParse(req.body);
+  // ... (省略具体实现，请直接使用原文件代码)
+  if (!validation.success) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
+  }
+  const data = validation.data;
+
+  const targetStore = await prisma.store.findUnique({
+    where: { id: data.storeId },
+    select: { countryCode: true }
+  });
+  if (!targetStore) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(400).json({ error: '目标店铺不存在' });
+  }
+  if (!ensureCountryAccess(targetStore.countryCode, req)) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    return res.status(403).json({ error: '权限不足：无法在该国家的店铺上架' });
+  }
+
+  const { rates } = await getRates();
+  const currencyCode = countryCurrencyMap[targetStore.countryCode] || null;
+
+  const payload = {
+    ...data,
+    platformUrl: data.platformUrl || null
+  };
+  if (req.file) {
+    payload.storeImageUrl = `/uploads/listings/${req.file.filename}`;
+  }
+
+  const newListing = await prisma.storeProductListing.create({
+    data: payload,
+    include: {
+      product: { select: { sku: true, publicName: true, name: true } },
+      store: { include: { country: true } }
+    }
+  });
+
+  const conversionRate = resolveRateValue(rates, currencyCode);
+  const convertedPrice = conversionRate ? newListing.currentPrice / conversionRate : null;
+
+  res.status(201).json({
+    ...newListing,
+    currencyCode,
+    currentPriceRmb: convertedPrice,
+    lastWeekSales: 0,
+    thisMonthSales: 0,
+    totalSales: 0,
+  });
+});
+
+router.get('/store-listings/options', async (req, res) => {
+  // ... (代码不变)
+  try {
+    const allowedCountries = getAllowedCountries(req);
+    const [countries, stores, products] = await Promise.all([
+      prisma.managedCountry.findMany({
+        where: allowedCountries ? { code: { in: allowedCountries } } : undefined,
+        orderBy: { code: 'asc' },
+      }),
+      prisma.store.findMany({
+        where: allowedCountries ? { countryCode: { in: allowedCountries } } : undefined,
+        select: { id: true, name: true, countryCode: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.product.findMany({
+        orderBy: { sku: 'asc' },
+        select: { id: true, sku: true, name: true, publicName: true },
+      }),
+    ]);
+
+    res.json({
+      countries,
+      stores,
+      products,
+      currencyMap: countryCurrencyMap,
+    });
+  } catch (error) {
+    console.error('获取上架选项失败:', error);
+    res.status(500).json({ error: '获取上架选项失败' });
+  }
+});
+
+// ⬇️ 【新增】 获取指定店铺的所有 Listings (用于手动映射)
+router.get('/store-listings/by-store/:storeId', async (req, res) => {
+  try {
+    const { storeId } = req.params;
+
+    // 权限检查
+    const store = await prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) return res.status(404).json({ error: '店铺未找到' });
+    if (!ensureCountryAccess(store.countryCode, req)) {
+      return res.status(403).json({ error: '权限不足' });
+    }
+
+    const listings = await prisma.storeProductListing.findMany({
+      where: { storeId },
+      select: {
+        id: true,
+        storeTitle: true,
+        productCode: true,
+        storeImageUrl: true, // Added
+        product: {
+          select: {
+            sku: true,
+            name: true,
+            publicName: true
+          }
+        }
+      },
+      orderBy: { storeTitle: 'asc' }
+    });
+
+    res.json(listings);
+  } catch (error) {
+    console.error('获取店铺 Listings 失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+// ⬆️ 【新增】
+router.get('/store-listings/:id', async (req, res) => {
+  // ... (代码不变)
+  try {
+    const { id } = req.params;
+    const listing = await prisma.storeProductListing.findUnique({
+      where: { id: id },
+      include: { store: { select: { countryCode: true } } }
+    });
+
+    if (!listing) {
+      return res.status(404).json({ error: '未找到该上架商品' });
+    }
+
+    if (listing.store && !ensureCountryAccess(listing.store.countryCode, req)) {
+      return res.status(403).json({ error: '权限不足：无法查看该上架商品' });
+    }
+    res.json(listing);
+
+  } catch (error) {
+    console.error('获取上架详情失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+router.put('/store-listings/:id', upload.single('storeImageUrl'), async (req, res) => {
+  // ... (代码不变)
+  try {
+    const { id } = req.params;
+
+    const oldListing = await prisma.storeProductListing.findUnique({
+      where: { id },
+      include: { store: { select: { countryCode: true } } }
+    });
+    if (!oldListing) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(404).json({ error: '未找到该上架商品' });
+    }
+    if (oldListing.store && !ensureCountryAccess(oldListing.store.countryCode, req)) {
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(403).json({ error: '权限不足：无法编辑该上架商品' });
+    }
+    req.listing = oldListing;
+
+    const validation = updateListingSchema.safeParse(req.body);
     if (!validation.success) {
-        if (req.file) fs.unlinkSync(req.file.path); 
-        return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
+      if (req.file) fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
     }
     const data = validation.data;
-
-    const targetStore = await prisma.store.findUnique({
-      where: { id: data.storeId },
-      select: { countryCode: true }
-    });
-    if (!targetStore) {
-      if (req.file) fs.unlinkSync(req.file.path);
-      return res.status(400).json({ error: '目标店铺不存在' });
-    }
-    if (!ensureCountryAccess(targetStore.countryCode, req)) {
-      if (req.file) fs.unlinkSync(req.file.path);
-      return res.status(403).json({ error: '权限不足：无法在该国家的店铺上架' });
-    }
-    
-    const { rates } = await getRates();
-    const currencyCode = countryCurrencyMap[targetStore.countryCode] || null;
 
     const payload = {
       ...data,
       platformUrl: data.platformUrl || null
     };
+
     if (req.file) {
       payload.storeImageUrl = `/uploads/listings/${req.file.filename}`;
+      if (oldListing.storeImageUrl) {
+        const oldPath = path.join(__dirname, '..', oldListing.storeImageUrl);
+        if (fs.existsSync(oldPath)) {
+          fs.unlinkSync(oldPath);
+        }
+      }
     }
 
-    const newListing = await prisma.storeProductListing.create({
+    const updatedListing = await prisma.storeProductListing.update({
+      where: { id: id },
       data: payload,
-      include: { 
+      include: {
         product: { select: { sku: true, publicName: true, name: true } },
         store: { include: { country: true } }
       }
     });
-    
-    const conversionRate = resolveRateValue(rates, currencyCode);
-    const convertedPrice = conversionRate ? newListing.currentPrice / conversionRate : null;
 
-    res.status(201).json({
-      ...newListing,
-      currencyCode,
-      currentPriceRmb: convertedPrice, 
-      lastWeekSales: 0,
-      thisMonthSales: 0,
-      totalSales: 0,
+    res.json({
+      ...updatedListing,
+      currencyCode: countryCurrencyMap[updatedListing.store.countryCode] || null,
     });
-});
 
-router.get('/store-listings/options', async (req, res) => {
-    // ... (代码不变)
-    try {
-        const allowedCountries = getAllowedCountries(req);
-        const [countries, stores, products] = await Promise.all([
-          prisma.managedCountry.findMany({
-            where: allowedCountries ? { code: { in: allowedCountries } } : undefined,
-            orderBy: { code: 'asc' },
-          }),
-          prisma.store.findMany({
-            where: allowedCountries ? { countryCode: { in: allowedCountries } } : undefined,
-            select: { id: true, name: true, countryCode: true },
-            orderBy: { name: 'asc' },
-          }),
-          prisma.product.findMany({
-            orderBy: { sku: 'asc' },
-            select: { id: true, sku: true, name: true, publicName: true },
-          }),
-        ]);
-    
-        res.json({
-          countries,
-          stores,
-          products,
-          currencyMap: countryCurrencyMap,
-        });
-      } catch (error) {
-        console.error('获取上架选项失败:', error);
-        res.status(500).json({ error: '获取上架选项失败' });
-      }
-});
-router.get('/store-listings/:id', async (req, res) => {
-    // ... (代码不变)
-    try {
-        const { id } = req.params;
-        const listing = await prisma.storeProductListing.findUnique({
-          where: { id: id },
-          include: { store: { select: { countryCode: true } } }
-        });
-        
-        if (!listing) {
-          return res.status(404).json({ error: '未找到该上架商品' });
-        }
-    
-        if (listing.store && !ensureCountryAccess(listing.store.countryCode, req)) {
-          return res.status(403).json({ error: '权限不足：无法查看该上架商品' });
-        }
-        res.json(listing);
-    
-      } catch (error) {
-        console.error('获取上架详情失败:', error);
-        res.status(500).json({ error: '服务器内部错误' });
-      }
-});
-
-router.put('/store-listings/:id', upload.single('storeImageUrl'), async (req, res) => {
-    // ... (代码不变)
-    try {
-        const { id } = req.params;
-        
-        const oldListing = await prisma.storeProductListing.findUnique({
-          where: { id },
-          include: { store: { select: { countryCode: true } } }
-        });
-        if (!oldListing) {
-          if (req.file) fs.unlinkSync(req.file.path);
-          return res.status(404).json({ error: '未找到该上架商品' });
-        }
-        if (oldListing.store && !ensureCountryAccess(oldListing.store.countryCode, req)) {
-          if (req.file) fs.unlinkSync(req.file.path);
-          return res.status(403).json({ error: '权限不足：无法编辑该上架商品' });
-        }
-        req.listing = oldListing; 
-    
-        const validation = updateListingSchema.safeParse(req.body);
-        if (!validation.success) {
-          if (req.file) fs.unlinkSync(req.file.path); 
-          return res.status(400).json({ error: '输入数据无效', details: validation.error.errors });
-        }
-        const data = validation.data;
-        
-        const payload = {
-          ...data,
-          platformUrl: data.platformUrl || null
-        };
-    
-        if (req.file) {
-          payload.storeImageUrl = `/uploads/listings/${req.file.filename}`;
-          if (oldListing.storeImageUrl) {
-            const oldPath = path.join(__dirname, '..', oldListing.storeImageUrl);
-            if (fs.existsSync(oldPath)) {
-              fs.unlinkSync(oldPath);
-            }
-          }
-        }
-    
-        const updatedListing = await prisma.storeProductListing.update({
-          where: { id: id },
-          data: payload,
-          include: { 
-            product: { select: { sku: true, publicName: true, name: true } },
-            store: { include: { country: true } }
-          }
-        });
-    
-        res.json({
-          ...updatedListing,
-          currencyCode: countryCurrencyMap[updatedListing.store.countryCode] || null,
-        });
-    
-      } catch (error) {
-        if (req.file) fs.unlinkSync(req.file.path);
-        if (error.code === 'P2025') return res.status(404).json({ error: '未找到该上架商品' });
-        console.error('更新上架商品失败:', error);
-        res.status(500).json({ error: '服务器内部错误' });
-      }
+  } catch (error) {
+    if (req.file) fs.unlinkSync(req.file.path);
+    if (error.code === 'P2025') return res.status(404).json({ error: '未找到该上架商品' });
+    console.error('更新上架商品失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
 });
 
 router.delete('/store-listings/:id', async (req, res) => {
-    // ... (代码不变)
-    try {
-        if ((req.user?.role || '') !== 'admin') {
-          return res.status(403).json({ error: '仅超级管理员可以删除上架商品' });
-        }
-        const { id } = req.params;
-    
-        const listing = await prisma.storeProductListing.findUnique({ where: { id } });
-        if (!listing) {
-          return res.status(404).json({ error: '未找到该上架商品' });
-        }
-        
-        if (listing.storeImageUrl) {
-          const oldPath = path.join(__dirname, '..', listing.storeImageUrl);
-          if (fs.existsSync(oldPath)) {
-            fs.unlinkSync(oldPath);
-          }
-        }
-        
-        await prisma.storeProductListing.delete({
-          where: { id: id }
-        });
-        
-        res.status(204).send(); 
-    
-      } catch (error)
-     {
-        if (error.code === 'P2025') return res.status(404).json({ error: '未找到该上架商品' });
-        console.error('删除上架商品失败:', error);
-        res.status(500).json({ error: '服务器内部错误' });
+  // ... (代码不变)
+  try {
+    if ((req.user?.role || '') !== 'admin') {
+      return res.status(403).json({ error: '仅超级管理员可以删除上架商品' });
+    }
+    const { id } = req.params;
+
+    const listing = await prisma.storeProductListing.findUnique({ where: { id } });
+    if (!listing) {
+      return res.status(404).json({ error: '未找到该上架商品' });
+    }
+
+    if (listing.storeImageUrl) {
+      const oldPath = path.join(__dirname, '..', listing.storeImageUrl);
+      if (fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
       }
+    }
+
+    await prisma.storeProductListing.delete({
+      where: { id: id }
+    });
+
+    res.status(204).send();
+
+  } catch (error) {
+    if (error.code === 'P2025') return res.status(404).json({ error: '未找到该上架商品' });
+    console.error('删除上架商品失败:', error);
+    res.status(500).json({ error: '服务器内部错误' });
+  }
 });
 
 module.exports = router;

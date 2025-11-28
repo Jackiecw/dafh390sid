@@ -324,6 +324,7 @@ import CalendarPage from './CalendarPage.vue';
 import FinancePage from './FinancePage.vue';
 import LogisticsPage from './LogisticsPage.vue';
 import ProductManagement from './ProductManagement.vue';
+import DataImport from './DataImport.vue';
 
 const menuGroups = [
   {
@@ -338,12 +339,21 @@ const menuGroups = [
     ],
   },
   {
+    key: 'sales',
+    title: '销售数据',
+    description: '明细 · 导入',
+    defaultOpen: true,
+    items: [
+      { key: 'SALES_DATA', name: '销售明细' },
+      { key: 'SALES_IMPORT', name: '数据导入' },
+    ],
+  },
+  {
     key: 'operations',
     title: '业务运营',
     description: '销售 · 运营 · 财务',
     defaultOpen: true,
     items: [
-      { key: 'SALES_DATA', name: '销售数据' },
       { key: 'ON_SALE_PRODUCTS', name: '店铺在售' },
       { key: 'PRODUCT_CATALOG', name: '产品目录' },
       { key: 'OPERATION_CENTER', name: '运营中心' },
@@ -374,6 +384,7 @@ const viewComponents = {
   DASHBOARD: DashboardHome,
   CALENDAR: CalendarPage,
   SALES_DATA: SalesDataPage,
+  SALES_IMPORT: DataImport,
   REPORTS: WeeklyReportPage,
   FINANCE_ADMIN: FinancePage,
   ON_SALE_PRODUCTS: OnSaleProductsPage,

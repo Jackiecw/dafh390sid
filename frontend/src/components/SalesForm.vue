@@ -83,9 +83,35 @@
         </div>
         
         <div class="space-y-2">
-          <label for="revenue" class="form-label">销售额 (原币种) *</label>
-          <input type="number" step="0.01" id="revenue" v-model="formOtherData.revenue" required 
-                 class="form-input" />
+          <label for="revenue" class="form-label">销售额 *</label>
+          <div class="flex space-x-2">
+             <input type="number" step="0.01" id="revenue" v-model="formOtherData.revenue" required 
+                  class="form-input flex-1" />
+             <select id="currency" v-model="formOtherData.currency" class="form-input w-24">
+                <option value="CNY">CNY</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="THB">THB</option>
+                <option value="PHP">PHP</option>
+                <option value="MYR">MYR</option>
+                <option value="IDR">IDR</option>
+                <option value="VND">VND</option>
+                <option value="SGD">SGD</option>
+             </select>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label for="platformOrderId" class="form-label">平台订单号 (可选)</label>
+          <input type="text" id="platformOrderId" v-model="formOtherData.platformOrderId" 
+                 class="form-input" placeholder="例如: 230101ABC..." />
+        </div>
+
+        <div class="space-y-2">
+          <label for="orderStatus" class="form-label">订单状态 (可选)</label>
+          <input type="text" id="orderStatus" v-model="formOtherData.orderStatus" 
+                 class="form-input" placeholder="例如: Completed" />
         </div>
         
         <div class="space-y-2 md:col-span-2">
@@ -136,7 +162,10 @@ const formOtherData = ref({
   recordDate: new Date().toISOString().split('T')[0],
   salesVolume: null,
   revenue: null,
+  currency: 'CNY',
   notes: '',
+  platformOrderId: '',
+  orderStatus: ''
 });
 
 const successMessage = ref('');
@@ -238,7 +267,10 @@ const handleSubmit = async () => {
     productId: targetListing.product.id,
     salesVolume: parseInt(formOtherData.value.salesVolume, 10) || 0,
     revenue: parseFloat(formOtherData.value.revenue) || 0,
+    currency: formOtherData.value.currency || 'CNY',
     notes: formOtherData.value.notes || null,
+    platformOrderId: formOtherData.value.platformOrderId || null,
+    orderStatus: formOtherData.value.orderStatus || null,
   };
 
   try {

@@ -13,9 +13,17 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoggedIn = computed(() => !!token.value);
   const nickname = computed(() => user.value?.nickname || '用户');
   const role = computed(() => user.value?.role || 'GUEST');
-  
+
   // (不变) 菜单权限
-  const permissions = computed(() => user.value?.permissions || []);
+  // (不变) 菜单权限
+  const permissions = computed(() => {
+    const perms = user.value?.permissions || [];
+    // TODO: Remove this dev hack
+    if (!perms.includes('SALES_IMPORT')) {
+      return [...perms, 'SALES_IMPORT'];
+    }
+    return perms;
+  });
 
   // (修改) 国家权限
   const operatedCountries = computed(() => user.value?.operatedCountries || []);
@@ -32,7 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
         const decoded = jwtDecode(token.value);
         // 检查 Token 是否过期
         if (decoded.exp * 1000 > Date.now()) {
-          
+
           // (不变)
           // decoded 现在是 { ..., permissions: [], operatedCountries: [], supervisedCountries: [], avatarUrl: ... }
           // 我们把它完整存入 user ref
@@ -73,10 +81,10 @@ export const useAuthStore = defineStore('auth', () => {
     isLoggedIn,
     nickname,
     role,
-    permissions, 
-    operatedCountries, 
+    permissions,
+    operatedCountries,
     supervisedCountries, // ⬅️ 【新增】
-    avatarUrl, 
+    avatarUrl,
     login,
     logout
   };

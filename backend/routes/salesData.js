@@ -14,7 +14,10 @@ const salesDataSchema = z.object({
   listingId: z.string().optional().nullable(),
   salesVolume: z.number().int().min(0),
   revenue: z.number().min(0),
+  currency: z.string().default('CNY'),
   notes: z.string().optional().nullable(),
+  platformOrderId: z.string().optional().nullable(),
+  orderStatus: z.string().optional().nullable(),
 });
 
 const SALES_SORTABLE_FIELDS = new Set(['recordDate', 'salesVolume', 'revenue', 'createdAt']);
@@ -177,7 +180,7 @@ router.post('/sales', authMiddleware, async (req, res) => {
       });
     }
 
-    const { recordDate, storeId, productId, listingId, salesVolume, revenue, notes } = validation.data;
+    const { recordDate, storeId, productId, listingId, salesVolume, revenue, currency, notes, platformOrderId, orderStatus } = validation.data;
     const userId = req.user.userId;
 
     const newSalesData = await prisma.salesData.create({
@@ -185,7 +188,10 @@ router.post('/sales', authMiddleware, async (req, res) => {
         recordDate: new Date(recordDate),
         salesVolume,
         revenue,
+        currency,
         notes: notes || null,
+        platformOrderId: platformOrderId || null,
+        orderStatus: orderStatus || null,
         enteredById: userId,
         storeId,
         productId,
@@ -198,7 +204,7 @@ router.post('/sales', authMiddleware, async (req, res) => {
     if (error.code === 'P2003') {
       return res.status(400).json({ error: '提交失败：所选的店铺、商品或链接无效' });
     }
-    return res.status(500).json({ error: '服务器内部错误' });
+    return res.status(500).json({ error: '服务器内部错误', message: error.message, stack: error.stack });
   }
 });
 
@@ -235,7 +241,7 @@ router.get('/sales-data', authMiddleware, async (req, res) => {
     });
   } catch (error) {
     console.error('获取销售数据列表失败:', error);
-    return res.status(500).json({ error: '服务器内部错误' });
+    return res.status(500).json({ error: '服务器内部错误', message: error.message, stack: error.stack });
   }
 });
 
@@ -257,7 +263,7 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
       });
     }
 
-    const { recordDate, storeId, productId, listingId, salesVolume, revenue, notes } = validation.data;
+    const { recordDate, storeId, productId, listingId, salesVolume, revenue, currency, notes, platformOrderId, orderStatus } = validation.data;
     const updatedSalesData = await prisma.salesData.update({
       where: { id },
       data: {
@@ -267,7 +273,10 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
         listingId: listingId || null,
         salesVolume,
         revenue,
+        currency,
         notes: notes || null,
+        platformOrderId: platformOrderId || null,
+        orderStatus: orderStatus || null,
       },
       include: salesDataInclude,
     });
@@ -284,7 +293,7 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: '数据未找到' });
     }
-    return res.status(500).json({ error: '服务器内部错误' });
+    return res.status(500).json({ error: '服务器内部错误', message: error.message, stack: error.stack });
   }
 });
 
@@ -308,7 +317,7 @@ router.delete('/sales-data/:id', authMiddleware, async (req, res) => {
     if (error.code === 'P2025') {
       return res.status(404).json({ error: '数据未找到' });
     }
-    return res.status(500).json({ error: '服务器内部错误' });
+    return res.status(500).json({ error: '服务器内部错误', message: error.message, stack: error.stack });
   }
 });
 

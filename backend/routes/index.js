@@ -10,6 +10,7 @@ module.exports = function registerRoutes(app) {
   app.use('/api', require('./data'));
   app.use('/api', require('./salesData'));
   app.use('/api', require('./profile'));
+  app.use('/api', require('./salesImport')); // ⬇️ 【新增】 销售数据导入
 
   // Admin 路由
   app.use('/api/admin', require('./admin'));

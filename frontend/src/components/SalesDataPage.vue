@@ -14,49 +14,12 @@
       </div>
     </section>
 
-    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
-      <nav class="flex gap-3">
-        <button
-          @click="currentTab = 'management'"
-          :class="[
-            'rounded-full px-5 py-2 text-sm font-semibold transition',
-            currentTab === 'management'
-              ? 'bg-[#3B82F6] text-white shadow'
-              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
-          ]"
-        >
-          数据管理
-        </button>
-        <button
-          @click="currentTab = 'entry'"
-          :class="[
-            'rounded-full px-5 py-2 text-sm font-semibold transition',
-            currentTab === 'entry'
-              ? 'bg-[#3B82F6] text-white shadow'
-              : 'bg-[#F3F4F6] text-[#6B7280] hover:text-[#1F2937]'
-          ]"
-        >
-          数据录入
-        </button>
-      </nav>
-    </section>
-
     <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
-      <div v-if="currentTab === 'management'">
-        <SalesDataManagement />
-      </div>
-      <div v-else>
-        <SalesForm />
-      </div>
+      <SalesDataManagement />
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import SalesForm from './SalesForm.vue';
 import SalesDataManagement from './SalesDataManagement.vue';
-
-// 默认显示“数据管理”
-const currentTab = ref('management'); 
 </script>
