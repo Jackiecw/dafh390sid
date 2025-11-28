@@ -41,6 +41,36 @@ class ExcelParser {
         return null;
     }
 
+    static mapStatus(platform, rawStatus) {
+        if (!rawStatus) return null;
+        const status = rawStatus.trim();
+
+        const STATUS_MAP = {
+            SHOPEE: {
+                'Belum Bayar': 'PENDING',
+                'Perlu Dikirim': 'READY_TO_SHIP',
+                'Sedang Dikirim': 'SHIPPED',
+                'Telah Dikirim': 'SHIPPED',
+                'Selesai': 'COMPLETED',
+                'Batal': 'CANCELLED',
+                'Pengembalian': 'RETURNED'
+            },
+            TIKTOK_SHOP: {
+                'Unpaid': 'PENDING',
+                'Awaiting Shipment': 'READY_TO_SHIP',
+                'Awaiting Collection': 'READY_TO_SHIP',
+                'Shipped': 'SHIPPED',
+                'In Transit': 'SHIPPED',
+                'Delivered': 'DELIVERED',
+                'Completed': 'COMPLETED',
+                'Canceled': 'CANCELLED',
+                'Returned': 'RETURNED'
+            }
+        };
+
+        return STATUS_MAP[platform]?.[status] || status; // Fallback to raw status if not mapped
+    }
+
     static parseShopee(data) {
         return data.map(row => {
             // Shopee: "2.866.250" -> need to remove dots
@@ -55,7 +85,7 @@ class ExcelParser {
 
             return {
                 platformOrderId: String(row['No. Pesanan']).trim(),
-                orderStatus: row['Status Pesanan'] ? String(row['Status Pesanan']).trim() : null,
+                orderStatus: this.mapStatus('SHOPEE', row['Status Pesanan']),
                 title: row['Nama Produk'] ? String(row['Nama Produk']).trim() : null,
                 sku: row['Nomor Referensi SKU'] ? String(row['Nomor Referensi SKU']).trim() : (row['SKU Induk'] ? String(row['SKU Induk']).trim() : null),
                 quantity: parseInt(row['Jumlah'] || '1', 10),
@@ -88,7 +118,7 @@ class ExcelParser {
 
                 return {
                     platformOrderId: String(row['Order ID']).trim(), // Ensure string
-                    orderStatus: row['Order Status'] ? String(row['Order Status']).trim() : null,
+                    orderStatus: this.mapStatus('TIKTOK_SHOP', row['Order Status']),
                     title: row['Product Name'] ? String(row['Product Name']).trim() : null,
                     sku: row['Seller SKU'] ? String(row['Seller SKU']).trim() : null,
                     quantity: parseInt(row['Quantity'] || '1', 10),

@@ -34,7 +34,7 @@
               <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 
                 <div class="input-group">
-                  <label for="username">鐢ㄦ埛鍚?(鐧诲綍璐﹀彿) *</label>
+                  <label for="username">用户名 (登录账号) *</label>
                   <input 
                     type="text" 
                     id="username" 
@@ -45,19 +45,19 @@
                 </div>
                 
                 <div v-if="!isEditMode" class="input-group">
-                  <label for="password">鍒濆瀵嗙爜 (鑷冲皯8浣? *</label>
+                  <label for="password">初始密码 (至少8位) *</label>
                   <input type="password" id="password" v-model="formData.password" />
                 </div>
                 
                 <div class="input-group">
-                  <label for="nickname">鏄电О *</label>
+                  <label for="nickname">昵称 *</label>
                   <input type="text" id="nickname" v-model="formData.nickname" />
                 </div>
                 
                 <div class="input-group">
-                  <label for="role">鍒嗛厤瑙掕壊 *</label>
+                  <label for="role">分配角色 *</label>
                   <select id="role" v-model="formData.roleId">
-                    <option disabled value="">璇烽€夋嫨涓€涓鑹?..</option>
+                    <option disabled value="">请选择一个角色...</option>
                     <option v-for="role in roles" :key="role.id" :value="role.id">
                       {{ role.description }} ({{ role.name }})
                     </option>
@@ -65,7 +65,7 @@
                 </div>
                 
                 <div class="input-group md:col-span-2">
-                  <label>涓荤鍥藉 (鍙€?</label>
+                  <label>主管国家 (可选)</label>
                   <div class="mt-2 space-y-2 max-h-32 overflow-y-auto rounded-md border p-4">
                     <div v-for="country in countryOptions" :key="country.id" class="flex items-center">
                       <input 
@@ -83,7 +83,7 @@
                 </div>
 
                 <div class="input-group md:col-span-2">
-                  <label>杩愯惀鍥藉 (鍙€?</label>
+                  <label>运营国家 (可选)</label>
                   <div class="mt-2 space-y-2 max-h-32 overflow-y-auto rounded-md border p-4">
                     <div v-for="country in countryOptions" :key="country.id" class="flex items-center">
                       <input 
@@ -100,7 +100,7 @@
                                isOperatedCountryDisabled(country.id) ? 'text-gray-400 cursor-not-allowed' : 'text-gray-700'
                              ]">
                         {{ country.name }} ({{ country.code }})
-                        <span v-if="isOperatedCountryDisabled(country.id)" class="text-xs">(涓荤)</span>
+                        <span v-if="isOperatedCountryDisabled(country.id)" class="text-xs">(主管)</span>
                       </label>
                     </div>
                   </div>
@@ -118,7 +118,7 @@
                   @click="closeModal"
                   class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
                 >
-                  鍙栨秷
+                  取消
                 </button>
                 <button
                   type="button"
@@ -259,7 +259,7 @@ function resetForm() {
 </script>
 
 <style scoped>
-/* (涓嶅彉) 琛ㄥ崟鏍峰紡 */
+/* (不变) 表单样式 */
 .input-group {
   display: flex;
   flex-direction: column;

@@ -83,31 +83,70 @@ function buildRecordDateFilter(startDate, endDate) {
 
 function buildSalesDataWhere(query, user) {
   const where = {};
-  const storeFilter = {};
-  const operatedCountries = user.operatedCountries || [];
 
+  // 1. Base Permissions
   if (user.role !== 'admin') {
-    storeFilter.countryCode = { in: operatedCountries.length ? operatedCountries : [] };
+    const permissionConditions = [];
+
+    // Rule 1: Managers can view all records for their supervised countries
+    const supervisedCountries = user.supervisedCountries || [];
+    if (supervisedCountries.length > 0) {
+      // supervisedCountries is array of objects { code, name } usually, but let's check how it's passed.
+      // In authMiddleware, it's attached. In salesImport.js I used { in: supervisedCountries }.
+      // Let's assume it's an array of codes or objects.
+      // In auth.js login: supervisedCountries = user.supervisedCountries (which is array of Country).
+      // So it's array of objects. We need to map to codes if so.
+      // Wait, in authMiddleware: req.user = user (payload).
+      // In auth.js payload: supervisedCountries: supervisedCountries (which is mapped from user.supervisedCountries).
+      // Let's check auth.js again.
+      // It seems I didn't check auth.js payload construction deeply enough.
+      // But in salesImport.js I used `user.supervisedCountries` directly as if it contains codes?
+      // No, in salesImport.js I used `countryCode: { in: supervisedCountries }`.
+      // If supervisedCountries is array of objects, this would fail.
+      // Let's check `auth.js` payload.
+      // Ah, I see in `auth.js` snippet I viewed earlier:
+      // `supervisedCountries: supervisedCountries`
+      // And `supervisedCountries` variable came from `user.supervisedCountries.map(c => c.country.code)`?
+      // I need to be careful.
+      // Let's assume `user.supervisedCountries` is array of strings (codes) for now, or I should verify.
+      // Actually, looking at `salesData.js` line 165: `const supervisedCodes = user.supervisedCountries.map((c) => c.code);`
+      // This implies `user.supervisedCountries` is an array of objects with a `code` property.
+
+      const supervisedCodes = user.supervisedCountries.map(c => c.code);
+      if (supervisedCodes.length > 0) {
+        permissionConditions.push({
+          store: { countryCode: { in: supervisedCodes } }
+        });
+      }
+    }
+
+    // Rule 2: View own records
+    permissionConditions.push({
+      enteredById: user.userId
+    });
+
+    // Combine with OR
+    if (where.AND) {
+      where.AND.push({ OR: permissionConditions });
+    } else {
+      where.AND = [{ OR: permissionConditions }];
+    }
   }
 
+  // 2. Apply Filters (on top of permissions)
   if (query.countryCode) {
-    if (user.role !== 'admin' && !operatedCountries.includes(query.countryCode)) {
-      return {
-        error: {
-          status: 403,
-          message: '权限不足：您无法查看该国家的销售数据',
-        },
-      };
-    }
-    storeFilter.countryCode = query.countryCode;
+    // We don't need to check permission here explicitly because the OR condition above handles it.
+    // If user requests a country they don't supervise and have no records in, result is empty.
+    // But to be nice, we could check, but simpler to just add to AND.
+    // However, we must ensure `store` filter merges correctly.
+    // Prisma `where` with relations can be tricky.
+    // Let's use `AND` for filters.
+
+    where.store = { ...where.store, countryCode: query.countryCode };
   }
 
   if (query.platform) {
-    storeFilter.platform = query.platform;
-  }
-
-  if (Object.keys(storeFilter).length > 0) {
-    where.store = storeFilter;
+    where.store = { ...where.store, platform: query.platform };
   }
 
   if (query.storeId) {
@@ -162,12 +201,18 @@ async function checkManagementPermission(userId, salesDataId) {
     return { canManage: false, error: '数据未找到', status: 404 };
   }
 
+  // Rule 1: Manage own records
+  if (data.enteredById === userId) {
+    return { canManage: true };
+  }
+
+  // Rule 2: Manage supervised countries
   const supervisedCodes = user.supervisedCountries.map((c) => c.code);
   if (supervisedCodes.includes(data.store.countryCode)) {
     return { canManage: true };
   }
 
-  return { canManage: false, error: '权限不足：您不是该国家的主管', status: 403 };
+  return { canManage: false, error: '权限不足：您只能管理自己录入的数据或主管国家的数据', status: 403 };
 }
 
 router.post('/sales', authMiddleware, async (req, res) => {

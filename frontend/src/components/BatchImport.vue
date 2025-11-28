@@ -62,7 +62,6 @@
     </div>
 
 
-    <!-- Preview Table -->
     <div v-if="previewData.length > 0" class="bg-white rounded-lg shadow overflow-hidden">
         <div class="px-4 py-5 sm:px-6 border-b border-stone-200 flex justify-between items-center">
             <h3 class="text-lg font-medium leading-6 text-stone-900">预览数据</h3>
@@ -71,6 +70,38 @@
                 其中未匹配 <span class="text-red-600 font-bold">{{ selectedUnmatchedCount }}</span> 条
             </div>
         </div>
+        
+        <!-- Pagination Controls (Top) -->
+        <div class="px-4 py-3 border-b border-stone-200 bg-stone-50 flex items-center justify-between sm:px-6">
+            <div class="flex items-center">
+                <span class="mr-2 text-sm text-stone-700">每页显示:</span>
+                <select v-model="pageSize" class="form-select rounded-md border-stone-300 py-1 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option :value="10">10</option>
+                    <option :value="20">20</option>
+                    <option :value="50">50</option>
+                </select>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button 
+                    @click="currentPage--" 
+                    :disabled="currentPage === 1"
+                    class="relative inline-flex items-center rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                >
+                    上一页
+                </button>
+                <span class="text-sm text-stone-700">
+                    第 {{ currentPage }} / {{ totalPages }} 页
+                </span>
+                <button 
+                    @click="currentPage++" 
+                    :disabled="currentPage === totalPages"
+                    class="relative inline-flex items-center rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                >
+                    下一页
+                </button>
+            </div>
+        </div>
+
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200">
                 <thead class="bg-stone-50">
@@ -79,6 +110,7 @@
                             <input type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-stone-300 text-indigo-600 focus:ring-indigo-600" :checked="isAllSelected" @change="toggleSelectAll" />
                         </th>
                         <th scope="col" class="table-th">订单号</th>
+                        <th scope="col" class="table-th">日期</th>
                         <th scope="col" class="table-th">状态</th>
                         <th scope="col" class="table-th">商品标题</th>
                         <th scope="col" class="table-th">SKU</th>
@@ -89,16 +121,32 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-stone-200 bg-white">
-                    <tr v-for="(item, index) in previewData" :key="index" :class="item.listingId ? 'bg-green-50/50' : 'bg-red-50/50'">
+                    <tr v-for="(item, index) in paginatedPreviewData" :key="item.platformOrderId" :class="getRowClass(item)">
                         <td class="relative px-7 sm:w-12 sm:px-6">
                             <input type="checkbox" class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-stone-300 text-indigo-600 focus:ring-indigo-600" v-model="item.selected" />
                         </td>
-                        <td class="table-td font-medium">{{ item.platformOrderId }}</td>
-                        <td class="table-td text-stone-500">{{ item.orderStatus }}</td>
+                        <td class="table-td font-medium">
+                            {{ item.platformOrderId }}
+                            <span v-if="item.isUpdate" class="ml-2 inline-flex items-center rounded-md bg-yellow-100 px-2 py-1 text-xs font-medium text-yellow-800">更新</span>
+                        </td>
+                        <td class="table-td text-stone-500 whitespace-nowrap">{{ formatDate(item.orderDate) }}</td>
+                        <td class="table-td text-stone-500">
+                            <div v-if="item.isUpdate && item.existingData && item.existingData.orderStatus !== item.orderStatus" class="flex flex-col">
+                                <span class="line-through text-xs text-stone-400">{{ item.existingData.orderStatus }}</span>
+                                <span class="font-bold text-indigo-600">{{ item.orderStatus }}</span>
+                            </div>
+                            <span v-else>{{ item.orderStatus }}</span>
+                        </td>
                         <td class="table-td text-stone-500 max-w-xs truncate" :title="item.title">{{ item.title }}</td>
                         <td class="table-td text-stone-500">{{ item.sku }}</td>
                         <td class="table-td text-stone-500">{{ item.quantity }}</td>
-                        <td class="table-td text-stone-500">{{ item.revenue }}</td>
+                        <td class="table-td text-stone-500">
+                            <div v-if="item.isUpdate && item.existingData && item.existingData.revenue !== item.revenue" class="flex flex-col">
+                                <span class="line-through text-xs text-stone-400">{{ item.existingData.revenue }}</span>
+                                <span class="font-bold text-indigo-600">{{ item.revenue }}</span>
+                            </div>
+                            <span v-else>{{ item.revenue }}</span>
+                        </td>
                         <td class="table-td">
                             <span v-if="item.listingId" class="inline-flex items-center rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700">已匹配 ({{ item.matchType }})</span>
                             <span v-else class="inline-flex items-center rounded-md bg-red-100 px-2 py-1 text-xs font-medium text-red-700">未匹配</span>
@@ -131,41 +179,7 @@
         @confirm="handleMappingConfirm" 
     />
 
-    <!-- Recent Imports Section -->
-    <div class="mt-8">
-        <h3 class="text-lg font-medium leading-6 text-stone-900 mb-4">最近导入记录</h3>
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-stone-200">
-                    <thead class="bg-stone-50">
-                        <tr>
-                            <th scope="col" class="table-th">导入时间</th>
-                            <th scope="col" class="table-th">文件名</th>
-                            <th scope="col" class="table-th">平台</th>
-                            <th scope="col" class="table-th">操作人</th>
-                            <th scope="col" class="table-th">数据量</th>
-                            <th scope="col" class="table-th text-right">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-stone-200 bg-white">
-                        <tr v-for="batch in importBatches" :key="batch.id">
-                            <td class="table-td">{{ new Date(batch.importedAt).toLocaleString() }}</td>
-                            <td class="table-td text-stone-500">{{ batch.fileName }}</td>
-                            <td class="table-td text-stone-500">{{ batch.platform }}</td>
-                            <td class="table-td text-stone-500">{{ batch.importedBy?.nickname || 'Unknown' }}</td>
-                            <td class="table-td text-stone-500">{{ batch._count?.salesData || 0 }}</td>
-                            <td class="table-td text-right">
-                                <button @click="rollbackBatch(batch)" class="text-red-600 hover:text-red-900 font-medium">回滚 (撤销)</button>
-                            </td>
-                        </tr>
-                        <tr v-if="importBatches.length === 0">
-                            <td colspan="6" class="py-10 text-center text-sm text-stone-500">暂无导入记录</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+
 
   </div>
 </template>
@@ -186,7 +200,11 @@ const loading = ref(false);
 const submitting = ref(false);
 const previewData = ref([]);
 const stores = ref([]); 
-const importBatches = ref([]);
+
+
+// Pagination State
+const currentPage = ref(1);
+const pageSize = ref(10);
 
 const showMappingModal = ref(false);
 const currentMappingItem = ref(null);
@@ -194,6 +212,19 @@ const currentMappingItem = ref(null);
 const selectedCount = computed(() => previewData.value.filter(i => i.selected).length);
 const selectedUnmatchedCount = computed(() => previewData.value.filter(i => i.selected && !i.listingId).length);
 const isAllSelected = computed(() => previewData.value.length > 0 && previewData.value.every(i => i.selected));
+
+// Pagination Computed
+const totalPages = computed(() => Math.ceil(previewData.value.length / pageSize.value) || 1);
+const paginatedPreviewData = computed(() => {
+    const start = (currentPage.value - 1) * pageSize.value;
+    const end = start + pageSize.value;
+    return previewData.value.slice(start, end);
+});
+
+// Reset page when data changes
+watch(previewData, () => {
+    currentPage.value = 1;
+});
 
 // Computed: Available Countries based on stores and permissions
 const availableCountries = computed(() => {
@@ -234,32 +265,11 @@ onMounted(async () => {
     } catch (e) {
         console.error("Failed to fetch stores", e);
     }
-    fetchBatches();
 });
 
-const fetchBatches = async () => {
-    try {
-        const response = await apiClient.get('/sales-import/batches');
-        importBatches.value = response.data;
-    } catch (e) {
-        console.error("Failed to fetch batches", e);
-    }
-};
 
-const rollbackBatch = async (batch) => {
-    if (!confirm(`确定要撤销 ${batch.fileName} 的导入吗？\n这将删除该批次导入的所有销售数据，且不可恢复！`)) {
-        return;
-    }
-    
-    try {
-        await apiClient.delete(`/sales-import/batch/${batch.id}`);
-        alert("回滚成功");
-        fetchBatches();
-    } catch (e) {
-        console.error("Rollback failed", e);
-        alert("回滚失败: " + (e.response?.data?.error || e.message));
-    }
-};
+
+
 
 const handleFileSelect = (event) => {
     selectedFile.value = event.target.files[0];
@@ -295,8 +305,7 @@ const uploadAndPreview = async () => {
     loading.value = true;
     const formData = new FormData();
     formData.append('file', selectedFile.value);
-    // We don't send platform anymore, we let backend detect it, or we could send expected platform
-    // But backend logic currently detects it. We will validate the result.
+    formData.append('storeId', selectedStoreId.value); // Append storeId
 
     try {
         const response = await apiClient.post('/sales-import/preview', formData, {
@@ -334,7 +343,7 @@ const handleMappingConfirm = (mappingResult) => {
     if (index !== -1) {
         previewData.value[index].listingId = mappingResult.listingId;
         previewData.value[index].matchType = 'MANUAL';
-        previewData.value[index].createMapping = true; // Flag to create mapping on backend
+        // previewData.value[index].createMapping = true; // REMOVED: Do not create automatic mapping
     }
 };
 
@@ -361,7 +370,7 @@ const confirmImport = async () => {
         const response = await apiClient.post('/sales-import/confirm', payload);
         alert(`导入成功! 成功: ${response.data.success}, 失败: ${response.data.failed}`);
         reset();
-        fetchBatches(); // Refresh batches list
+        reset();
     } catch (e) {
         console.error("Import failed", e);
         alert("导入失败: " + (e.response?.data?.error || e.message));
@@ -370,6 +379,16 @@ const confirmImport = async () => {
     }
 };
 
+const getRowClass = (item) => {
+    if (!item.listingId) return 'bg-red-50/50';
+    if (item.isUpdate) return 'bg-yellow-50/50';
+    return 'bg-green-50/50';
+};
+
+const formatDate = (dateString) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString();
+};
 </script>
 
 <style scoped>

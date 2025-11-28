@@ -33,12 +33,22 @@
           </select>
         </div>
         
-        <div class="input-group col-span-1 md:col-span-2">
+        <div class="input-group">
           <label for="filterStore">店铺</label>
           <select id="filterStore" v-model="filters.storeId" :disabled="!filters.countryCode && !filters.platform" class="form-input disabled:bg-gray-100">
             <option value="">所有店铺</option>
             <option v-for="store in storeOptions" :key="store.id" :value="store.id">
               {{ store.name }}
+            </option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="filterStatus">订单状态</label>
+          <select id="filterStatus" v-model="filters.orderStatus" class="form-input">
+            <option value="">所有状态</option>
+            <option v-for="(label, value) in ORDER_STATUS_MAP" :key="value" :value="value">
+              {{ label }}
             </option>
           </select>
         </div>
@@ -70,6 +80,7 @@
               <th class="table-th">国家</th>
               <th class="table-th">店铺</th>
               <th class="table-th">商品链接 / SKU</th>
+              <th class="table-th">状态</th>
               <th @click="setSort('salesVolume')" class="table-th cursor-pointer">
                 销量 <SortIcon :field="'salesVolume'" :sorting="sorting" />
               </th>
@@ -94,6 +105,12 @@
                 <div v-else class="text-stone-600">
                   {{ row.product.sku }} <span class="text-xs text-stone-400">(旧数据)</span>
                 </div>
+              </td>
+              <td class="table-td">
+                <span v-if="row.orderStatus" :class="getStatusClass(row.orderStatus)" class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset">
+                  {{ ORDER_STATUS_MAP[row.orderStatus] || row.orderStatus }}
+                </span>
+                <span v-else class="text-gray-400">-</span>
               </td>
               <td class="table-td">{{ row.salesVolume }}</td>
               <td class="table-td">{{ row.revenue.toFixed(2) }}</td>
@@ -177,6 +194,17 @@ import useStoreListings from '../composables/useStoreListings';
 import SalesDataEditModal from './SalesDataEditModal.vue';
 import { FunnelIcon, ArrowPathIcon, ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/20/solid';
 
+// --- 常量 (Constants) ---
+const ORDER_STATUS_MAP = {
+  'PENDING': '待付款',
+  'READY_TO_SHIP': '待发货',
+  'SHIPPED': '已发货',
+  'DELIVERED': '已送达',
+  'COMPLETED': '已完成',
+  'CANCELLED': '已取消',
+  'RETURNED': '已退货'
+};
+
 // --- 状态 (State) ---
 const salesData = ref([]);
 const isLoading = ref(true);
@@ -201,6 +229,7 @@ const defaultFilters = () => ({
   countryCode: '',
   platform: '',
   storeId: '',
+  orderStatus: '',
 });
 const filters = ref(defaultFilters());
 const sorting = ref({ by: 'recordDate', order: 'desc' });
@@ -383,6 +412,19 @@ function handleSaleUpdated(updatedRow) {
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
   return new Date(dateString).toISOString().split('T')[0];
+}
+
+function getStatusClass(status) {
+  const classes = {
+    'PENDING': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+    'READY_TO_SHIP': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+    'SHIPPED': 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+    'DELIVERED': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+    'COMPLETED': 'bg-green-50 text-green-700 ring-green-600/20',
+    'CANCELLED': 'bg-red-50 text-red-700 ring-red-600/20',
+    'RETURNED': 'bg-orange-50 text-orange-700 ring-orange-600/20',
+  };
+  return classes[status] || 'bg-gray-50 text-gray-600 ring-gray-500/10';
 }
 </script>
 

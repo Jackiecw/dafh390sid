@@ -54,7 +54,7 @@
                   id="username"
                   v-model="username"
                   required
-                  class="form-input pl-12"
+                  class="form-input pl-14"
                 />
               </div>
             </div>
@@ -71,7 +71,7 @@
                   v-model="password"
                   required
                   @keyup.enter="handleLogin"
-                  class="form-input pl-12"
+                  class="form-input pl-14"
                 />
               </div>
             </div>

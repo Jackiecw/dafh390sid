@@ -296,6 +296,7 @@ import SalesDataPage from './SalesDataPage.vue';
 import WeeklyReportPage from './WeeklyReportPage.vue';
 import CommonLinks from './CommonLinks.vue';
 import ProfileManagement from './ProfileManagement.vue';
+import ImportHistory from './ImportHistory.vue'; // ⬅️ 【新增】
 import UserManagement from './UserManagement.vue';
 import StoreManagement from './StoreManagement.vue';
 import { useAuthStore } from '../stores/auth';
@@ -346,6 +347,7 @@ const menuGroups = [
     items: [
       { key: 'SALES_DATA', name: '销售明细' },
       { key: 'SALES_IMPORT', name: '数据导入' },
+      { key: 'SALES_IMPORT_HISTORY', name: '导入记录' }, // ⬅️ 【新增】
     ],
   },
   {
@@ -385,6 +387,7 @@ const viewComponents = {
   CALENDAR: CalendarPage,
   SALES_DATA: SalesDataPage,
   SALES_IMPORT: DataImport,
+  SALES_IMPORT_HISTORY: ImportHistory, // ⬅️ 【新增】
   REPORTS: WeeklyReportPage,
   FINANCE_ADMIN: FinancePage,
   ON_SALE_PRODUCTS: OnSaleProductsPage,

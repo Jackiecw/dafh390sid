@@ -112,6 +112,16 @@
                     <label for="edit_revenue" class="form-label">销售额 *</label>
                     <input type="number" step="0.01" id="edit_revenue" v-model="formData.revenue" required class="form-input" />
                   </div>
+
+                  <div class="space-y-2">
+                    <label for="edit_status" class="form-label">订单状态</label>
+                    <select id="edit_status" v-model="formData.orderStatus" class="form-input">
+                      <option value="">未设置</option>
+                      <option v-for="(label, value) in ORDER_STATUS_MAP" :key="value" :value="value">
+                        {{ label }}
+                      </option>
+                    </select>
+                  </div>
                   
                   <div class="space-y-2 md:col-span-2">
                     <label for="edit_notes" class="form-label">备注 (可选)</label>
@@ -154,6 +164,17 @@ import {
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
 import useStoreListings from '../composables/useStoreListings';
+
+// --- 常量 (Constants) ---
+const ORDER_STATUS_MAP = {
+  'PENDING': '待付款',
+  'READY_TO_SHIP': '待发货',
+  'SHIPPED': '已发货',
+  'DELIVERED': '已送达',
+  'COMPLETED': '已完成',
+  'CANCELLED': '已取消',
+  'RETURNED': '已退货'
+};
 
 const props = defineProps({
   isOpen: { type: Boolean, default: false },
@@ -265,7 +286,8 @@ watch(() => props.isOpen, async (newVal) => {
       recordDate: new Date(props.saleDataToEdit.recordDate).toISOString().split('T')[0],
       notes: props.saleDataToEdit.notes || '',
       // ⬇️ 【新增】绑定 listingId
-      listingId: props.saleDataToEdit.listingId || ''
+      listingId: props.saleDataToEdit.listingId || '',
+      orderStatus: props.saleDataToEdit.orderStatus || ''
     };
 
     // 2. 加载所有店铺选项
@@ -312,7 +334,8 @@ async function handleSubmit() {
     productId: targetListing.product.id, // ⬇️ 提交对应的 productId
     salesVolume: parseInt(formData.value.salesVolume) || 0,
     revenue: parseFloat(formData.value.revenue) || 0,
-    notes: formData.value.notes || null
+    notes: formData.value.notes || null,
+    orderStatus: formData.value.orderStatus || null
   };
 
   try {

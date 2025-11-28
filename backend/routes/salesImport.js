@@ -27,7 +27,8 @@ router.post('/sales-import/preview', upload.single('file'), async (req, res) => 
         }
 
         const filePath = req.file.path;
-        const platform = req.body.platform; // Optional, can be auto-detected
+        const platform = req.body.platform; // Optional
+        const storeId = req.body.storeId;   // Added storeId
 
         // 1. Parse Excel
         let parseResult;
@@ -54,6 +55,41 @@ router.post('/sales-import/preview', upload.single('file'), async (req, res) => 
                 ...matchResult // listingId, matchType
             };
         }));
+
+        // 3. Check for existing orders (Updates)
+        if (storeId) {
+            const orderIds = previewData.map(item => item.platformOrderId).filter(id => id);
+
+            // Find existing sales data for this store and these order IDs
+            const existingSales = await prisma.salesData.findMany({
+                where: {
+                    storeId: storeId,
+                    platformOrderId: { in: orderIds }
+                },
+                select: {
+                    platformOrderId: true,
+                    orderStatus: true,
+                    revenue: true,
+                    salesVolume: true
+                }
+            });
+
+            // Create a map for quick lookup
+            const existingMap = new Map();
+            existingSales.forEach(sale => {
+                existingMap.set(sale.platformOrderId, sale);
+            });
+
+            // Attach existing data to preview items
+            previewData.forEach(item => {
+                if (existingMap.has(item.platformOrderId)) {
+                    item.isUpdate = true;
+                    item.existingData = existingMap.get(item.platformOrderId);
+                } else {
+                    item.isUpdate = false;
+                }
+            });
+        }
 
         res.json({
             platform: detectedPlatform,
@@ -103,7 +139,8 @@ router.post('/sales-import/confirm', async (req, res) => {
 
         for (const item of items) {
             try {
-                // 2. Create Mapping if requested
+                // 2. Create Mapping if requested (DISABLED per user request)
+                /*
                 if (item.createMapping && item.listingId) {
                     const existing = await prisma.listingMapping.findFirst({
                         where: {
@@ -125,6 +162,7 @@ router.post('/sales-import/confirm', async (req, res) => {
                         });
                     }
                 }
+                */
 
                 // 3. Upsert SalesData
                 if (item.platformOrderId && item.listingId) {
@@ -148,6 +186,12 @@ router.post('/sales-import/confirm', async (req, res) => {
 
                     await prisma.salesData.upsert({
                         where: {
+                            // Unique constraint is on platformOrderId
+                            // Ideally, it should be platformOrderId + storeId, but schema might be just platformOrderId unique globally or per store?
+                            // Checking schema... platformOrderId is @unique. This means an order ID can only exist once globally.
+                            // This assumes order IDs are unique across all stores/platforms or we only import unique ones.
+                            // If order IDs clash between platforms, we might have an issue, but usually they are unique enough or we prefix them.
+                            // For now, using platformOrderId as per existing schema.
                             platformOrderId: item.platformOrderId
                         },
                         update: {
@@ -201,18 +245,107 @@ router.post('/sales-import/confirm', async (req, res) => {
     }
 });
 
-// GET /sales-import/batches (Recent Imports)
+// GET /sales-import/batches (Import History)
 router.get('/sales-import/batches', async (req, res) => {
     try {
-        const batches = await prisma.importBatch.findMany({
-            take: 10,
-            orderBy: { importedAt: 'desc' },
-            include: {
-                importedBy: { select: { nickname: true } },
-                _count: { select: { salesData: true } }
+        const { country, platform, userId, page = 1, pageSize = 20 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(pageSize);
+        const take = parseInt(pageSize);
+
+        const where = {};
+
+        // 1. Apply Filters
+        if (platform) where.platform = platform;
+        if (userId) where.importedById = userId;
+        if (country) {
+            where.salesData = {
+                some: {
+                    store: {
+                        countryCode: country
+                    }
+                }
+            };
+        }
+
+        // 2. Apply Permissions
+        const user = req.user;
+        if (user.role !== 'admin') {
+            const permissionConditions = [];
+
+            // Rule 1: Managers can view all records for their supervised countries
+            const supervisedCountries = user.supervisedCountries || [];
+            if (supervisedCountries.length > 0) {
+                permissionConditions.push({
+                    salesData: {
+                        some: {
+                            store: {
+                                countryCode: { in: supervisedCountries }
+                            }
+                        }
+                    }
+                });
             }
+
+            // Rule 2: Operators (and Managers) can view their own records
+            // "If only operation country permission, only view own records" implies if they have supervision, they see more.
+            // But usually one can always see their own imports.
+            permissionConditions.push({
+                importedById: user.userId
+            });
+
+            // Combine with OR
+            if (where.AND) {
+                where.AND.push({ OR: permissionConditions });
+            } else {
+                where.AND = [{ OR: permissionConditions }];
+            }
+        }
+
+        // Execute Query
+        const [total, batches] = await prisma.$transaction([
+            prisma.importBatch.count({ where }),
+            prisma.importBatch.findMany({
+                where,
+                skip,
+                take,
+                orderBy: { importedAt: 'desc' },
+                include: {
+                    importedBy: { select: { nickname: true, username: true } },
+                    _count: { select: { salesData: true } },
+                    // We need to fetch one sales data to know the country/store for display if needed, 
+                    // but for list we might just show platform. 
+                    // To show "Country", we can try to fetch one related salesData's store country.
+                    salesData: {
+                        take: 1,
+                        select: {
+                            store: {
+                                select: { country: { select: { name: true, code: true } } }
+                            }
+                        }
+                    }
+                }
+            })
+        ]);
+
+        // Transform result to flatten country info
+        const result = batches.map(batch => ({
+            id: batch.id,
+            platform: batch.platform,
+            fileName: batch.fileName,
+            importedAt: batch.importedAt,
+            importedBy: batch.importedBy,
+            count: batch._count.salesData,
+            country: batch.salesData[0]?.store?.country || null
+        }));
+
+        res.json({
+            data: result,
+            total,
+            page: parseInt(page),
+            pageSize: parseInt(pageSize),
+            totalPages: Math.ceil(total / take)
         });
-        res.json(batches);
+
     } catch (error) {
         console.error('Get Batches Error:', error);
         res.status(500).json({ error: 'Internal Server Error', message: error.message, stack: error.stack });
@@ -223,8 +356,44 @@ router.get('/sales-import/batches', async (req, res) => {
 router.delete('/sales-import/batch/:id', async (req, res) => {
     try {
         const { id } = req.params;
+        const user = req.user;
 
-        // Transaction to delete SalesData and Batch
+        // 1. Find the batch
+        const batch = await prisma.importBatch.findUnique({
+            where: { id },
+            include: {
+                salesData: {
+                    take: 1,
+                    select: { store: { select: { countryCode: true } } }
+                }
+            }
+        });
+
+        if (!batch) {
+            return res.status(404).json({ error: 'Batch not found' });
+        }
+
+        // 2. Check Permissions
+        let canDelete = false;
+        if (user.role === 'admin') {
+            canDelete = true;
+        } else {
+            // Own record?
+            if (batch.importedById === user.userId) {
+                canDelete = true;
+            }
+            // Managed country?
+            const batchCountry = batch.salesData[0]?.store?.countryCode;
+            if (batchCountry && user.supervisedCountries?.includes(batchCountry)) {
+                canDelete = true;
+            }
+        }
+
+        if (!canDelete) {
+            return res.status(403).json({ error: 'Permission denied' });
+        }
+
+        // 3. Transaction to delete SalesData and Batch
         await prisma.$transaction([
             prisma.salesData.deleteMany({
                 where: { importBatchId: id }
