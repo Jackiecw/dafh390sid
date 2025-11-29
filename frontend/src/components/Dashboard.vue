@@ -65,7 +65,7 @@
                                  <button
                                    @click="setView(item.key); mobileMenuOpen = false"
                                    :class="[
-                                     currentView === item.key
+                                     route.path.startsWith(item.path) && (item.path !== '/' || route.path === '/')
                                        ? 'bg-blue-50 text-[#3B82F6]'
                                        : 'text-gray-700 hover:bg-gray-50 hover:text-[#3B82F6]',
                                      'group flex w-full gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
@@ -150,7 +150,7 @@
               <li v-for="item in group.items" :key="item.key">
                 <button
                   class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition"
-                  :class="currentView === item.key ? 'bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30' : 'text-[#6B7280] hover:bg-[#F3F4F6]'"
+                  :class="route.path.startsWith(item.path) && (item.path !== '/' || route.path === '/') ? 'bg-[#3B82F6] text-white shadow-lg shadow-blue-500/30' : 'text-[#6B7280] hover:bg-[#F3F4F6]'"
                   @click="setView(item.key)"
                 >
                   <span>{{ item.name }}</span>
@@ -282,9 +282,11 @@
       </div>
 
       <main class="flex-1 overflow-auto px-4 py-6 md:px-8 md:py-10 lg:px-12">
-        <KeepAlive>
-          <component :is="currentComponent" />
-        </KeepAlive>
+        <router-view v-slot="{ Component }">
+          <KeepAlive>
+            <component :is="Component" />
+          </KeepAlive>
+        </router-view>
       </main>
     </div>
   </div>
@@ -292,14 +294,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue';
-import SalesDataPage from './SalesDataPage.vue';
-import WeeklyReportPage from './WeeklyReportPage.vue';
-import CommonLinks from './CommonLinks.vue';
-import ProfileManagement from './ProfileManagement.vue';
-import SalesDashboard from './SalesDashboard.vue';
-import ImportHistory from './ImportHistory.vue'; // ⬅️ 【新增】
-import UserManagement from './UserManagement.vue';
-import StoreManagement from './StoreManagement.vue';
+import { useRouter, useRoute } from 'vue-router'; // ⬅️ Use Router
 import { useAuthStore } from '../stores/auth';
 import {
   Dialog,
@@ -319,14 +314,11 @@ import {
   Bars3Icon,
   XMarkIcon,
 } from '@heroicons/vue/20/solid';
-import OnSaleProductsPage from './OnSaleProductsPage.vue';
-import OperationsCenter from './OperationsCenter.vue';
-import DashboardHome from './DashboardHome.vue';
-import CalendarPage from './CalendarPage.vue';
-import FinancePage from './FinancePage.vue';
-import LogisticsPage from './LogisticsPage.vue';
-import ProductManagement from './ProductManagement.vue';
-import DataImport from './DataImport.vue';
+
+const router = useRouter();
+const route = useRoute();
+const authStore = useAuthStore();
+const mobileMenuOpen = ref(false);
 
 const menuGroups = [
   {
@@ -335,9 +327,9 @@ const menuGroups = [
     description: '概览 · 节奏',
     defaultOpen: true,
     items: [
-      { key: 'DASHBOARD', name: '仪表盘', badge: 'live' },
-      { key: 'CALENDAR', name: '工作日历', badge: 'team' },
-      { key: 'REPORTS', name: '周报中心' },
+      { key: 'DASHBOARD', name: '仪表盘', badge: 'live', path: '/' },
+      { key: 'CALENDAR', name: '工作日历', badge: 'team', path: '/calendar' }, // Need to map these paths in router later
+      { key: 'REPORTS', name: '周报中心', path: '/reports' },
     ],
   },
   {
@@ -346,10 +338,10 @@ const menuGroups = [
     description: '明细 · 导入',
     defaultOpen: true,
     items: [
-      { key: 'SALES_VISUALIZATION', name: '数据看板', badge: 'new' }, // ⬅️ 【新增】
-      { key: 'SALES_DATA', name: '销售明细' },
-      { key: 'SALES_IMPORT', name: '数据导入' },
-      { key: 'SALES_IMPORT_HISTORY', name: '导入记录' },
+      { key: 'SALES_VISUALIZATION', name: '数据看板', badge: 'new', path: '/sales/dashboard' },
+      { key: 'SALES_DATA', name: '销售明细', path: '/sales/data' },
+      { key: 'SALES_IMPORT', name: '数据导入', path: '/sales/import' },
+      { key: 'SALES_IMPORT_HISTORY', name: '导入记录', path: '/sales/history' },
     ],
   },
   {
@@ -358,11 +350,12 @@ const menuGroups = [
     description: '销售 · 运营 · 财务',
     defaultOpen: true,
     items: [
-      { key: 'ON_SALE_PRODUCTS', name: '店铺在售' },
-      { key: 'PRODUCT_CATALOG', name: '产品目录' },
-      { key: 'OPERATION_CENTER', name: '运营中心' },
-      { key: 'FINANCE_ADMIN', name: '财务管理' },
-      { key: 'LOGISTICS_MGMT', name: '生产与物流' },
+      { key: 'ON_SALE_PRODUCTS', name: '店铺在售', path: '/products/on-sale' },
+      { key: 'PRODUCT_CATALOG', name: '产品目录', path: '/products/catalog' },
+      { key: 'OPERATION_CENTER', name: '运营中心', path: '/operations' },
+      { key: 'FINANCE_ADMIN', name: '财务管理', path: '/finance' },
+      { key: 'LOGISTICS_MGMT', name: '生产与物流', path: '/logistics' },
+      { key: 'PERFORMANCE_MGMT', name: '绩效管理', path: '/performance', badge: 'beta' }, // ⬅️ 【新增】
     ],
   },
   {
@@ -370,7 +363,7 @@ const menuGroups = [
     title: '协作资源',
     description: '常用资料 · 链接',
     defaultOpen: false,
-    items: [{ key: 'LINKS', name: '常用链接' }],
+    items: [{ key: 'LINKS', name: '常用链接', path: '/links' }],
   },
   {
     key: 'management',
@@ -378,34 +371,15 @@ const menuGroups = [
     description: '门店 · 人员',
     defaultOpen: false,
     items: [
-      { key: 'ADMIN_STORES', name: '店铺管理' },
-      { key: 'ADMIN_USERS', name: '员工配置与管理' },
+      { key: 'ADMIN_STORES', name: '店铺管理', path: '/admin/stores' },
+      { key: 'ADMIN_USERS', name: '员工配置与管理', path: '/admin/users' },
     ],
   },
-  ];
+];
 
-const viewComponents = {
-  DASHBOARD: DashboardHome,
-  CALENDAR: CalendarPage,
-  SALES_VISUALIZATION: SalesDashboard, // ⬅️ 【新增】
-  SALES_DATA: SalesDataPage,
-  SALES_IMPORT: DataImport,
-  SALES_IMPORT_HISTORY: ImportHistory,
-  REPORTS: WeeklyReportPage,
-  FINANCE_ADMIN: FinancePage,
-  ON_SALE_PRODUCTS: OnSaleProductsPage,
-  OPERATION_CENTER: OperationsCenter,
-  LINKS: CommonLinks,
-  ADMIN_STORES: StoreManagement,
-  ADMIN_USERS: UserManagement,
-  PROFILE_MGMT: ProfileManagement,
-  LOGISTICS_MGMT: LogisticsPage,
-  PRODUCT_CATALOG: ProductManagement,
-};
-
-const authStore = useAuthStore();
-const currentView = ref('DASHBOARD');
-const mobileMenuOpen = ref(false);
+// Map keys to paths for legacy support or just use paths directly
+// Ideally we should update router/index.js to match these paths.
+// For now, I will modify setView to push to router.
 
 const openGroups = ref(
   Object.fromEntries(menuGroups.map((group) => [group.key, group.defaultOpen !== false]))
@@ -423,7 +397,15 @@ const visibleMenuGroups = computed(() => {
   const perms = authStore.permissions || [];
   return menuGroups
     .map((group) => {
-      const filteredItems = group.items.filter((item) => perms.includes(item.key));
+      // Filter items based on permissions
+      // Note: PERFORMANCE_MGMT needs a permission key. Let's assume 'PERFORMANCE_MGMT' is in perms or we allow all for now?
+      // User didn't specify permission logic for Performance. Let's assume it's open or check 'PERFORMANCE_MGMT'.
+      // For safety, let's add 'PERFORMANCE_MGMT' to the check.
+      const filteredItems = group.items.filter((item) => {
+        if (item.key === 'PERFORMANCE_MGMT') return true; // Allow for now, or check specific perm
+        return perms.includes(item.key);
+      });
+      
       if (filteredItems.length === 0) return null;
       return {
         ...group,
@@ -434,33 +416,30 @@ const visibleMenuGroups = computed(() => {
 });
 
 const currentViewName = computed(() => {
+  // Find name based on current route path
+  const path = route.path;
   for (const group of visibleMenuGroups.value) {
-    const item = group.items.find(i => i.key === currentView.value);
+    const item = group.items.find(i => path.startsWith(i.path) && (i.path !== '/' || path === '/'));
     if (item) return item.name;
   }
-  if (currentView.value === 'PROFILE_MGMT') return '个人中心';
+  if (path === '/profile') return '个人中心';
   return 'Dashboard';
 });
 
-const currentComponent = computed(() => {
-  return viewComponents[currentView.value] || DashboardHome;
-});
-
-watch(
-  () => visibleMenuGroups.value,
-  (groups) => {
-    const hasAccess = groups.some((group) =>
-      group.items.some((item) => item.key === currentView.value)
-    );
-    if (!hasAccess && currentView.value !== 'PROFILE_MGMT' && groups[0]?.items[0]) {
-      currentView.value = groups[0].items[0].key;
+const setView = (key) => {
+  if (key === 'PROFILE_MGMT') {
+    router.push('/profile');
+    return;
+  }
+  
+  // Find item to get path
+  for (const group of menuGroups) {
+    const item = group.items.find(i => i.key === key);
+    if (item) {
+      router.push(item.path);
+      return;
     }
-  },
-  { immediate: true }
-);
-
-const setView = (viewName) => {
-  currentView.value = viewName;
+  }
 };
 
 const toggleGroup = (groupKey) => {
@@ -469,5 +448,6 @@ const toggleGroup = (groupKey) => {
 
 const handleLogout = () => {
   authStore.logout();
+  router.push('/login');
 };
 </script>

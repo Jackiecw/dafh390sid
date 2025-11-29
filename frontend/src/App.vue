@@ -1,5 +1,5 @@
 <template>
-  <component :is="authStore.isLoggedIn ? Dashboard : Login" />
+  <router-view />
 </template>
 
 <script setup>

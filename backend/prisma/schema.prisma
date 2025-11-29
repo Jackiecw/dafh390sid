@@ -49,6 +49,15 @@ model User {
 
   // 导入批次
   importedBatches ImportBatch[]
+
+  // --- 绩效管理关联 ---
+  managerId    String?
+  manager      User?   @relation("UserReporting", fields: [managerId], references: [id])
+  subordinates User[]  @relation("UserReporting")
+
+  reviewsAsEmployee PerformanceReview[] @relation("ReviewEmployee")
+  reviewsAsManager  PerformanceReview[] @relation("ReviewManager")
+  reviewsAsDirector PerformanceReview[] @relation("ReviewDirector")
 }
 
 // --- 2. 角色模型 (Role) ---
@@ -771,4 +780,106 @@ enum LogisticsBillingMethod {
   BY_CBM
   BY_WEIGHT
   FLAT_FEE
+}
+
+// ------------------------------------------------
+// === 绩效管理模型 (Performance Management) ===
+// ------------------------------------------------
+
+enum ReviewStatus {
+  DRAFT
+  SELF_REVIEW
+  MANAGER_REVIEW
+  DIRECTOR_REVIEW
+  COMPLETED
+  CANCELED
+}
+
+model PerformanceTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items   PerformanceTemplateItem[]
+  reviews PerformanceReview[]
+}
+
+model PerformanceTemplateItem {
+  id          String  @id @default(cuid())
+  category    String // 维度，如：业绩指标/价值观
+  kpiName     String // 指标名
+  description String? // 评分标准
+  weight      Float // 权重 (0-100)
+
+  template   PerformanceTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  templateId String
+}
+
+model PerformanceReview {
+  id     String       @id @default(cuid())
+  month  DateTime     @db.Date // 考核月份 (存为当月1号)
+  status ReviewStatus @default(DRAFT)
+
+  // 关联人员
+  employee   User @relation("ReviewEmployee", fields: [employeeId], references: [id])
+  employeeId String
+
+  manager   User @relation("ReviewManager", fields: [managerId], references: [id])
+  managerId String
+
+  director   User?   @relation("ReviewDirector", fields: [directorId], references: [id])
+  directorId String?
+
+  // 关联模板
+  template   PerformanceTemplate @relation(fields: [templateId], references: [id])
+  templateId String
+
+  // 评分汇总 (自动计算)
+  selfScoreTotal     Float?
+  managerScoreTotal  Float?
+  directorScoreTotal Float?
+  finalScore         Float? // 通常等于 managerScoreTotal 或 directorScoreTotal
+
+  // 新增字段 (2025-11-29)
+  summaryThisMonth   String? @db.Text // 本月工作总结
+  planNextMonth      String? @db.Text // 下月工作重点计划
+  companySuggestions String? @db.Text // 公司或部门存在的问题和建议
+
+  items PerformanceReviewItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, month, templateId]) // 同一个人同一个月同一个模板只能有一份
+  @@index([employeeId])
+  @@index([managerId])
+  @@index([status])
+}
+
+model PerformanceReviewItem {
+  id String @id @default(cuid())
+
+  review   PerformanceReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reviewId String
+
+  // 快照数据 (防止模板修改影响历史)
+  category    String
+  kpiName     String
+  description String?
+  weight      Float
+
+  // 评分数据
+  selfScore   Float?
+  selfComment String? @db.Text
+
+  managerScore   Float?
+  managerComment String? @db.Text
+
+  directorScore   Float?
+  directorComment String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

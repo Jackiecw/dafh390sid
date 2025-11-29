@@ -1,53 +1,28 @@
 // ./backend/loginRateLimiter.js
-
 const logger = require('./logger');
 
-const ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 ·ÖÖÓ
+const ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_ATTEMPTS_PER_WINDOW = 5;
 
 const attemptStore = new Map();
 
-function cleanupExpiredEntries() {
-  const now = Date.now();
-  for (const [key, entry] of attemptStore.entries()) {
-    if (now - entry.firstAttemptAt > ATTEMPT_WINDOW_MS) {
-      attemptStore.delete(key);
-    }
-  }
-}
-
-setInterval(cleanupExpiredEntries, ATTEMPT_WINDOW_MS).unref();
-
 function loginRateLimiter(req, res, next) {
-  const identifier =
-    req.ip ||
-    req.headers['x-forwarded-for'] ||
-    `${req.connection.remoteAddress || ''}:${req.headers['user-agent'] || ''}`;
-
+  const ip = req.ip || req.connection.remoteAddress;
   const now = Date.now();
-  const entry = attemptStore.get(identifier);
 
-  if (!entry || now - entry.firstAttemptAt > ATTEMPT_WINDOW_MS) {
-    attemptStore.set(identifier, { count: 1, firstAttemptAt: now });
-    return next();
+  let attempts = attemptStore.get(ip) || [];
+  // Filter out old attempts
+  attempts = attempts.filter(timestamp => now - timestamp < ATTEMPT_WINDOW_MS);
+
+  if (attempts.length >= MAX_ATTEMPTS_PER_WINDOW) {
+    const windowMinutes = ATTEMPT_WINDOW_MS / 60000;
+    logger.warn(`ç™»å½•å°è¯•è¿‡å¤šï¼š${ip} åœ¨ ${windowMinutes} åˆ†é’Ÿå†…å°è¯•æ¬¡æ•°è¶…è¿‡é™åˆ¶`, { ip });
+    return res.status(429).json({ error: 'ç™»å½•å°è¯•æ¬¡æ•°è¿‡å¤šï¼Œè¯·ç¨åŽå†è¯•' });
   }
 
-  entry.count += 1;
-
-  if (entry.count > MAX_ATTEMPTS_PER_WINDOW) {
-    const retryAfterSeconds = Math.ceil(
-      (ATTEMPT_WINDOW_MS - (now - entry.firstAttemptAt)) / 1000
-    );
-    logger.warn(
-      `µÇÂ¼³¢ÊÔ¹ý¶à£º${identifier} ÔÚ ${ATTEMPT_WINDOW_MS / 60000} ·ÖÖÓÄÚ´¥·¢ÁËËÙÂÊÏÞÖÆ`
-    );
-    return res.status(429).json({
-      error: 'µÇÂ¼³¢ÊÔ¹ý¶à£¬ÇëÉÔºóÔÙÊÔ',
-      retryAfterSeconds,
-    });
-  }
-
-  return next();
+  attempts.push(now);
+  attemptStore.set(ip, attempts);
+  next();
 }
 
 loginRateLimiter.reset = () => attemptStore.clear();

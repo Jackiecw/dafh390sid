@@ -103,10 +103,13 @@ import apiClient from '../api';
 import { UserIcon, LockClosedIcon } from '@heroicons/vue/20/solid';
 import logoUrl from '../assets/logo.png';
 
+import { useRouter } from 'vue-router'; // ⬅️ Import router
+
 const username = ref('');
 const password = ref('');
 const errorMessage = ref('');
 const authStore = useAuthStore();
+const router = useRouter(); // ⬅️ Init router
 
 const handleLogin = async () => {
   errorMessage.value = '';
@@ -116,6 +119,7 @@ const handleLogin = async () => {
       password: password.value,
     });
     authStore.login(data.token);
+    router.push('/'); // ⬅️ Redirect to dashboard
   } catch (error) {
     if (error.response?.data?.error) {
       errorMessage.value = error.response.data.error;

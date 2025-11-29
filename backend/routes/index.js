@@ -22,4 +22,5 @@ module.exports = function registerRoutes(app) {
   app.use('/api', require('./operation'));
   app.use('/api', require('./finance'));
   app.use('/api', require('./logistics'));
+  app.use('/api', require('./performance')); // ⬇️ 【新增】 绩效管理
 };
