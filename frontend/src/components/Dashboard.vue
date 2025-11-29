@@ -296,6 +296,7 @@ import SalesDataPage from './SalesDataPage.vue';
 import WeeklyReportPage from './WeeklyReportPage.vue';
 import CommonLinks from './CommonLinks.vue';
 import ProfileManagement from './ProfileManagement.vue';
+import SalesDashboard from './SalesDashboard.vue';
 import ImportHistory from './ImportHistory.vue'; // ⬅️ 【新增】
 import UserManagement from './UserManagement.vue';
 import StoreManagement from './StoreManagement.vue';
@@ -345,9 +346,10 @@ const menuGroups = [
     description: '明细 · 导入',
     defaultOpen: true,
     items: [
+      { key: 'SALES_VISUALIZATION', name: '数据看板', badge: 'new' }, // ⬅️ 【新增】
       { key: 'SALES_DATA', name: '销售明细' },
       { key: 'SALES_IMPORT', name: '数据导入' },
-      { key: 'SALES_IMPORT_HISTORY', name: '导入记录' }, // ⬅️ 【新增】
+      { key: 'SALES_IMPORT_HISTORY', name: '导入记录' },
     ],
   },
   {
@@ -380,14 +382,15 @@ const menuGroups = [
       { key: 'ADMIN_USERS', name: '员工配置与管理' },
     ],
   },
-];
+  ];
 
 const viewComponents = {
   DASHBOARD: DashboardHome,
   CALENDAR: CalendarPage,
+  SALES_VISUALIZATION: SalesDashboard, // ⬅️ 【新增】
   SALES_DATA: SalesDataPage,
   SALES_IMPORT: DataImport,
-  SALES_IMPORT_HISTORY: ImportHistory, // ⬅️ 【新增】
+  SALES_IMPORT_HISTORY: ImportHistory,
   REPORTS: WeeklyReportPage,
   FINANCE_ADMIN: FinancePage,
   ON_SALE_PRODUCTS: OnSaleProductsPage,

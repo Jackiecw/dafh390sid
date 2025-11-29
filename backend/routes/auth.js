@@ -75,6 +75,7 @@ router.post('/register', async (req, res) => {
 // ⬇️ 【重大修改】
 router.post('/login', loginRateLimiter, async (req, res) => {
   try {
+    // ... (existing code)
     // 1. (不变) 验证输入
     const validation = loginSchema.safeParse(req.body);
     if (!validation.success) {
@@ -90,12 +91,12 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { username: username },
       include: {
-        role: { 
+        role: {
           include: {
-            menus: true 
+            menus: true
           }
         },
-        operatedCountries: { 
+        operatedCountries: {
           select: { code: true }
         },
         supervisedCountries: { // ⬅️ 【新增】
@@ -116,7 +117,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     }
 
     // 5. 【修改】生成新的 JWT Token 负载 (Payload)
-    
+
     // (A) (不变) 提取菜单权限
     const permissions = user.role.menus.map(menu => menu.key);
 
@@ -128,12 +129,12 @@ router.post('/login', loginRateLimiter, async (req, res) => {
 
     // (D) 创建 Token
     const token = jwt.sign(
-      { 
-        userId: user.id, 
-        role: user.role.name, 
+      {
+        userId: user.id,
+        role: user.role.name,
         nickname: user.nickname,
         avatarUrl: user.avatarUrl,
-        permissions: permissions, 
+        permissions: permissions,
         operatedCountries: operatedCountries,
         supervisedCountries: supervisedCountries // ⬅️ 【新增】
       },
@@ -142,7 +143,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
     );
 
     // 6. (不变) 把通行证发回给前端
-    res.json({ 
+    res.json({
       message: '登录成功!',
       token: token
     });

@@ -9,7 +9,7 @@ async function main() {
 
   // --- 1. 创建所有“菜单项” ---
   console.log('正在创建菜单项...');
-  
+
   // (已有菜单)
   const menuDashboard = await prisma.menuItem.upsert({
     where: { key: 'DASHBOARD' }, update: {},
@@ -27,13 +27,11 @@ async function main() {
     where: { key: 'REPORTS' }, update: {},
     create: { key: 'REPORTS', name: '周报中心' },
   });
-  const menuWeeklyReport = await prisma.menuItem.upsert({
-    where: { key: 'WEEKLY_REPORT' }, update: {},
-    create: { key: 'WEEKLY_REPORT', name: '周报填写' },
-  });
+
+  // --- 新增缺失的菜单项 ---
   const menuViewReports = await prisma.menuItem.upsert({
     where: { key: 'VIEW_REPORTS' }, update: {},
-    create: { key: 'VIEW_REPORTS', name: '周报查看' },
+    create: { key: 'VIEW_REPORTS', name: '查看报表' },
   });
   const menuLinks = await prisma.menuItem.upsert({
     where: { key: 'LINKS' }, update: {},
@@ -41,16 +39,15 @@ async function main() {
   });
   const menuAdminUsers = await prisma.menuItem.upsert({
     where: { key: 'ADMIN_USERS' }, update: {},
-    create: { key: 'ADMIN_USERS', name: '员工配置与管理' },
+    create: { key: 'ADMIN_USERS', name: '用户管理' },
   });
   const menuAdminStores = await prisma.menuItem.upsert({
     where: { key: 'ADMIN_STORES' }, update: {},
     create: { key: 'ADMIN_STORES', name: '店铺管理' },
   });
   const menuOnSaleProducts = await prisma.menuItem.upsert({
-    // (名称已在 P3 修改)
-    where: { key: 'ON_SALE_PRODUCTS' }, update: { name: '店铺在售' },
-    create: { key: 'ON_SALE_PRODUCTS', name: '店铺在售' },
+    where: { key: 'ON_SALE_PRODUCTS' }, update: {},
+    create: { key: 'ON_SALE_PRODUCTS', name: '在售商品' },
   });
   const menuOperationCenter = await prisma.menuItem.upsert({
     where: { key: 'OPERATION_CENTER' }, update: {},
@@ -62,109 +59,36 @@ async function main() {
   });
   const menuFinanceEntry = await prisma.menuItem.upsert({
     where: { key: 'FINANCE_ENTRY' }, update: {},
-    create: { key: 'FINANCE_ENTRY', name: '支出录入' },
+    create: { key: 'FINANCE_ENTRY', name: '财务录入' },
   });
   const menuFinanceView = await prisma.menuItem.upsert({
     where: { key: 'FINANCE_VIEW' }, update: {},
-    create: { key: 'FINANCE_VIEW', name: '支出查询' },
+    create: { key: 'FINANCE_VIEW', name: '财务查看' },
   });
   const menuFinanceExport = await prisma.menuItem.upsert({
     where: { key: 'FINANCE_EXPORT' }, update: {},
-    create: { key: 'FINANCE_EXPORT', name: '支出批量导出' },
+    create: { key: 'FINANCE_EXPORT', name: '财务导出' },
   });
   const menuLogisticsMgmt = await prisma.menuItem.upsert({
     where: { key: 'LOGISTICS_MGMT' }, update: {},
-    create: { key: 'LOGISTICS_MGMT', name: '生产与物流' },
+    create: { key: 'LOGISTICS_MGMT', name: '物流管理' },
   });
-  
-  // ⬇️ --- 【新增：PRODUCT_CATALOG 菜单项】 ---
   const menuProductCatalog = await prisma.menuItem.upsert({
-    where: { key: 'PRODUCT_CATALOG' },
-    update: {},
-    create: { key: 'PRODUCT_CATALOG', name: '产品目录' },
-  });
-  // ⬆️ --- 【新增】 ---
-
-  // (清理旧菜单 - 不变)
-  try {
-    await prisma.menuItem.delete({ where: { key: 'ADMIN_PRODUCTS' } });
-    console.log('旧的 "ADMIN_PRODUCTS" 菜单项已删除。');
-  } catch (e) { /* (忽略错误) */ }
-
-
-  // --- 2. 创建“角色”并【关联菜单】---
-  
-  console.log('正在创建“运营专员”角色...');
-  const roleOperation = await prisma.role.upsert({
-    where: { name: 'operation' },
-    update: { 
-      menus: {
-        connect: [
-          { id: menuDashboard.id },
-          { id: menuSalesData.id }, 
-          { id: menuWeeklyReport.id }, 
-          { id: menuLinks.id },
-          { id: menuOnSaleProducts.id },
-          { id: menuOperationCenter.id },
-          { id: menuReports.id }, 
-          { id: menuCalendar.id },
-          { id: menuFinanceAdmin.id },
-          { id: menuFinanceEntry.id },
-          { id: menuLogisticsMgmt.id },
-          { id: menuProductCatalog.id }, // ⬅️ 【关联】
-        ],
-        disconnect: [ /* (不变) */ ]
-      },
-    },
-    create: {
-      name: 'operation',
-      description: '运营专员',
-      menus: {
-        connect: [
-          { id: menuDashboard.id },
-          { id: menuSalesData.id }, 
-          { id: menuWeeklyReport.id }, 
-          { id: menuLinks.id },
-          { id: menuOnSaleProducts.id },
-          { id: menuOperationCenter.id },
-          { id: menuReports.id }, 
-          { id: menuCalendar.id },
-          { id: menuFinanceAdmin.id },
-          { id: menuFinanceEntry.id },
-          { id: menuLogisticsMgmt.id },
-          { id: menuProductCatalog.id }, // ⬅️ 【关联】
-        ],
-      },
-    },
+    where: { key: 'PRODUCT_CATALOG' }, update: {},
+    create: { key: 'PRODUCT_CATALOG', name: '商品目录' },
   });
 
-  console.log('正在创建“超级管理员”角色...');
+  // --- 修复 WeeklyReport 菜单项 ---
+  const menuWeeklyReport = await prisma.menuItem.upsert({
+    where: { key: 'WEEKLY_REPORT' }, update: {},
+    create: { key: 'WEEKLY_REPORT', name: '周报中心' },
+  });
+
+  // --- 2. 创建角色 (Role) ---
+  console.log('正在创建角色...');
   const roleAdmin = await prisma.role.upsert({
     where: { name: 'admin' },
-    update: { 
-      menus: {
-        connect: [
-          { id: menuDashboard.id },
-          { id: menuSalesData.id },
-          { id: menuWeeklyReport.id }, 
-          { id: menuViewReports.id },
-          { id: menuLinks.id },
-          { id: menuAdminUsers.id },
-          { id: menuAdminStores.id },
-          { id: menuOnSaleProducts.id }, 
-          { id: menuOperationCenter.id },
-          { id: menuReports.id }, 
-          { id: menuCalendar.id }, 
-          { id: menuFinanceAdmin.id },
-          { id: menuFinanceEntry.id },
-          { id: menuFinanceView.id },
-          { id: menuFinanceExport.id },
-          { id: menuLogisticsMgmt.id },
-          { id: menuProductCatalog.id }, // ⬅️ 【关联】
-        ],
-        disconnect: [ /* (不变) */ ]
-      },
-    },
+    update: {},
     create: {
       name: 'admin',
       description: '超级管理员 (拥有所有权限)',
@@ -179,27 +103,27 @@ async function main() {
           { id: menuAdminStores.id },
           { id: menuOnSaleProducts.id },
           { id: menuOperationCenter.id },
-          { id: menuReports.id }, 
-          { id: menuCalendar.id }, 
+          { id: menuReports.id },
+          { id: menuCalendar.id },
           { id: menuFinanceAdmin.id },
           { id: menuFinanceEntry.id },
           { id: menuFinanceView.id },
           { id: menuFinanceExport.id },
           { id: menuLogisticsMgmt.id },
-          { id: menuProductCatalog.id }, // ⬅️ 【关联】
+          { id: menuProductCatalog.id },
         ],
       },
     },
   });
 
-  // --- 3. (不变) 创建您的第一个“超级管理员”用户 ---
+  // --- 3. 创建您的第一个“超级管理员”用户 ---
   const adminPassword = 'your_secure_password123';
   const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
   console.log('正在创建“超级管理员”用户...');
   const adminUser = await prisma.user.upsert({
     where: { username: 'admin' },
-    update: {}, 
+    update: {},
     create: {
       username: 'admin',
       passwordHash: hashedPassword,
@@ -224,7 +148,7 @@ async function main() {
       { code: 'SG', name: 'Singapore' },
       { code: 'OTHER', name: 'Other' },
     ],
-    skipDuplicates: true, 
+    skipDuplicates: true,
   });
 
   console.log('...播种 (Seeding) 完成！');

@@ -84,34 +84,29 @@
         
         <div class="space-y-2">
           <label for="revenue" class="form-label">销售额 *</label>
-          <div class="flex space-x-2">
-             <input type="number" step="0.01" id="revenue" v-model="formOtherData.revenue" required 
-                  class="form-input flex-1" />
-             <select id="currency" v-model="formOtherData.currency" class="form-input w-24">
-                <option value="CNY">CNY</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="THB">THB</option>
-                <option value="PHP">PHP</option>
-                <option value="MYR">MYR</option>
-                <option value="IDR">IDR</option>
-                <option value="VND">VND</option>
-                <option value="SGD">SGD</option>
-             </select>
+          <div class="relative rounded-md shadow-sm">
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+              <span class="text-gray-500 sm:text-sm font-bold">{{ formOtherData.currency || 'CNY' }}</span>
+            </div>
+            <input type="number" step="0.01" id="revenue" v-model="formOtherData.revenue" required 
+                 class="form-input pr-12 text-right font-mono text-lg" placeholder="0.00" />
           </div>
         </div>
 
         <div class="space-y-2">
-          <label for="platformOrderId" class="form-label">平台订单号 (可选)</label>
-          <input type="text" id="platformOrderId" v-model="formOtherData.platformOrderId" 
+          <label for="platformOrderId" class="form-label">平台订单号 *</label>
+          <input type="text" id="platformOrderId" v-model="formOtherData.platformOrderId" required
                  class="form-input" placeholder="例如: 230101ABC..." />
         </div>
 
         <div class="space-y-2">
-          <label for="orderStatus" class="form-label">订单状态 (可选)</label>
-          <input type="text" id="orderStatus" v-model="formOtherData.orderStatus" 
-                 class="form-input" placeholder="例如: Completed" />
+          <label for="orderStatus" class="form-label">订单状态 *</label>
+          <select id="orderStatus" v-model="formOtherData.orderStatus" required class="form-input">
+            <option value="" disabled>请选择状态...</option>
+            <option v-for="status in orderStatusOptions" :key="status" :value="status">
+              {{ status }}
+            </option>
+          </select>
         </div>
         
         <div class="space-y-2 md:col-span-2">
@@ -214,11 +209,35 @@ const storeOptions = computed(() => {
   );
 });
 
-watch(selectedCountry, () => {
+const currencyMap = {
+  'ID': 'IDR',
+  'TH': 'THB',
+  'VN': 'VND',
+  'MY': 'MYR',
+  'PH': 'PHP',
+  'SG': 'SGD',
+  'OTHER': 'USD'
+};
+
+const orderStatusOptions = [
+  'Completed',
+  'Pending',
+  'Cancelled',
+  'Refunded',
+  'Returned'
+];
+
+watch(selectedCountry, (newVal) => {
   selectedPlatform.value = '';
   selectedStoreId.value = '';
   selectedListingId.value = '';
   storeListings.value = [];
+  
+  if (newVal && currencyMap[newVal]) {
+    formOtherData.value.currency = currencyMap[newVal];
+  } else {
+    formOtherData.value.currency = 'USD';
+  }
 });
 
 watch(selectedPlatform, () => {
@@ -272,6 +291,11 @@ const handleSubmit = async () => {
     platformOrderId: formOtherData.value.platformOrderId || null,
     orderStatus: formOtherData.value.orderStatus || null,
   };
+
+  if (!payload.platformOrderId || !payload.orderStatus) {
+      errorMessage.value = '请填写平台订单号和订单状态';
+      return;
+  }
 
   try {
     const response = await apiClient.post('/sales', payload);

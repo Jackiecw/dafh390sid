@@ -4,6 +4,7 @@ const express = require('express');
 const { z } = require('zod');
 const prisma = require('../prismaClient');
 const authMiddleware = require('../authMiddleware');
+const { getRates, countryCurrencyMap, currencySymbols } = require('./datahelpers');
 
 const router = express.Router();
 
@@ -339,6 +340,254 @@ router.put('/sales-data/:id', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: '数据未找到' });
     }
     return res.status(500).json({ error: '服务器内部错误', message: error.message, stack: error.stack });
+  }
+});
+
+router.get('/sales-data/stats', authMiddleware, async (req, res) => {
+  try {
+    const { role, supervisedCountries = [] } = req.user;
+    const { startDate, endDate, countryCode, platform, storeId } = req.query;
+
+    // 1. Determine Target Country & Currency
+    // If countryCode is 'ALL' or not provided (and user is admin), we aggregate everything in CNY.
+    // If countryCode is specific, we show that country's currency + CNY equivalent.
+
+    let targetCurrency = 'CNY';
+    let isMultiCurrency = false;
+
+    if (countryCode && countryCode !== 'ALL') {
+      // Specific country selected
+      const currencyCode = countryCurrencyMap[countryCode];
+      if (currencyCode) {
+        targetCurrency = currencySymbols[currencyCode] || currencyCode;
+      }
+    } else {
+      // All countries (Admin view) -> Aggregate in CNY
+      isMultiCurrency = true;
+    }
+
+    // 2. Fetch Exchange Rates
+    const { rates } = await getRates();
+
+    // Helper: Convert amount to CNY
+    const toCNY = (amount, currency) => {
+      if (!amount) return 0;
+      if (currency === 'CNY') return amount;
+      const rateKey = `CNY_${currency}`;
+      const rate = rates[rateKey];
+      if (rate) return amount / rate; // Rate is 1 CNY = X Foreign, so Foreign / Rate = CNY
+      return 0; // Fallback
+    };
+
+    // Helper: Convert CNY to Target Currency (if needed)
+    // Note: If we are in single country mode, data is likely already in that currency or needs conversion.
+    // But our SalesData has 'currency' field. We should normalize everything to CNY first, then to Target if needed?
+    // Actually, simpler: Normalize EVERYTHING to CNY for aggregation. 
+    // Then if single country view, convert CNY result back to Local (or just sum Local if all records are Local).
+    // But records might be mixed if dirty data. Safest is: Record -> CNY -> Target.
+
+    // 3. Date Ranges for Growth Calculation
+    const currentStart = new Date(startDate);
+    const currentEnd = new Date(endDate);
+
+    // Calculate duration in ms
+    const duration = currentEnd.getTime() - currentStart.getTime();
+
+    // Previous period: Same duration, ending just before currentStart
+    const previousEnd = new Date(currentStart.getTime() - 24 * 60 * 60 * 1000); // 1 day before start
+    const previousStart = new Date(previousEnd.getTime() - duration);
+
+    // 4. Build Where Clause (Base)
+    const buildWhere = (start, end) => {
+      const where = {};
+
+      // Permissions
+      if (role !== 'admin') {
+        const permissionConditions = [];
+        const supervisedCodes = supervisedCountries.map(c => c.code);
+        if (supervisedCodes.length > 0) {
+          permissionConditions.push({ store: { countryCode: { in: supervisedCodes } } });
+        }
+        permissionConditions.push({ enteredById: req.user.userId });
+        where.AND = [{ OR: permissionConditions }];
+      }
+
+      // Filters
+      const storeFilter = {};
+      if (countryCode && countryCode !== 'ALL') storeFilter.countryCode = countryCode;
+      if (platform) storeFilter.platform = platform;
+      if (Object.keys(storeFilter).length > 0) {
+        where.store = { ...where.store, ...storeFilter };
+      }
+      if (storeId) where.storeId = storeId;
+
+      // Date Range
+      const recordDateFilter = buildRecordDateFilter(start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
+      if (recordDateFilter) where.recordDate = recordDateFilter;
+
+      return where;
+    };
+
+    const currentWhere = buildWhere(currentStart, currentEnd);
+    const previousWhere = buildWhere(previousStart, previousEnd);
+
+    // 5. Fetch Data (Current & Previous)
+    // We fetch raw data to handle currency conversion accurately in JS
+    const fetchData = async (where) => {
+      return prisma.salesData.findMany({
+        where,
+        select: {
+          recordDate: true,
+          salesVolume: true,
+          revenue: true,
+          currency: true,
+          store: {
+            select: {
+              name: true,
+              platform: true,
+              country: { select: { code: true, name: true } }
+            }
+          },
+          product: { select: { sku: true } }
+        }
+      });
+    };
+
+    const [currentData, previousData] = await Promise.all([
+      fetchData(currentWhere),
+      fetchData(previousWhere)
+    ]);
+
+    // 6. Aggregation Logic
+    const aggregate = (data) => {
+      let totalGMV_CNY = 0;
+      let totalOrders = 0;
+
+      // For breakdown
+      const trendMap = {};
+      const platformMap = {};
+      const countryMap = {};
+      const storeMap = {};
+      const productMap = {};
+
+      data.forEach(row => {
+        const cnyAmount = toCNY(row.revenue, row.currency);
+        const orders = row.salesVolume || 0;
+
+        totalGMV_CNY += cnyAmount;
+        totalOrders += orders;
+
+        // Trend (CNY)
+        const dateKey = row.recordDate.toISOString().split('T')[0];
+        if (!trendMap[dateKey]) trendMap[dateKey] = { date: dateKey, gmv: 0, orders: 0 };
+        trendMap[dateKey].gmv += cnyAmount;
+        trendMap[dateKey].orders += orders;
+
+        // Platform (CNY)
+        const platform = row.store.platform;
+        if (!platformMap[platform]) platformMap[platform] = 0;
+        platformMap[platform] += cnyAmount;
+
+        // Country (CNY)
+        const country = row.store.country;
+        if (country) {
+          if (!countryMap[country.code]) countryMap[country.code] = { name: country.name, gmv: 0 };
+          countryMap[country.code].gmv += cnyAmount;
+        }
+
+        // Store (CNY)
+        const storeName = row.store.name;
+        if (!storeMap[storeName]) storeMap[storeName] = 0;
+        storeMap[storeName] += cnyAmount;
+
+        // Product (Volume)
+        const sku = row.product.sku;
+        if (!productMap[sku]) productMap[sku] = 0;
+        productMap[sku] += orders;
+      });
+
+      return { totalGMV_CNY, totalOrders, trendMap, platformMap, countryMap, storeMap, productMap };
+    };
+
+    const currentStats = aggregate(currentData);
+    const previousStats = aggregate(previousData);
+
+    // 7. Calculate Growth & Final Formatting
+    const calculateGrowth = (current, previous) => {
+      if (!previous || previous === 0) return current > 0 ? 100 : 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    const currentAOV_CNY = currentStats.totalOrders > 0 ? currentStats.totalGMV_CNY / currentStats.totalOrders : 0;
+    const previousAOV_CNY = previousStats.totalOrders > 0 ? previousStats.totalGMV_CNY / previousStats.totalOrders : 0;
+
+    const summary = {
+      totalGMV: currentStats.totalGMV_CNY, // Default to CNY
+      totalOrders: currentStats.totalOrders,
+      aov: currentAOV_CNY,
+      gmvGrowth: calculateGrowth(currentStats.totalGMV_CNY, previousStats.totalGMV_CNY),
+      ordersGrowth: calculateGrowth(currentStats.totalOrders, previousStats.totalOrders),
+      aovGrowth: calculateGrowth(currentAOV_CNY, previousAOV_CNY),
+      currency: 'CNY',
+      cnyTotalGMV: currentStats.totalGMV_CNY // Redundant but explicit
+    };
+
+    // If specific country, convert GMV/AOV back to local currency for display
+    if (countryCode && countryCode !== 'ALL') {
+      const rateKey = `CNY_${targetCurrency}`;
+      const rate = rates[rateKey]; // 1 CNY = X Local
+      if (rate) {
+        summary.totalGMV = currentStats.totalGMV_CNY * rate;
+        summary.aov = currentAOV_CNY * rate;
+        summary.currency = targetCurrency;
+      }
+    }
+
+    // Format Charts (All in CNY for consistency in comparison, or maybe Local if single country? 
+    // Requirement says: "All countries... only show RMB". "Single country... show local currency".
+    // So charts should follow the summary currency logic.
+
+    const convertToTarget = (cnyAmount) => {
+      if (summary.currency === 'CNY') return cnyAmount;
+      const rateKey = `CNY_${summary.currency}`;
+      const rate = rates[rateKey];
+      return rate ? cnyAmount * rate : cnyAmount;
+    };
+
+    const trend = Object.values(currentStats.trendMap)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .map(item => ({ ...item, gmv: convertToTarget(item.gmv) }));
+
+    const byPlatform = Object.entries(currentStats.platformMap)
+      .map(([platform, gmv]) => ({ platform, gmv: convertToTarget(gmv) }))
+      .sort((a, b) => b.gmv - a.gmv);
+
+    const byCountry = Object.entries(currentStats.countryMap)
+      .map(([code, data]) => ({ code, name: data.name, gmv: convertToTarget(data.gmv) })) // Note: This might be weird if single country view, but single country view only has 1 country bar anyway.
+      .sort((a, b) => b.gmv - a.gmv);
+
+    const topStores = Object.entries(currentStats.storeMap)
+      .map(([name, gmv]) => ({ name, gmv: convertToTarget(gmv) }))
+      .sort((a, b) => b.gmv - a.gmv)
+      .slice(0, 5);
+
+    const topProducts = Object.entries(currentStats.productMap)
+      .map(([sku, volume]) => ({ sku, volume }))
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 5);
+
+    res.json({
+      summary,
+      trend,
+      byPlatform,
+      byCountry,
+      topStores,
+      topProducts
+    });
+
+  } catch (error) {
+    console.error('Get Sales Stats Error:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 });
 
