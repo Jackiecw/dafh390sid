@@ -14,6 +14,29 @@
       </div>
     </section>
 
+    <!-- Country Selection -->
+    <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm" v-if="currentTab !== '导入记录'">
+      <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">选择国家</h3>
+      <div class="flex flex-wrap gap-3">
+        <button
+          v-for="country in availableCountries"
+          :key="country.code"
+          @click="selectedCountry = country.code"
+          :class="[
+            'px-6 py-2 rounded-xl text-sm font-bold transition-all duration-200 border',
+            selectedCountry === country.code
+              ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
+              : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+          ]"
+        >
+          {{ country.name }}
+        </button>
+        <div v-if="availableCountries.length === 0 && !storesLoading" class="text-sm text-gray-500 py-2">
+          暂无可用国家数据
+        </div>
+      </div>
+    </section>
+
     <section class="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
       <nav class="flex flex-wrap gap-3">
         <button
@@ -33,25 +56,68 @@
     </section>
 
     <section class="rounded-3xl border border-[#E5E7EB] bg-white p-6 shadow-sm">
-      <component :is="currentTabComponent" />
+      <component 
+        :is="currentTabComponent" 
+        :selectedCountry="selectedCountry"
+      />
     </section>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import BatchImport from './BatchImport.vue'
 import SalesForm from './SalesForm.vue'
+import ImportHistory from './ImportHistory.vue'
+import useStoreListings from '../composables/useStoreListings'
+import { useAuthStore } from '../stores/auth'
+
+const authStore = useAuthStore()
+const { stores, fetchStores, storesLoading } = useStoreListings()
 
 const tabs = [
   { name: '批量导入', component: BatchImport },
   { name: '手动录入', component: SalesForm },
+  { name: '导入记录', component: ImportHistory },
 ]
 
 const currentTab = ref('批量导入')
+const selectedCountry = ref('')
 
 const currentTabComponent = computed(() => {
   return tabs.find(t => t.name === currentTab.value)?.component
 })
-</script>
 
+const availableCountries = computed(() => {
+  const uniqueCountriesMap = new Map()
+  stores.value.forEach(store => {
+    if (store.country) {
+      uniqueCountriesMap.set(store.country.code, store.country)
+    }
+  })
+  
+  const allUniqueCountries = Array.from(uniqueCountriesMap.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+
+  if (authStore.role === 'admin') {
+    return allUniqueCountries
+  }
+  
+  const userCountryCodes = authStore.operatedCountries || []
+  return allUniqueCountries.filter(country => 
+    userCountryCodes.includes(country.code)
+  )
+})
+
+onMounted(async () => {
+  await fetchStores()
+})
+
+// Auto-select if only one country
+watch(availableCountries, (newVal) => {
+  if (newVal.length === 1 && !selectedCountry.value) {
+    selectedCountry.value = newVal[0].code
+  }
+}, { immediate: true })
+
+</script>

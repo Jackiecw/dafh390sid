@@ -3,15 +3,7 @@
     <!-- Upload Section -->
     <div class="space-y-6">
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div class="input-group">
-                <label for="country">国家</label>
-                <select id="country" v-model="selectedCountry" class="form-input">
-                    <option value="" disabled>请选择国家</option>
-                    <option v-for="country in availableCountries" :key="country.code" :value="country.code">
-                        {{ country.name }}
-                    </option>
-                </select>
-            </div>
+            <!-- Country selection moved to parent -->
             
              <div class="input-group">
                 <label for="store">所属店铺</label>
@@ -19,6 +11,7 @@
                     <option value="" disabled>请选择店铺</option>
                     <option v-for="store in filteredStores" :key="store.id" :value="store.id">{{ store.name }}</option>
                 </select>
+                <p v-if="!selectedCountry" class="text-xs text-red-500 mt-1">请先在上方选择国家</p>
             </div>
 
             <div class="col-span-full">
@@ -191,8 +184,10 @@ import MappingModal from './MappingModal.vue';
 import apiClient from '../api';
 import { useAuthStore } from '../stores/auth';
 
+const props = defineProps(['selectedCountry']);
+
 const authStore = useAuthStore();
-const selectedCountry = ref('');
+// const selectedCountry = ref(''); // Removed, using prop
 const selectedStoreId = ref('');
 const selectedFile = ref(null);
 const isDragging = ref(false);
@@ -200,7 +195,6 @@ const loading = ref(false);
 const submitting = ref(false);
 const previewData = ref([]);
 const stores = ref([]); 
-
 
 // Pagination State
 const currentPage = ref(1);
@@ -226,34 +220,14 @@ watch(previewData, () => {
     currentPage.value = 1;
 });
 
-// Computed: Available Countries based on stores and permissions
-const availableCountries = computed(() => {
-    const uniqueCountriesMap = new Map();
-    stores.value.forEach(store => {
-        if (store.country) {
-            uniqueCountriesMap.set(store.country.code, store.country);
-        }
-    });
-    const allUniqueCountries = Array.from(uniqueCountriesMap.values())
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-    if (authStore.role === 'admin') {
-        return allUniqueCountries; 
-    }
-    const userCountryCodes = authStore.operatedCountries || []; 
-    return allUniqueCountries.filter(country => 
-        userCountryCodes.includes(country.code)
-    );
-});
-
 // Computed: Filtered Stores based on selected country
 const filteredStores = computed(() => {
-    if (!selectedCountry.value) return [];
-    return stores.value.filter(store => store.countryCode === selectedCountry.value);
+    if (!props.selectedCountry) return [];
+    return stores.value.filter(store => store.countryCode === props.selectedCountry);
 });
 
 // Watch: Reset store when country changes
-watch(selectedCountry, () => {
+watch(() => props.selectedCountry, () => {
     selectedStoreId.value = '';
 });
 
@@ -267,10 +241,6 @@ onMounted(async () => {
     }
 });
 
-
-
-
-
 const handleFileSelect = (event) => {
     selectedFile.value = event.target.files[0];
 };
@@ -283,7 +253,7 @@ const handleDrop = (event) => {
 const reset = () => {
     selectedFile.value = null;
     previewData.value = [];
-    selectedCountry.value = '';
+    // selectedCountry.value = ''; // Do not reset prop
     selectedStoreId.value = '';
 };
 
@@ -369,7 +339,6 @@ const confirmImport = async () => {
         
         const response = await apiClient.post('/sales-import/confirm', payload);
         alert(`导入成功! 成功: ${response.data.success}, 失败: ${response.data.failed}`);
-        reset();
         reset();
     } catch (e) {
         console.error("Import failed", e);

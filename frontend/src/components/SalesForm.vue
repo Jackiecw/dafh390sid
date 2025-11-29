@@ -12,16 +12,9 @@
                  class="form-input" />
         </div>
 
-        <div class="space-y-2">
-          <label for="country" class="form-label">国家 *</label>
-          <select id="country" v-model="selectedCountry" required class="form-input">
-            <option disabled value="">
-              {{ isLoadingStores ? '正在加载...' : '请选择国家...' }}
-            </option>
-            <option v-for="country in countryOptions" :key="country.code" :value="country.code">
-              {{ country.name }} ({{ country.code }})
-            </option>
-          </select>
+        <!-- Country selection moved to parent -->
+        <div class="space-y-2" v-if="!selectedCountry">
+           <p class="text-red-500 text-sm font-bold">请先在上方选择国家</p>
         </div>
         
         <div class="space-y-2">
@@ -133,6 +126,8 @@ import { useAuthStore } from '../stores/auth';
 import apiClient from '../api';
 import useStoreListings from '../composables/useStoreListings';
 
+const props = defineProps(['selectedCountry']);
+
 const authStore = useAuthStore();
 const {
   stores,
@@ -146,7 +141,7 @@ const {
 } = useStoreListings();
 const isLoadingStores = storesLoading;
 
-const selectedCountry = ref('');
+// const selectedCountry = ref(''); // Removed, using prop
 const selectedPlatform = ref('');
 const selectedStoreId = ref('');
 const selectedListingId = ref('');
@@ -176,35 +171,15 @@ watch(() => storesError.value, (val) => {
   }
 });
 
-const countryOptions = computed(() => {
-  const uniqueCountriesMap = new Map();
-  stores.value.forEach((store) => {
-    if (store.country) {
-      uniqueCountriesMap.set(store.country.code, store.country);
-    }
-  });
-  const allUniqueCountries = Array.from(uniqueCountriesMap.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-
-  if (authStore.role === 'admin') {
-    return allUniqueCountries;
-  }
-
-  return allUniqueCountries.filter((country) =>
-    permittedCountries.value.includes(country.code)
-  );
-});
-
 const platformOptions = computed(() => {
-  if (!selectedCountry.value) return [];
-  const platforms = getStoresByCountry(selectedCountry.value).map((store) => store.platform);
+  if (!props.selectedCountry) return [];
+  const platforms = getStoresByCountry(props.selectedCountry).map((store) => store.platform);
   return [...new Set(platforms)].sort();
 });
 
 const storeOptions = computed(() => {
-  if (!selectedCountry.value || !selectedPlatform.value) return [];
-  return getStoresByCountryAndPlatform(selectedCountry.value, selectedPlatform.value).sort((a, b) =>
+  if (!props.selectedCountry || !selectedPlatform.value) return [];
+  return getStoresByCountryAndPlatform(props.selectedCountry, selectedPlatform.value).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
 });
@@ -227,7 +202,7 @@ const orderStatusOptions = [
   'Returned'
 ];
 
-watch(selectedCountry, (newVal) => {
+watch(() => props.selectedCountry, (newVal) => {
   selectedPlatform.value = '';
   selectedStoreId.value = '';
   selectedListingId.value = '';

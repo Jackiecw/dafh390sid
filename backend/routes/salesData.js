@@ -229,6 +229,25 @@ router.post('/sales', authMiddleware, async (req, res) => {
     const { recordDate, storeId, productId, listingId, salesVolume, revenue, currency, notes, platformOrderId, orderStatus } = validation.data;
     const userId = req.user.userId;
 
+    // Fetch store to get platform for ImportBatch
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: { platform: true }
+    });
+
+    if (!store) {
+      return res.status(400).json({ error: 'Invalid Store ID' });
+    }
+
+    // Create Import Batch for tracking (Manual Import)
+    const importBatch = await prisma.importBatch.create({
+      data: {
+        platform: store.platform,
+        fileName: `Manual Import - ${new Date().toISOString().split('T')[0]}`,
+        importedById: userId
+      }
+    });
+
     const newSalesData = await prisma.salesData.create({
       data: {
         recordDate: new Date(recordDate),
@@ -242,6 +261,7 @@ router.post('/sales', authMiddleware, async (req, res) => {
         storeId,
         productId,
         listingId: listingId || null,
+        importBatchId: importBatch.id, // Link to batch
       },
     });
     return res.status(201).json(newSalesData);
